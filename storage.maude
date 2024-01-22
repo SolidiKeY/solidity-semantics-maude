@@ -8,11 +8,24 @@ fmod STORAGE{X :: TRIV, Y :: TRIV} is
   sorts Storage{X, Y} .
 
   op [] : -> Storage{X, Y} [ctor] .
-  op write___ : Storage{X, Y} X$Elt Y$Elt -> Storage{X, Y} [ctor] .
+  op write : Storage{X, Y} X$Elt Y$Elt -> Storage{X, Y} [ctor] .
+
+  vars k1 k2 : X$Elt .
+  vars STORAGE : Storage{X, Y} .
+  vars v1 v2 : Y$Elt .
+
+  eq write(write(STORAGE, k1, v1), k1, v2) = write(STORAGE, k1, v2) .
+  ceq write (write(STORAGE, k1, v1), k2, v2) = write(write(STORAGE, k2, v2), k1, v1)
+    if not (k1 == k2) [nonexec] .
+
 endfm
 
 fmod STORAGE-TEST is
   protecting STORAGE{Nat, Nat} .
 endfm
 
-red write [] 0 (1 + 1) .
+red write([], 0, (1 + 1)) .
+
+red write(write([], 0, 1), 0, 2) .
+
+red write(write([], 0, 1), 3, 2) .
