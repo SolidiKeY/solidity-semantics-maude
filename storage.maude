@@ -1,6 +1,4 @@
 fmod STORAGE{X :: TRIV, Y :: DEFAULT} is
-  protecting NAT .
-
   sorts Storage{X, Y} .
 
   op [] : -> Storage{X, Y} [ctor] .
