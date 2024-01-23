@@ -1,4 +1,4 @@
-fmod STORAGE{X :: TRIV, Y :: TRIV} is
+fmod STORAGE{X :: TRIV, Y :: DEFAULT} is
   protecting NAT .
 
   sorts Storage{X, Y} .
@@ -18,13 +18,12 @@ fmod STORAGE{X :: TRIV, Y :: TRIV} is
 
   eq read(write(STORAGE, k1, v1),k2) = if k1 == k2 then v1 else read(STORAGE, k2) fi .
 
+  eq read([], k1) = 0 .
 
 endfm
 
 fmod STORAGE-TEST is
-  vars X : Nat .
-  protecting STORAGE{Nat, Nat} .
-  eq read([], X) = 0 .
+  protecting STORAGE{Nat, Nat0} .
 endfm
 
 
@@ -36,4 +35,4 @@ red write(write([], 0, 1), 3, 2) .
 
 red read(write([],0,1),0) .
 
-red read(write([],0,1),1) .
+red read(write([],0,1),2) .
