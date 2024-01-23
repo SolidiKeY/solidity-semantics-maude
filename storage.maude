@@ -1,7 +1,3 @@
----- from the book All About Maude
----- from the Maude Manual
----- by the Maude team
-
 fmod STORAGE{X :: TRIV, Y :: TRIV} is
   protecting NAT .
 
