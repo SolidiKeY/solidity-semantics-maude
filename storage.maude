@@ -1,23 +1,23 @@
-fmod STORAGE{X :: TRIV, Y :: DEFAULT} is
-  sorts Storage{X, Y} .
+fmod MAPS{X :: TRIV, Y :: DEFAULT} is
+  sorts Map{X, Y} .
 
-  op [] : -> Storage{X, Y} [ctor] .
-  op write : Storage{X, Y} X$Elt Y$Elt -> Storage{X, Y} [ctor] .
+  op [] : -> Map{X, Y} [ctor] .
+  op write : Map{X, Y} X$Elt Y$Elt -> Map{X, Y} [ctor] .
 
   vars k1 k2 : X$Elt .
-  vars STORAGE : Storage{X, Y} .
+  vars MAPS : Map{X, Y} .
   vars v1 v2 : Y$Elt .
 
-  op read : Storage{X, Y} X$Elt -> Y$Elt .
+  op read : Map{X, Y} X$Elt -> Y$Elt .
 
-  eq read(write(STORAGE, k1, v1),k2) = if k1 == k2 then v1 else read(STORAGE, k2) fi .
+  eq read(write(MAPS, k1, v1),k2) = if k1 == k2 then v1 else read(MAPS, k2) fi .
 
   eq read([], k1) = 0 .
 
 endfm
 
-fmod STORAGE-TEST is
-  protecting STORAGE{Nat, Nat0} .
+fmod MAPS-TEST is
+  protecting MAPS{Nat, Nat0} .
 endfm
 
 
