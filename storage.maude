@@ -1,23 +1,23 @@
-fmod MAPS{X :: TRIV, Y :: DEFAULT} is
+fmod MAP{X :: TRIV, Y :: DEFAULT} is
   sorts Map{X, Y} .
 
   op emptyMap : -> Map{X, Y} [ctor] .
   op write : Map{X, Y} X$Elt Y$Elt -> Map{X, Y} [ctor] .
 
   vars k1 k2 : X$Elt .
-  vars MAPS : Map{X, Y} .
+  vars MAP : Map{X, Y} .
   vars v1 v2 : Y$Elt .
 
   op read : Map{X, Y} X$Elt -> Y$Elt .
 
-  eq read(write(MAPS, k1, v1),k2) = if k1 == k2 then v1 else read(MAPS, k2) fi .
+  eq read(write(MAP, k1, v1),k2) = if k1 == k2 then v1 else read(MAP, k2) fi .
 
   eq read(emptyMap, k1) = 0 .
 
 endfm
 
-fmod MAPS-TEST is
-  protecting MAPS{Nat, Nat0} .
+fmod MAP-TEST is
+  protecting MAP{Nat, Nat0} .
 endfm
 
 
