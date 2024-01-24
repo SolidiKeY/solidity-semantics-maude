@@ -8,10 +8,6 @@ fmod STORAGE{X :: TRIV, Y :: DEFAULT} is
   vars STORAGE : Storage{X, Y} .
   vars v1 v2 : Y$Elt .
 
-  eq write(write(STORAGE, k1, v1), k1, v2) = write(STORAGE, k1, v2) .
-  ceq write (write(STORAGE, k1, v1), k2, v2) = write(write(STORAGE, k2, v2), k1, v1)
-    if k1 =/= k2 [nonexec] .
-
   op read : Storage{X, Y} X$Elt -> Y$Elt .
 
   eq read(write(STORAGE, k1, v1),k2) = if k1 == k2 then v1 else read(STORAGE, k2) fi .
