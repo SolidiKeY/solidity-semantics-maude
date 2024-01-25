@@ -16,7 +16,6 @@ fmod TREELIST{X :: TRIV} is
   op write : List{X} List{Nat} Item{X} -> List{X} .
   eq write(xs, [n], y) = write(xs, n, y) .
   eq write([x], [0 En], y) = [ write(x, En, y) ] .
-  *** eq write([x], [(s n) En], y) = append([x], write(E, [n En], y)) .
   eq write([x E], [0 En], y) = [write(x, En, y) E] .
   eq write([x E], [(s n) En], y) = append([x], write([E], [n En], y)) .
 
