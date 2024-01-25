@@ -1,4 +1,4 @@
-fmod MAP{X :: TRIV, Y :: DEFAULT} is
+fmod MapDict{X :: TRIV, Y :: DEFAULT} is
   sorts Map{X, Y} .
 
   op emptyMap : -> Map{X, Y} [ctor] .
@@ -17,7 +17,7 @@ fmod MAP{X :: TRIV, Y :: DEFAULT} is
 endfm
 
 fmod MAP-TEST is
-  protecting MAP{Nat, Nat0} .
+  protecting MapDict{Nat, Nat0} .
 endfm
 
 
