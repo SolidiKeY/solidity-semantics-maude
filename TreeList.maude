@@ -2,11 +2,23 @@ fmod TREELIST{X :: TRIV} is
   pr LIST*{X} .
   pr LIST*{Nat} .
 
-  vars x y : X$Elt .
+  vars x y : Item{X} .
+  vars xs : List{X} .
+  vars E : PreList{X} .
+  vars n : Nat .
+  vars En : PreList{Nat} .
 
-  op write : List{X} Nat X$Elt -> List{X} .
+  op write : List{X} Nat Item{X} -> List{X} .
   eq write([x], 0, y) = [y] .
+  eq write([x E], 0, y) = append([y], [E]) .
+  eq write([x E], s n, y) = append([x], write([E], n, y)) .
 
+  op write : List{X} List{Nat} Item{X} -> List{X} .
+  eq write(xs, [n], y) = write(xs, n, y) .
+  eq write([x], [0 En], y) = [ write(x, En, y) ] .
+  *** eq write([x], [(s n) En], y) = append([x], write(E, [n En], y)) .
+  eq write([x E], [0 En], y) = [write(x, En, y) E] .
+  eq write([x E], [(s n) En], y) = append([x], write([E], [n En], y)) .
 
 endfm
 
@@ -18,3 +30,18 @@ endfm
 red [[0 0] [1 1]] .
 
 red write([0], 0, 1) .
+
+red write([0 1], 0, 2) .
+
+red write([0 1], 1, 2) .
+
+red write([0 1], [1], 2) .
+
+red write([0 1], [0], 2) .
+
+red write([[0]], [0 0], 1) .
+
+red write([[1 2] [3 4]], [0 0], 5) .
+red write([[1 2] [3 4]], [1 0], 5) .
+red write([[1 2] [3 4]], [0 1], 5) .
+red write([[1 2] [3 4]], [1 1], 5) .
