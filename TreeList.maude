@@ -1,0 +1,20 @@
+fmod TREELIST{X :: TRIV} is
+  pr LIST*{X} .
+  pr LIST*{Nat} .
+
+  vars x y : X$Elt .
+
+  op write : List{X} Nat X$Elt -> List{X} .
+  eq write([x], 0, y) = [y] .
+
+
+endfm
+
+
+fmod TEST-TREELIST is
+  protecting TREELIST{Nat} .
+endfm
+
+red [[0 0] [1 1]] .
+
+red write([0], 0, 1) .
