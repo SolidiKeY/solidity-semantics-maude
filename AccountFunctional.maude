@@ -1,0 +1,18 @@
+fmod ACC-FUNCTIONAL is
+  pr STRING .
+  pr INT .
+  sort Account .
+  op createAccount : Int Bool -> Account .
+
+  sort AccountIdentifier .
+  op balance : -> AccountIdentifier .
+  op isOpen : -> AccountIdentifier .
+
+  sort Person .
+  op createPerson : String Account -> Person .
+
+  sort PersonIdentifier .
+  op name : -> PersonIdentifier .
+  op account : -> PersonIdentifier .
+
+endfm
