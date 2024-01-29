@@ -52,6 +52,20 @@ fmod ACC-FUNCTIONAL is
 
   op writeAccount : Person PersonIdentifier Account -> Person .
   eq writeAccount(Person(name, acc), $account, newAcc) = Person(name, newAcc) .
+
+  vars listId : ListId .
+
+  op writeInt : Person ListId Int -> Person .
+  eq writeInt(Person(name, acc), $account :: listId, newBalance) = Person(name, writeInt(acc, listId, newBalance)) .
+
+  op writeInt : Account ListId Int -> Account .
+  eq writeInt(acc,$balance :: [], newBalance) = writeInt(acc, $balance, newBalance) .
+
+  op writeBool : Person ListId Bool -> Person .
+  eq writeBool(Person(name, acc), $account :: listId, isOpenNew) = Person(name, writeBool(acc, listId, isOpenNew)) .
+
+  op writeBool : Account ListId Bool -> Account .
+  eq writeBool(acc, $isOpen :: [], isOpenNew) = writeBool(acc, $isOpen, isOpenNew) .
 endfm
 
 fmod ACC-TESTE is
@@ -81,3 +95,6 @@ red writeBool(aliceAcc, $isOpen, false) .
 
 red writeString(alice, $name, "Ana") .
 red writeAccount(alice, $account, bobAcc) .
+
+red writeInt(alice, $account :: $balance :: [], 100) .
+red writeBool(alice, $account :: $isOpen :: [], false) .
