@@ -11,7 +11,7 @@ fmod ACC-FUNCTIONAL is
 
   vars balance newBalance : Int .
   vars isOpen isOpenNew : Bool .
-  vars acc : Account .
+  vars acc newAcc : Account .
 
   op getIntField : Account AccountIdentifier -> Int .
   eq getIntField(Account(balance, isOpen), $balance) = balance .
@@ -50,6 +50,8 @@ fmod ACC-FUNCTIONAL is
   op writeString : Person PersonIdentifier String -> Person .
   eq writeString(Person(name, acc), $name, newName) = Person(newName, acc) .
 
+  op writeAccount : Person PersonIdentifier Account -> Person .
+  eq writeAccount(Person(name, acc), $account, newAcc) = Person(name, newAcc) .
 endfm
 
 fmod ACC-TESTE is
@@ -78,3 +80,4 @@ red writeInt(aliceAcc, $balance, 100) .
 red writeBool(aliceAcc, $isOpen, false) .
 
 red writeString(alice, $name, "Ana") .
+red writeAccount(alice, $account, bobAcc) .
