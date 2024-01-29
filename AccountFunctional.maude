@@ -2,7 +2,7 @@ fmod ACC-FUNCTIONAL is
   pr STRING .
   pr INT .
   sort Account .
-  op createAccount : Int Bool -> Account .
+  op Account : Int Bool -> Account .
 
 
   sort AccountIdentifier .
@@ -14,13 +14,13 @@ fmod ACC-FUNCTIONAL is
   vars acc : Account .
 
   op getIntField : Account AccountIdentifier -> Int .
-  eq getIntField(createAccount(balance, isOpen), $balance) = balance .
+  eq getIntField(Account(balance, isOpen), $balance) = balance .
 
   op getBoolField : Account AccountIdentifier -> Bool .
-  eq getBoolField(createAccount(balance, isOpen), $isOpen) = isOpen .
+  eq getBoolField(Account(balance, isOpen), $isOpen) = isOpen .
 
   sort Person .
-  op createPerson : String Account -> Person .
+  op Person : String Account -> Person .
 
   vars name newName : String .
 
@@ -29,42 +29,42 @@ fmod ACC-FUNCTIONAL is
   op $account : -> PersonIdentifier .
 
   op getStringField : Person PersonIdentifier -> String .
-  eq getStringField(createPerson(name, acc), $name) = name .
+  eq getStringField(Person(name, acc), $name) = name .
 
   op getAccountField : Person PersonIdentifier -> Account .
-  eq getAccountField(createPerson(name, acc), $account) = acc .
+  eq getAccountField(Person(name, acc), $account) = acc .
 
   sort Identifier .
   subsort AccountIdentifier PersonIdentifier < Identifier .
 
   op writeInt : Account AccountIdentifier Int -> Account .
-  eq writeInt(createAccount(balance, isOpen),$balance, newBalance) = createAccount(newBalance, isOpen) .
+  eq writeInt(Account(balance, isOpen),$balance, newBalance) = Account(newBalance, isOpen) .
 
   op writeBool : Account AccountIdentifier Bool -> Account .
-  eq writeBool(createAccount(balance, isOpen),$isOpen, isOpenNew) = createAccount(balance, isOpenNew) .
+  eq writeBool(Account(balance, isOpen),$isOpen, isOpenNew) = Account(balance, isOpenNew) .
 
   sort ListId .
   op [] : -> ListId .
   op _::_ : Identifier ListId -> ListId .
 
   op writeString : Person PersonIdentifier String -> Person .
-  eq writeString(createPerson(name, acc), $name, newName) = createPerson(newName, acc) .
+  eq writeString(Person(name, acc), $name, newName) = Person(newName, acc) .
 
 endfm
 
 fmod ACC-TESTE is
     pr ACC-FUNCTIONAL .
     op aliceAcc : -> Account .
-    eq aliceAcc = createAccount(10, true) .
+    eq aliceAcc = Account(10, true) .
 
     op alice : -> Person .
-    eq alice = createPerson("Alice", aliceAcc) .
+    eq alice = Person("Alice", aliceAcc) .
 
     op bobAcc : -> Account .
-    eq bobAcc = createAccount(20, false) .
+    eq bobAcc = Account(20, false) .
 
     op bobAcc : -> Person .
-    eq bobAcc = createPerson("Bob", bobAcc) .
+    eq bobAcc = Person("Bob", bobAcc) .
 endfm
 
 red getIntField(aliceAcc, $balance) .
