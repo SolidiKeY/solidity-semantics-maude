@@ -13,12 +13,6 @@ fmod ACC-FUNCTIONAL is
   vars isOpen isOpenNew : Bool .
   vars acc newAcc : Account .
 
-  op getIntField : Account AccountIdentifier -> Int .
-  eq getIntField(Account(balance, isOpen), $balance) = balance .
-
-  op getBoolField : Account AccountIdentifier -> Bool .
-  eq getBoolField(Account(balance, isOpen), $isOpen) = isOpen .
-
   sort Person .
   op Person : String Account -> Person .
 
@@ -27,12 +21,6 @@ fmod ACC-FUNCTIONAL is
   sort PersonIdentifier .
   op $name : -> PersonIdentifier .
   op $account : -> PersonIdentifier .
-
-  op getStringField : Person PersonIdentifier -> String .
-  eq getStringField(Person(name, acc), $name) = name .
-
-  op getAccountField : Person PersonIdentifier -> Account .
-  eq getAccountField(Person(name, acc), $account) = acc .
 
   sort Identifier .
   subsort AccountIdentifier PersonIdentifier < Identifier .
@@ -66,6 +54,21 @@ fmod ACC-FUNCTIONAL is
 
   op writeBool : Account ListId Bool -> Account .
   eq writeBool(acc, $isOpen :: [], isOpenNew) = writeBool(acc, $isOpen, isOpenNew) .
+
+  *** Reading
+
+  op readString : Person PersonIdentifier -> String .
+  eq readString(Person(name, acc), $name) = name .
+
+  op readAccount : Person PersonIdentifier -> Account .
+  eq readAccount(Person(name, acc), $account) = acc .
+
+  op readInt : Account AccountIdentifier -> Int .
+  eq readInt(Account(balance, isOpen), $balance) = balance .
+
+  op readBool : Account AccountIdentifier -> Bool .
+  eq readBool(Account(balance, isOpen), $isOpen) = isOpen .
+
 endfm
 
 fmod ACC-TESTE is
@@ -83,12 +86,12 @@ fmod ACC-TESTE is
   eq bobAcc = Person("Bob", bobAcc) .
 endfm
 
-red getIntField(aliceAcc, $balance) .
-red getBoolField(aliceAcc, $isOpen) .
-red getStringField(alice, $name) .
-red getAccountField(alice, $account) .
+red readInt(aliceAcc, $balance) .
+red readBool(aliceAcc, $isOpen) .
+red readString(alice, $name) .
+red readAccount(alice, $account) .
 
-red getIntField(getAccountField(alice, $account), $balance) .
+red readInt(readAccount(alice, $account), $balance) .
 
 red writeInt(aliceAcc, $balance, 100) .
 red writeBool(aliceAcc, $isOpen, false) .
