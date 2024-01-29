@@ -4,15 +4,77 @@ fmod ACC-FUNCTIONAL is
   sort Account .
   op createAccount : Int Bool -> Account .
 
+
   sort AccountIdentifier .
-  op balance : -> AccountIdentifier .
-  op isOpen : -> AccountIdentifier .
+  op $balance : -> AccountIdentifier .
+  op $isOpen : -> AccountIdentifier .
+
+  vars balance newBalance : Int .
+  vars isOpen isOpenNew : Bool .
+  vars acc : Account .
+
+  op getIntField : Account AccountIdentifier -> Int .
+  eq getIntField(createAccount(balance, isOpen), $balance) = balance .
+
+  op getBoolField : Account AccountIdentifier -> Bool .
+  eq getBoolField(createAccount(balance, isOpen), $isOpen) = isOpen .
 
   sort Person .
   op createPerson : String Account -> Person .
 
+  vars name newName : String .
+
   sort PersonIdentifier .
-  op name : -> PersonIdentifier .
-  op account : -> PersonIdentifier .
+  op $name : -> PersonIdentifier .
+  op $account : -> PersonIdentifier .
+
+  op getStringField : Person PersonIdentifier -> String .
+  eq getStringField(createPerson(name, acc), $name) = name .
+
+  op getAccountField : Person PersonIdentifier -> Account .
+  eq getAccountField(createPerson(name, acc), $account) = acc .
+
+  sort Identifier .
+  subsort AccountIdentifier PersonIdentifier < Identifier .
+
+  op writeInt : Account AccountIdentifier Int -> Account .
+  eq writeInt(createAccount(balance, isOpen),$balance, newBalance) = createAccount(newBalance, isOpen) .
+
+  op writeBool : Account AccountIdentifier Bool -> Account .
+  eq writeBool(createAccount(balance, isOpen),$isOpen, isOpenNew) = createAccount(balance, isOpenNew) .
+
+  sort ListId .
+  op [] : -> ListId .
+  op _::_ : Identifier ListId -> ListId .
+
+  op writeString : Person PersonIdentifier String -> Person .
+  eq writeString(createPerson(name, acc), $name, newName) = createPerson(newName, acc) .
 
 endfm
+
+fmod ACC-TESTE is
+    pr ACC-FUNCTIONAL .
+    op aliceAcc : -> Account .
+    eq aliceAcc = createAccount(10, true) .
+
+    op alice : -> Person .
+    eq alice = createPerson("Alice", aliceAcc) .
+
+    op bobAcc : -> Account .
+    eq bobAcc = createAccount(20, false) .
+
+    op bobAcc : -> Person .
+    eq bobAcc = createPerson("Bob", bobAcc) .
+endfm
+
+red getIntField(aliceAcc, $balance) .
+red getBoolField(aliceAcc, $isOpen) .
+red getStringField(alice, $name) .
+red getAccountField(alice, $account) .
+
+red getIntField(getAccountField(alice, $account), $balance) .
+
+red writeInt(aliceAcc, $balance, 100) .
+red writeBool(aliceAcc, $isOpen, false) .
+
+red writeString(alice, $name, "Ana") .
