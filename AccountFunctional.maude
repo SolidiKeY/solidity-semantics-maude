@@ -16,6 +16,7 @@ fmod ACC-FUNCTIONAL is
   sort Person .
   op Person : String Account -> Person .
 
+  vars person : Person .
   vars name newName : String .
 
   sort PersonIdentifier .
@@ -25,11 +26,15 @@ fmod ACC-FUNCTIONAL is
   sort Identifier .
   subsort AccountIdentifier PersonIdentifier < Identifier .
 
+  *** Writing
+
   op writeInt : Account AccountIdentifier Int -> Account .
   eq writeInt(Account(balance, isOpen),$balance, newBalance) = Account(newBalance, isOpen) .
 
   op writeBool : Account AccountIdentifier Bool -> Account .
   eq writeBool(Account(balance, isOpen),$isOpen, isOpenNew) = Account(balance, isOpenNew) .
+
+  **** Writing Lists
 
   sort ListId .
   op [] : -> ListId .
@@ -69,6 +74,29 @@ fmod ACC-FUNCTIONAL is
   op readBool : Account AccountIdentifier -> Bool .
   eq readBool(Account(balance, isOpen), $isOpen) = isOpen .
 
+  **** Reading Lists
+
+  op readString : Person ListId -> String .
+  eq readString(person, $name :: []) = readString(person, $name) .
+
+  op readInt : Account ListId -> Int .
+  eq readInt(acc, $balance :: []) = readInt(acc, $balance) .
+
+  op readBool : Account ListId -> Bool .
+  eq readBool(acc, $isOpen :: []) = readBool(acc, $isOpen) .
+
+  op readInt : Person ListId -> Int .
+  eq readInt(Person(name, acc), $account :: listId) = readInt(acc, listId) .
+
+  op readBool : Person ListId -> Bool .
+  eq readBool(Person(name, acc), $account :: listId) = readBool(acc, listId) .
+
+
+  op readAccount : Account ListId -> Account .
+  eq readAccount(acc, []) = acc .
+
+  op readPerson : Person ListId -> Person .
+  eq readPerson(person, []) = person .
 endfm
 
 fmod ACC-TESTE is
@@ -86,12 +114,6 @@ fmod ACC-TESTE is
   eq bobAcc = Person("Bob", bobAcc) .
 endfm
 
-red readInt(aliceAcc, $balance) .
-red readBool(aliceAcc, $isOpen) .
-red readString(alice, $name) .
-red readAccount(alice, $account) .
-
-red readInt(readAccount(alice, $account), $balance) .
 
 red writeInt(aliceAcc, $balance, 100) .
 red writeBool(aliceAcc, $isOpen, false) .
@@ -101,3 +123,17 @@ red writeAccount(alice, $account, bobAcc) .
 
 red writeInt(alice, $account :: $balance :: [], 100) .
 red writeBool(alice, $account :: $isOpen :: [], false) .
+
+
+red readInt(aliceAcc, $balance) .
+red readBool(aliceAcc, $isOpen) .
+red readString(alice, $name) .
+red readAccount(alice, $account) .
+
+red readInt(readAccount(alice, $account), $balance) .
+
+red readInt(alice, $account :: $balance :: []) .
+red readBool(alice, $account :: $isOpen :: []) .
+
+red readPerson(alice, []) .
+red readAccount(bobAcc, []) .
