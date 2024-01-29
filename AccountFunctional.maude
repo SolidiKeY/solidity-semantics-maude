@@ -53,18 +53,18 @@ fmod ACC-FUNCTIONAL is
 endfm
 
 fmod ACC-TESTE is
-    pr ACC-FUNCTIONAL .
-    op aliceAcc : -> Account .
-    eq aliceAcc = Account(10, true) .
+  pr ACC-FUNCTIONAL .
+  op aliceAcc : -> Account .
+  eq aliceAcc = Account(10, true) .
 
-    op alice : -> Person .
-    eq alice = Person("Alice", aliceAcc) .
+  op alice : -> Person .
+  eq alice = Person("Alice", aliceAcc) .
 
-    op bobAcc : -> Account .
-    eq bobAcc = Account(20, false) .
+  op bobAcc : -> Account .
+  eq bobAcc = Account(20, false) .
 
-    op bobAcc : -> Person .
-    eq bobAcc = Person("Bob", bobAcc) .
+  op bobAcc : -> Person .
+  eq bobAcc = Person("Bob", bobAcc) .
 endfm
 
 red getIntField(aliceAcc, $balance) .
