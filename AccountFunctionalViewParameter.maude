@@ -24,7 +24,7 @@ fmod ACC-FUNCTIONAL{IDENTIFIER :: TRIV} is
   op $account : -> PersonIdentifier .
 
   sort Identifier .
-  subsort AccountIdentifier PersonIdentifier < IDENTIFIER$Elt .
+  subsort AccountIdentifier PersonIdentifier < IDENTIFIER$Elt < Identifier .
 
   *** Writing
 
@@ -38,7 +38,7 @@ fmod ACC-FUNCTIONAL{IDENTIFIER :: TRIV} is
 
   sort ListId .
   op [] : -> ListId .
-  op _::_ : IDENTIFIER$Elt ListId -> ListId .
+  op _::_ : Identifier ListId -> ListId .
 
   op writeString : Person PersonIdentifier String -> Person .
   eq writeString(Person(name, acc), $name, newName) = Person(newName, acc) .
