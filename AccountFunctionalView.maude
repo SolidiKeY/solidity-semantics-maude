@@ -41,7 +41,7 @@ endv
 
 fmod ACC-FUNCTIONAL-CONT is
   including ACC-FUNCTIONAL .
-  pr LIST{Identifier} .
+  pr LIST-CONS{Identifier} .
 
   vars balance newBalance : Int .
   vars isOpen isOpenNew : Bool .
@@ -49,15 +49,7 @@ fmod ACC-FUNCTIONAL-CONT is
   vars person : Person .
   vars name newName : String .
 
-
   **** Writing Lists
-
-  op myList : -> List{Identifier} .
-  eq myList = $name $account .
-
-  sort ListId .
-  op [] : -> ListId .
-  op _::_ : Identifier ListId -> ListId .
 
   op writeString : Person PersonIdentifier String -> Person .
   eq writeString(Person(name, acc), $name, newName) = Person(newName, acc) .
@@ -65,18 +57,18 @@ fmod ACC-FUNCTIONAL-CONT is
   op writeAccount : Person PersonIdentifier Account -> Person .
   eq writeAccount(Person(name, acc), $account, newAcc) = Person(name, newAcc) .
 
-  vars listId : ListId .
+  vars listId : [List{Identifier}] .
 
-  op writeInt : Person ListId Int -> Person .
+  op writeInt : Person List{Identifier} Int -> Person .
   eq writeInt(Person(name, acc), $account :: listId, newBalance) = Person(name, writeInt(acc, listId, newBalance)) .
 
-  op writeInt : Account ListId Int -> Account .
+  op writeInt : Account List{Identifier} Int -> Account .
   eq writeInt(acc,$balance :: [], newBalance) = writeInt(acc, $balance, newBalance) .
 
-  op writeBool : Person ListId Bool -> Person .
+  op writeBool : Person List{Identifier} Bool -> Person .
   eq writeBool(Person(name, acc), $account :: listId, isOpenNew) = Person(name, writeBool(acc, listId, isOpenNew)) .
 
-  op writeBool : Account ListId Bool -> Account .
+  op writeBool : Account List{Identifier} Bool -> Account .
   eq writeBool(acc, $isOpen :: [], isOpenNew) = writeBool(acc, $isOpen, isOpenNew) .
 
   *** Reading
@@ -95,26 +87,26 @@ fmod ACC-FUNCTIONAL-CONT is
 
   **** Reading Lists
 
-  op readString : Person ListId -> String .
+  op readString : Person [NeList{Identifier}] -> String .
   eq readString(person, $name :: []) = readString(person, $name) .
 
-  op readInt : Account ListId -> Int .
+  op readInt : Account [NeList{Identifier}] -> Int .
   eq readInt(acc, $balance :: []) = readInt(acc, $balance) .
 
-  op readBool : Account ListId -> Bool .
+  op readBool : Account [NeList{Identifier}] -> Bool .
   eq readBool(acc, $isOpen :: []) = readBool(acc, $isOpen) .
 
-  op readInt : Person ListId -> Int .
+  op readInt : Person [NeList{Identifier}] -> Int .
   eq readInt(Person(name, acc), $account :: listId) = readInt(acc, listId) .
 
-  op readBool : Person ListId -> Bool .
+  op readBool : Person [NeList{Identifier}] -> Bool .
   eq readBool(Person(name, acc), $account :: listId) = readBool(acc, listId) .
 
 
-  op readAccount : Account ListId -> Account .
+  op readAccount : Account [List{Identifier}] -> Account .
   eq readAccount(acc, []) = acc .
 
-  op readPerson : Person ListId -> Person .
+  op readPerson : Person [List{Identifier}] -> Person .
   eq readPerson(person, []) = person .
 endfm
 
@@ -156,5 +148,3 @@ red readBool(alice, $account :: $isOpen :: []) .
 
 red readPerson(alice, []) .
 red readAccount(bobAcc, []) .
-
-red myList .
