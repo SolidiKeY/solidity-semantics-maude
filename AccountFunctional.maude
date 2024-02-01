@@ -110,8 +110,8 @@ fmod ACC-TESTE is
   op bobAcc : -> Account .
   eq bobAcc = Account(20, false) .
 
-  op bobAcc : -> Person .
-  eq bobAcc = Person("Bob", bobAcc) .
+  op bob : -> Person .
+  eq bob = Person("Bob", bobAcc) .
 endfm
 
 

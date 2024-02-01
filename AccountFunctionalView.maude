@@ -41,7 +41,7 @@ endv
 
 fmod ACC-FUNCTIONAL-CONT is
   including ACC-FUNCTIONAL .
-  pr LIST-CONS{Identifier} .
+  pr LIST{Identifier} * (op __ to _::_) * (op nil to []) .
 
   vars balance newBalance : Int .
   vars isOpen isOpenNew : Bool .
@@ -118,11 +118,12 @@ fmod ACC-TESTE is
   op alice : -> Person .
   eq alice = Person("Alice", aliceAcc) .
 
+  op bob : -> Person .
+  eq bob = Person("Bob", bobAcc) .
+
   op bobAcc : -> Account .
   eq bobAcc = Account(20, false) .
 
-  op bobAcc : -> Person .
-  eq bobAcc = Person("Bob", bobAcc) .
 endfm
 
 
