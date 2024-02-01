@@ -36,7 +36,7 @@ fmod ACC-FUNCTIONAL is
 endfm
 
 view Identifier from TRIV to ACC-FUNCTIONAL is
-  sort Elt to PersonIdentifier .
+  sort Elt to Identifier .
 endv
 
 fmod ACC-FUNCTIONAL-CONT is
@@ -57,7 +57,7 @@ fmod ACC-FUNCTIONAL-CONT is
   op writeAccount : Person PersonIdentifier Account -> Person .
   eq writeAccount(Person(name, acc), $account, newAcc) = Person(name, newAcc) .
 
-  vars listId : [List{Identifier}] .
+  vars listId : List{Identifier} .
 
   op writeInt : Person List{Identifier} Int -> Person .
   eq writeInt(Person(name, acc), $account :: listId, newBalance) = Person(name, writeInt(acc, listId, newBalance)) .
@@ -87,26 +87,26 @@ fmod ACC-FUNCTIONAL-CONT is
 
   **** Reading Lists
 
-  op readString : Person [NeList{Identifier}] -> String .
+  op readString : Person NeList{Identifier} -> String .
   eq readString(person, $name :: []) = readString(person, $name) .
 
-  op readInt : Account [NeList{Identifier}] -> Int .
+  op readInt : Account NeList{Identifier} -> Int .
   eq readInt(acc, $balance :: []) = readInt(acc, $balance) .
 
-  op readBool : Account [NeList{Identifier}] -> Bool .
+  op readBool : Account NeList{Identifier} -> Bool .
   eq readBool(acc, $isOpen :: []) = readBool(acc, $isOpen) .
 
-  op readInt : Person [NeList{Identifier}] -> Int .
+  op readInt : Person NeList{Identifier} -> Int .
   eq readInt(Person(name, acc), $account :: listId) = readInt(acc, listId) .
 
-  op readBool : Person [NeList{Identifier}] -> Bool .
+  op readBool : Person NeList{Identifier} -> Bool .
   eq readBool(Person(name, acc), $account :: listId) = readBool(acc, listId) .
 
 
-  op readAccount : Account [List{Identifier}] -> Account .
+  op readAccount : Account List{Identifier} -> Account .
   eq readAccount(acc, []) = acc .
 
-  op readPerson : Person [List{Identifier}] -> Person .
+  op readPerson : Person List{Identifier} -> Person .
   eq readPerson(person, []) = person .
 endfm
 
