@@ -1,6 +1,7 @@
 fmod ACC-FUNCTIONAL{IDENTIFIER :: TRIV} is
   pr STRING .
   pr INT .
+  pr LIST{IDENTIFIER} * (op __ to _::_) * (op nil to []) .
   sort Account .
   op Account : Int Bool -> Account .
 
@@ -36,28 +37,24 @@ fmod ACC-FUNCTIONAL{IDENTIFIER :: TRIV} is
 
   **** Writing Lists
 
-  sort ListId .
-  op [] : -> ListId .
-  op _::_ : Identifier ListId -> ListId .
-
   op writeString : Person PersonIdentifier String -> Person .
   eq writeString(Person(name, acc), $name, newName) = Person(newName, acc) .
 
   op writeAccount : Person PersonIdentifier Account -> Person .
   eq writeAccount(Person(name, acc), $account, newAcc) = Person(name, newAcc) .
 
-  vars listId : ListId .
+  vars listId : List{IDENTIFIER} .
 
-  op writeInt : Person ListId Int -> Person .
+  op writeInt : Person List{IDENTIFIER} Int -> Person .
   eq writeInt(Person(name, acc), $account :: listId, newBalance) = Person(name, writeInt(acc, listId, newBalance)) .
 
-  op writeInt : Account ListId Int -> Account .
+  op writeInt : Account List{IDENTIFIER} Int -> Account .
   eq writeInt(acc,$balance :: [], newBalance) = writeInt(acc, $balance, newBalance) .
 
-  op writeBool : Person ListId Bool -> Person .
+  op writeBool : Person List{IDENTIFIER} Bool -> Person .
   eq writeBool(Person(name, acc), $account :: listId, isOpenNew) = Person(name, writeBool(acc, listId, isOpenNew)) .
 
-  op writeBool : Account ListId Bool -> Account .
+  op writeBool : Account List{IDENTIFIER} Bool -> Account .
   eq writeBool(acc, $isOpen :: [], isOpenNew) = writeBool(acc, $isOpen, isOpenNew) .
 
   *** Reading
@@ -76,26 +73,26 @@ fmod ACC-FUNCTIONAL{IDENTIFIER :: TRIV} is
 
   **** Reading Lists
 
-  op readString : Person ListId -> String .
+  op readString : Person List{IDENTIFIER} -> String .
   eq readString(person, $name :: []) = readString(person, $name) .
 
-  op readInt : Account ListId -> Int .
+  op readInt : Account List{IDENTIFIER} -> Int .
   eq readInt(acc, $balance :: []) = readInt(acc, $balance) .
 
-  op readBool : Account ListId -> Bool .
+  op readBool : Account List{IDENTIFIER} -> Bool .
   eq readBool(acc, $isOpen :: []) = readBool(acc, $isOpen) .
 
-  op readInt : Person ListId -> Int .
+  op readInt : Person List{IDENTIFIER} -> Int .
   eq readInt(Person(name, acc), $account :: listId) = readInt(acc, listId) .
 
-  op readBool : Person ListId -> Bool .
+  op readBool : Person List{IDENTIFIER} -> Bool .
   eq readBool(Person(name, acc), $account :: listId) = readBool(acc, listId) .
 
 
-  op readAccount : Account ListId -> Account .
+  op readAccount : Account List{IDENTIFIER} -> Account .
   eq readAccount(acc, []) = acc .
 
-  op readPerson : Person ListId -> Person .
+  op readPerson : Person List{IDENTIFIER} -> Person .
   eq readPerson(person, []) = person .
 endfm
 
