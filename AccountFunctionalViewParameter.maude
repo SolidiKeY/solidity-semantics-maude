@@ -6,9 +6,9 @@ fmod ACC-FUNCTIONAL{IDENTIFIER :: TRIV} is
   op Account : Int Bool -> Account .
 
 
-  sort AccountIdentifier .
-  op $balance : -> AccountIdentifier .
-  op $isOpen : -> AccountIdentifier .
+  sort AccountField .
+  op $balance : -> AccountField .
+  op $isOpen : -> AccountField .
 
   vars balance newBalance : Int .
   vars isOpen isOpenNew : Bool .
@@ -20,27 +20,27 @@ fmod ACC-FUNCTIONAL{IDENTIFIER :: TRIV} is
   vars person : Person .
   vars name newName : String .
 
-  sort PersonIdentifier .
-  op $name : -> PersonIdentifier .
-  op $account : -> PersonIdentifier .
+  sort PersonField .
+  op $name : -> PersonField .
+  op $account : -> PersonField .
 
-  sort Identifier .
-  subsort AccountIdentifier PersonIdentifier < IDENTIFIER$Elt < Identifier .
+  sort Field .
+  subsort AccountField PersonField < IDENTIFIER$Elt < Field .
 
   *** Writing
 
-  op writeInt : Account AccountIdentifier Int -> Account .
+  op writeInt : Account AccountField Int -> Account .
   eq writeInt(Account(balance, isOpen),$balance, newBalance) = Account(newBalance, isOpen) .
 
-  op writeBool : Account AccountIdentifier Bool -> Account .
+  op writeBool : Account AccountField Bool -> Account .
   eq writeBool(Account(balance, isOpen),$isOpen, isOpenNew) = Account(balance, isOpenNew) .
 
   **** Writing Lists
 
-  op writeString : Person PersonIdentifier String -> Person .
+  op writeString : Person PersonField String -> Person .
   eq writeString(Person(name, acc), $name, newName) = Person(newName, acc) .
 
-  op writeAccount : Person PersonIdentifier Account -> Person .
+  op writeAccount : Person PersonField Account -> Person .
   eq writeAccount(Person(name, acc), $account, newAcc) = Person(name, newAcc) .
 
   vars listId : List{IDENTIFIER} .
@@ -59,16 +59,16 @@ fmod ACC-FUNCTIONAL{IDENTIFIER :: TRIV} is
 
   *** Reading
 
-  op readString : Person PersonIdentifier -> String .
+  op readString : Person PersonField -> String .
   eq readString(Person(name, acc), $name) = name .
 
-  op readAccount : Person PersonIdentifier -> Account .
+  op readAccount : Person PersonField -> Account .
   eq readAccount(Person(name, acc), $account) = acc .
 
-  op readInt : Account AccountIdentifier -> Int .
+  op readInt : Account AccountField -> Int .
   eq readInt(Account(balance, isOpen), $balance) = balance .
 
-  op readBool : Account AccountIdentifier -> Bool .
+  op readBool : Account AccountField -> Bool .
   eq readBool(Account(balance, isOpen), $isOpen) = isOpen .
 
   **** Reading Lists

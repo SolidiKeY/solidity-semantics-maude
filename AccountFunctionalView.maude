@@ -5,9 +5,9 @@ fmod ACC-FUNCTIONAL is
   op Account : Int Bool -> Account .
 
 
-  sort AccountIdentifier .
-  op $balance : -> AccountIdentifier .
-  op $isOpen : -> AccountIdentifier .
+  sort AccountField .
+  op $balance : -> AccountField .
+  op $isOpen : -> AccountField .
 
   vars balance newBalance : Int .
   vars isOpen isOpenNew : Bool .
@@ -19,29 +19,29 @@ fmod ACC-FUNCTIONAL is
   vars person : Person .
   vars name newName : String .
 
-  sort PersonIdentifier .
-  op $name : -> PersonIdentifier .
-  op $account : -> PersonIdentifier .
+  sort PersonField .
+  op $name : -> PersonField .
+  op $account : -> PersonField .
 
-  sort Identifier .
-  subsort AccountIdentifier PersonIdentifier < Identifier .
+  sort Field .
+  subsort AccountField PersonField < Field .
 
   *** Writing
 
-  op writeInt : Account AccountIdentifier Int -> Account .
+  op writeInt : Account AccountField Int -> Account .
   eq writeInt(Account(balance, isOpen),$balance, newBalance) = Account(newBalance, isOpen) .
 
-  op writeBool : Account AccountIdentifier Bool -> Account .
+  op writeBool : Account AccountField Bool -> Account .
   eq writeBool(Account(balance, isOpen),$isOpen, isOpenNew) = Account(balance, isOpenNew) .
 endfm
 
-view Identifier from TRIV to ACC-FUNCTIONAL is
-  sort Elt to Identifier .
+view Field from TRIV to ACC-FUNCTIONAL is
+  sort Elt to Field .
 endv
 
 fmod ACC-FUNCTIONAL-CONT is
   including ACC-FUNCTIONAL .
-  pr LIST{Identifier} * (op __ to _::_) * (op nil to []) .
+  pr LIST{Field} * (op __ to _::_) * (op nil to []) .
 
   vars balance newBalance : Int .
   vars isOpen isOpenNew : Bool .
@@ -51,62 +51,62 @@ fmod ACC-FUNCTIONAL-CONT is
 
   **** Writing Lists
 
-  op writeString : Person PersonIdentifier String -> Person .
+  op writeString : Person PersonField String -> Person .
   eq writeString(Person(name, acc), $name, newName) = Person(newName, acc) .
 
-  op writeAccount : Person PersonIdentifier Account -> Person .
+  op writeAccount : Person PersonField Account -> Person .
   eq writeAccount(Person(name, acc), $account, newAcc) = Person(name, newAcc) .
 
-  vars listId : List{Identifier} .
+  vars listId : List{Field} .
 
-  op writeInt : Person List{Identifier} Int -> Person .
+  op writeInt : Person List{Field} Int -> Person .
   eq writeInt(Person(name, acc), $account :: listId, newBalance) = Person(name, writeInt(acc, listId, newBalance)) .
 
-  op writeInt : Account List{Identifier} Int -> Account .
+  op writeInt : Account List{Field} Int -> Account .
   eq writeInt(acc,$balance :: [], newBalance) = writeInt(acc, $balance, newBalance) .
 
-  op writeBool : Person List{Identifier} Bool -> Person .
+  op writeBool : Person List{Field} Bool -> Person .
   eq writeBool(Person(name, acc), $account :: listId, isOpenNew) = Person(name, writeBool(acc, listId, isOpenNew)) .
 
-  op writeBool : Account List{Identifier} Bool -> Account .
+  op writeBool : Account List{Field} Bool -> Account .
   eq writeBool(acc, $isOpen :: [], isOpenNew) = writeBool(acc, $isOpen, isOpenNew) .
 
   *** Reading
 
-  op readString : Person PersonIdentifier -> String .
+  op readString : Person PersonField -> String .
   eq readString(Person(name, acc), $name) = name .
 
-  op readAccount : Person PersonIdentifier -> Account .
+  op readAccount : Person PersonField -> Account .
   eq readAccount(Person(name, acc), $account) = acc .
 
-  op readInt : Account AccountIdentifier -> Int .
+  op readInt : Account AccountField -> Int .
   eq readInt(Account(balance, isOpen), $balance) = balance .
 
-  op readBool : Account AccountIdentifier -> Bool .
+  op readBool : Account AccountField -> Bool .
   eq readBool(Account(balance, isOpen), $isOpen) = isOpen .
 
   **** Reading Lists
 
-  op readString : Person NeList{Identifier} -> String .
+  op readString : Person NeList{Field} -> String .
   eq readString(person, $name :: []) = readString(person, $name) .
 
-  op readInt : Account NeList{Identifier} -> Int .
+  op readInt : Account NeList{Field} -> Int .
   eq readInt(acc, $balance :: []) = readInt(acc, $balance) .
 
-  op readBool : Account NeList{Identifier} -> Bool .
+  op readBool : Account NeList{Field} -> Bool .
   eq readBool(acc, $isOpen :: []) = readBool(acc, $isOpen) .
 
-  op readInt : Person NeList{Identifier} -> Int .
+  op readInt : Person NeList{Field} -> Int .
   eq readInt(Person(name, acc), $account :: listId) = readInt(acc, listId) .
 
-  op readBool : Person NeList{Identifier} -> Bool .
+  op readBool : Person NeList{Field} -> Bool .
   eq readBool(Person(name, acc), $account :: listId) = readBool(acc, listId) .
 
 
-  op readAccount : Account List{Identifier} -> Account .
+  op readAccount : Account List{Field} -> Account .
   eq readAccount(acc, []) = acc .
 
-  op readPerson : Person List{Identifier} -> Person .
+  op readPerson : Person List{Field} -> Person .
   eq readPerson(person, []) = person .
 endfm
 
