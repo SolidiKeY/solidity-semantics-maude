@@ -2,31 +2,32 @@ fmod ACC-FUNCTIONAL is
   pr STRING .
   pr INT .
   sort Account .
-  op Account : Int Bool -> Account .
+  op Account : Int Bool -> Account [ctor] .
 
 
   sort AccountField .
-  op $balance : -> AccountField .
-  op $isOpen : -> AccountField .
+  op $balance : -> AccountField [ctor] .
+  op $isOpen : -> AccountField [ctor] .
 
   vars balance newBalance : Int .
   vars isOpen isOpenNew : Bool .
   vars acc newAcc : Account .
 
   sort Person .
-  op Person : String Account -> Person .
+  op Person : String Account -> Person [ctor] .
 
   vars person : Person .
   vars name newName : String .
 
   sort PersonField .
-  op $name : -> PersonField .
-  op $account : -> PersonField .
+  op $name : -> PersonField [ctor] .
+  op $account : -> PersonField [ctor] .
 
   sort Field .
   subsort AccountField PersonField < Field .
 
   *** Writing
+
 
   op writeInt : Account AccountField Int -> Account .
   eq writeInt(Account(balance, isOpen),$balance, newBalance) = Account(newBalance, isOpen) .
@@ -34,28 +35,30 @@ fmod ACC-FUNCTIONAL is
   op writeBool : Account AccountField Bool -> Account .
   eq writeBool(Account(balance, isOpen),$isOpen, isOpenNew) = Account(balance, isOpenNew) .
 
-  **** Writing Lists
-
-  sort ListId .
-  op [] : -> ListId .
-  op _::_ : Field ListId -> ListId .
-
   op writeString : Person PersonField String -> Person .
   eq writeString(Person(name, acc), $name, newName) = Person(newName, acc) .
 
   op writeAccount : Person PersonField Account -> Person .
   eq writeAccount(Person(name, acc), $account, newAcc) = Person(name, newAcc) .
 
+  **** Writing Lists
+
+  sort ListId .
+  op [] : -> ListId [ctor] .
+  op _::_ : Field ListId -> ListId [ctor] .
+
   vars listId : ListId .
 
   op writeInt : Person ListId Int -> Person .
-  eq writeInt(Person(name, acc), $account :: listId, newBalance) = Person(name, writeInt(acc, listId, newBalance)) .
+  eq writeInt(Person(name, acc), $account :: listId, integerNew) =
+        Person(name, writeInt(acc, listId, integerNew)) .
 
   op writeInt : Account ListId Int -> Account .
-  eq writeInt(acc,$balance :: [], newBalance) = writeInt(acc, $balance, newBalance) .
+  eq writeInt(acc, $balance :: [], i) = writeInt(acc, $balance, i) .
 
   op writeBool : Person ListId Bool -> Person .
-  eq writeBool(Person(name, acc), $account :: listId, isOpenNew) = Person(name, writeBool(acc, listId, isOpenNew)) .
+  eq writeBool(Person(name, acc), $account :: listId, boolNew) =
+        Person(name, writeBool(acc, listId, boolNew)) .
 
   op writeBool : Account ListId Bool -> Account .
   eq writeBool(acc, $isOpen :: [], isOpenNew) = writeBool(acc, $isOpen, isOpenNew) .
@@ -112,6 +115,8 @@ fmod ACC-TESTE is
 
   op bob : -> Person .
   eq bob = Person("Bob", bobAcc) .
+
+  op accountSymb : -> Account .
 endfm
 
 
@@ -137,3 +142,5 @@ red readBool(alice, $account :: $isOpen :: []) .
 
 red readPerson(alice, []) .
 red readAccount(bobAcc, []) .
+
+red readInt(writeInt(Person("alice", accountSymb), $account :: $balance :: [], 10), $account :: $balance :: []) .
