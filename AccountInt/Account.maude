@@ -22,7 +22,7 @@ fmod ACC-FUNCTIONAL is
   sort Field .
   subsort AccountField PersonField < Field .
 
-  var field : Field .
+  var field fieldWrite fieldRead : Field .
 
   *** Writing
 
@@ -42,7 +42,7 @@ fmod ACC-FUNCTIONAL is
   op [] : -> ListId [ctor] .
   op _::_ : Field ListId -> ListId [ctor] .
 
-  vars listId : ListId .
+  vars listId listIdWrite listIdRead : ListId .
 
   op write : Account ListId Int -> Account .
   eq write(acc, field :: [], i) = write(acc, field, i) .
@@ -81,6 +81,22 @@ fmod ACC-FUNCTIONAL is
 
   op readPerson : Person ListId -> Person .
   eq readPerson(person, []) = person .
+
+
+  *** Read after writing
+
+  eq read(write(person, field, i), field) = i .
+  eq read(write(acc, field, i), field) = i .
+
+  eq read(write(person, field :: listIdWrite, i), field :: listIdRead) =
+        read(write(readAccount(person, field), listIdWrite, i), listIdRead) .
+
+  ceq read(write(person, fieldWrite :: listIdWrite, i), fieldRead :: listIdRead) = read(person, fieldRead :: listIdRead)
+    if fieldWrite =/= fieldRead .
+
+  eq read(writeAccount(person, $account, acc), $account :: listId) = read(acc, listId) .
+
+
 endfm
 
 fmod ACC-TESTE is
