@@ -88,8 +88,8 @@ fmod ACC-FUNCTIONAL is
   eq read(write(person, field, i), field) = i .
   eq read(write(acc, field, i), field) = i .
 
-  eq read(write(person, field :: listIdWrite, i), field :: listIdRead) =
-        read(write(readAccount(person, field), listIdWrite, i), listIdRead) .
+  eq read(write(person, $account :: listIdWrite, i), $account :: listIdRead) =
+        read(write(readAccount(person, $account), listIdWrite, i), listIdRead) .
 
   ceq read(write(person, fieldWrite :: listIdWrite, i), fieldRead :: listIdRead) = read(person, fieldRead :: listIdRead)
     if fieldWrite =/= fieldRead .
