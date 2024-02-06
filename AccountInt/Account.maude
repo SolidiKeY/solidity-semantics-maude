@@ -88,6 +88,11 @@ fmod ACC-FUNCTIONAL is
   eq read(write(person, field, i), field) = i .
   eq read(write(acc, field, i), field) = i .
 
+  ceq read(write(person, fieldWrite, i), fieldRead) = read(person, fieldRead)
+    if fieldWrite =/= fieldRead .
+  ceq read(write(acc, fieldWrite, i), fieldRead) = read(acc, fieldRead)
+    if fieldWrite =/= fieldRead .
+
   eq read(write(person, $account :: listIdWrite, i), $account :: listIdRead) =
         read(write(readAccount(person, $account), listIdWrite, i), listIdRead) .
 
@@ -114,6 +119,12 @@ fmod ACC-TESTE is
   eq bob = Person(30, bobAcc) .
 
   op accountSymb : -> Account .
+
+  op personSymbol : -> Person .
+  eq personSymbol = Person(25, accountSymb) .
+
+  op $acc$bal : -> ListId .
+  eq $acc$bal = $account :: $balance :: [] .
 endfm
 
 red write(aliceAcc, $balance, 100) .
@@ -132,10 +143,10 @@ red readAccount(alice, $account) .
 
 red read(readAccount(alice, $account), $balance) .
 
-red read(alice, $account :: $balance :: []) .
+red read(alice, $acc$bal ) .
 red read(alice, $account :: $debt :: []) .
 
 red readPerson(alice, []) .
 red readAccount(bobAcc, []) .
 
-red read(write(Person(25, accountSymb), $account :: $balance :: [], 10), $account :: $balance :: []) .
+red read(write(personSymbol, $acc$bal, 10), $acc$bal) .
