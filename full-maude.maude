@@ -1,4 +1,5 @@
 load MapDict .
 load TreeList .
 load Account/full-maude .
+load AccountInt/full-maude .
 quit().
