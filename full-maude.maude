@@ -1,7 +1,4 @@
 load MapDict .
 load TreeList .
-load AccountExample .
-load AccountFunctional .
-load AccountFunctionalView .
-load AccountFunctionalViewParameter .
+load Account/full-maude .
 quit().
