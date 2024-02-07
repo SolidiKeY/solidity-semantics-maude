@@ -22,7 +22,7 @@ fmod ACC-FUNCTIONAL is
   sort Field .
   subsort AccountField PersonField < Field .
 
-  var field fieldWrite fieldRead : Field .
+  vars field fieldWrite fieldRead : Field .
 
   *** Writing
 
@@ -89,7 +89,7 @@ fmod Read-After-Write is
   vars balance debt age i : Int .
   vars acc newAcc : Account .
   vars person : Person .
-  var field fieldWrite fieldRead : Field .
+  vars field fieldWrite fieldRead : Field .
   vars listId listIdWrite listIdRead : ListId .
 
   eq read(write(person, field, i), field) = i .
@@ -107,4 +107,26 @@ fmod Read-After-Write is
     if fieldWrite =/= fieldRead .
 
   eq read(writeAccount(person, $account, acc), $account :: listId) = read(acc, listId) .
+endfm
+
+
+fmod Create-Constructor is
+  inc ACC-FUNCTIONAL .
+
+  vars balance debt age i : Int .
+  vars acc newAcc : Account .
+  vars person : Person .
+  vars field fieldWrite fieldRead : Field .
+  vars listId listIdWrite listIdRead : ListId .
+
+  op ageSkolan : -> Int .
+  op accSkolan : -> Account .
+  op balanceSkolan : -> Int .
+  op debtSkolan : -> Int .
+
+  eq write(person, field, i) = write(Person(ageSkolan, accSkolan), field, i) .
+  eq write(person, listId, i) = write(Person(ageSkolan, accSkolan), listId, i) .
+
+  eq write(acc, field, i) = write(Account(balanceSkolan, debtSkolan), field, i) .
+  eq write(acc, listId, i) = write(Account(balanceSkolan, debtSkolan), listId, i) .
 endfm
