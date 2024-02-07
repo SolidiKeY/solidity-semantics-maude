@@ -1,2 +1,2 @@
-load Account .
+load AccWithExamples .
 quit().
