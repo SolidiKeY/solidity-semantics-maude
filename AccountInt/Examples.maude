@@ -14,11 +14,13 @@ fmod ACC-TESTE is
 
   op accountSymb : -> Account .
 
-  op personSymbol : -> Person .
-  eq personSymbol = Person(25, accountSymb) .
+  op bob : -> Person .
+  eq bob = Person(25, accountSymb) .
 
   op $acc$bal : -> ListId .
   eq $acc$bal = $account :: $balance :: [] .
+
+  op personSymbol : -> Person .
 endfm
 
 red write(aliceAcc, $balance, 100) .
@@ -43,4 +45,12 @@ red read(alice, $account :: $debt :: []) .
 red readPerson(alice, []) .
 red readAccount(bobAcc, []) .
 
-red read(write(personSymbol, $acc$bal, 10), $acc$bal) .
+red read(write(bob, $acc$bal, 10), $acc$bal) .
+
+red read(write(Person(25, accountSymb), $account :: $balance :: [] , 10), $account :: $balance :: []) .
+
+red read(write(personSymbol, $account :: $balance :: [] , 10), $account :: $balance :: []) .
+
+red read(write(defaultAccount, $balance :: [], 1), $balance :: [] ) .
+
+red read(write(defaultPerson, $account :: $balance :: [], 1), $account :: $balance :: [] ) .

@@ -100,6 +100,12 @@ fmod Read-After-Write is
   ceq read(write(acc, fieldWrite, i), fieldRead) = read(acc, fieldRead)
     if fieldWrite =/= fieldRead .
 
+  *** c1 :: c2 :: [] = c3 :: c4 :: []
+*** *  read( read( s, p4), p5)              if p2  = p4 :: p5   and p1 = p4 :: p6 this just happens if p5 != p6
+*** p5 can be p6
+
+
+*** if p2  = p4 :: p5   and p1 = p4 :: p6         p5 and p6 can be equal
   eq read(write(person, $account :: listIdWrite, i), $account :: listIdRead) =
         read(write(readAccount(person, $account), listIdWrite, i), listIdRead) .
 
@@ -119,14 +125,25 @@ fmod Create-Constructor is
   vars field fieldWrite fieldRead : Field .
   vars listId listIdWrite listIdRead : ListId .
 
-  op ageSkolan : -> Int .
-  op accSkolan : -> Account .
-  op balanceSkolan : -> Int .
-  op debtSkolan : -> Int .
+  op defaultPerson : -> Person .
+  op defaultAccount : -> Account .
 
-  eq write(person, field, i) = write(Person(ageSkolan, accSkolan), field, i) .
-  eq write(person, listId, i) = write(Person(ageSkolan, accSkolan), listId, i) .
+  op ageSkolem : -> Int .
+  op accSkolem : -> Account .
+  op balanceSkolem : -> Int .
+  op debtSkolem : -> Int .
 
-  eq write(acc, field, i) = write(Account(balanceSkolan, debtSkolan), field, i) .
-  eq write(acc, listId, i) = write(Account(balanceSkolan, debtSkolan), listId, i) .
+  eq write(defaultPerson, field, i) = write(Person(0, defaultAccount), field, i) .
+  eq write(defaultAccount, field, i) = write(Account(0, 0), field, i) .
+
+  eq write(defaultPerson, listId, i) = write(Person(0, defaultAccount), listId, i) .
+  eq write(defaultAccount, listId, i) = write(Account(0, 0), listId, i) .
+
+  eq write(person, field, i) = write(Person(ageSkolem, accSkolem), field, i) .
+  eq write(person, listId, i) = write(Person(ageSkolem, accSkolem), listId, i) .
+
+  eq write(acc, field, i) = write(Account(balanceSkolem, debtSkolem), field, i) .
+  eq write(acc, listId, i) = write(Account(balanceSkolem, debtSkolem), listId, i) .
 endfm
+
+*** write([ (0, 1) , (1 , 2) ], (0, 2)) = [ (0, 2), (0, 1) , (1 , 2) ]
