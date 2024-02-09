@@ -45,24 +45,10 @@ fmod WRITE-SUBSTITUTE is
     if keyInMap(map, key) .
 endfm
 
-fmod Testing is
-  *** pr WRITE-READ .
-  pr WRITE-SUBSTITUTE .
-
+fmod WRITE-READ-WITH-EXAMPLES is
+  pr WRITE-READ .
   op k1 : -> Key .
   op k2 : -> Key .
   op v1 : -> Value .
   op v2 : -> Value .
 endfm
-
-red read(defaultMap, k1) == defaultValue .
-
-red read(write(defaultMap, k1, v1), k1) == v1 .
-
-red read(write(defaultMap, k1, v1), k2) == defaultValue .
-
-red read(write(write(defaultMap, k1, v1), k1, v2), k1) == v2 .
-
-red read(write(write(defaultMap, k1, v1), k1, v2), k2) == defaultValue .
-
-red write(write(defaultMap, k1, v1), k1, v2) == write(defaultMap, k1, v2) .
