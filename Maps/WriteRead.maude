@@ -1,0 +1,41 @@
+fmod WRITE-READ is
+  sort Map .
+  sort Key .
+  sort Value .
+
+  op defaultValue : -> Value .
+  op defaultMap : -> Map .
+
+  op read : Map Key -> Value .
+  op write : Map Key Value -> Map .
+
+  vars key keyWrite keyRead : Key .
+  var value : Value .
+  var map : Map .
+
+  eq read(defaultMap, key) = defaultValue .
+
+  eq read(write(map, key, value), key) = value .
+
+  ceq read(write(map, keyWrite, value), keyRead) = read(map, keyRead)
+    if keyWrite =/= keyRead .
+endfm
+
+fmod Testing is
+  pr WRITE-READ .
+
+  op k1 : -> Key .
+  op k2 : -> Key .
+  op v1 : -> Value .
+  op v2 : -> Value .
+endfm
+
+red read(defaultMap, k1) .
+
+red read(write(defaultMap, k1, v1), k1) .
+
+red read(write(defaultMap, k1, v1), k2) .
+
+red read(write(write(defaultMap, k1, v1), k1, v2), k1) .
+
+red read(write(write(defaultMap, k1, v1), k1, v2), k2) .
