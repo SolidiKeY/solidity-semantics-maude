@@ -115,6 +115,39 @@ fmod Read-After-Write is
   eq read(writeAccount(person, $account, acc), $account :: listId) = read(acc, listId) .
 endfm
 
+fmod Read-After-Write-Richard-Solution is
+  inc ACC-FUNCTIONAL .
+
+  vars balance debt age i : Int .
+  vars acc newAcc : Account .
+  vars person : Person .
+  vars field fieldWrite fieldRead : Field .
+  vars listId listIdWrite listIdRead : ListId .
+
+  eq read(write(person, field, i), field) = i .
+  eq read(write(acc, field, i), field) = i .
+
+  op listsEqual : ListId ListId -> Bool .
+
+  eq listsEqual([], []) = true .
+  ceq listsEqual(fieldWrite :: listIdWrite, fieldRead :: listIdRead) = false
+    if fieldWrite =/= fieldRead .
+  eq listsEqual(field :: listIdWrite, field :: listIdRead) = listsEqual(listIdWrite, listIdRead) .
+
+  ceq read(write(person, fieldWrite, i), fieldRead) = read(person, fieldRead)
+    if fieldWrite =/= fieldRead .
+  ceq read(write(acc, fieldWrite, i), fieldRead) = read(acc, fieldRead)
+    if fieldWrite =/= fieldRead .
+
+
+  ceq read(write(person, listIdWrite, i), listIdRead) = i
+    if listsEqual(listIdWrite, listIdRead) .
+
+  eq read(write(person, listIdWrite, i), listIdRead) = read(person, listIdRead) .
+
+  eq read(writeAccount(person, $account, acc), $account :: listId) = read(acc, listId) .
+endfm
+
 
 fmod Create-Constructor is
   inc ACC-FUNCTIONAL .
@@ -145,5 +178,3 @@ fmod Create-Constructor is
   eq write(acc, field, i) = write(Account(balanceSkolem, debtSkolem), field, i) .
   eq write(acc, listId, i) = write(Account(balanceSkolem, debtSkolem), listId, i) .
 endfm
-
-*** write([ (0, 1) , (1 , 2) ], (0, 2)) = [ (0, 2), (0, 1) , (1 , 2) ]
