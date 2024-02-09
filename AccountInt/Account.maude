@@ -110,7 +110,7 @@ fmod Read-After-Write is
 endfm
 
 fmod Read-After-Write-Richard-Solution is
-  inc ACC-FUNCTIONAL-CONST .
+  inc ACC-FUNCTIONAL .
 
   vars balance debt age i : Int .
   vars acc newAcc : Account .
