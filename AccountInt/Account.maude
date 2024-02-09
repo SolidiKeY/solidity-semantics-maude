@@ -1,4 +1,4 @@
-fmod ACC-FUNCTIONAL is
+fmod ACC-FUNCTIONAL-CONST is
   pr INT .
   sort Account .
   op Account : Int Int -> Account [ctor] .
@@ -7,13 +7,9 @@ fmod ACC-FUNCTIONAL is
   op $balance : -> AccountField [ctor] .
   op $debt : -> AccountField [ctor] .
 
-  vars balance debt age i : Int .
-  vars acc newAcc : Account .
-
   sort Person .
   op Person : Int Account -> Person [ctor] .
 
-  vars person : Person .
 
   sort PersonField .
   op $age : -> PersonField [ctor] .
@@ -22,64 +18,62 @@ fmod ACC-FUNCTIONAL is
   sort Field .
   subsort AccountField PersonField < Field .
 
-  vars field fieldWrite fieldRead : Field .
-
-  *** Writing
-
-  op write : Account AccountField Int -> Account .
-  eq write(Account(balance, debt), $balance, i) = Account(i, debt) .
-  eq write(Account(balance, debt), $debt, i) = Account(balance, i) .
-
-  op write : Person PersonField Int -> Person .
-  eq write(Person(age, acc), $age, i) = Person(i, acc) .
-
-  op writeAccount : Person PersonField Account -> Person .
-  eq writeAccount(Person(age, acc), $account, newAcc) = Person(age, newAcc).
-
-  **** Writing Lists
-
   sort ListId .
   op [] : -> ListId [ctor] .
   op _::_ : Field ListId -> ListId [ctor] .
 
+  op write : Account AccountField Int -> Account .
+  op write : Account ListId Int -> Account .
+  op write : Person PersonField Int -> Person .
+  op writeAccount : Person PersonField Account -> Person .
+  op write : Person ListId Int -> Person .
+  op write : Person ListId Int -> Person .
+  op read : Account AccountField -> Int .
+  op read : Account AccountField -> Int .
+  op read : Person PersonField -> Int .
+  op readAccount : Person PersonField -> Account .
+  op read : Account ListId -> Int .
+  op read : Person ListId -> Int .
+  op readAccount : Account ListId -> Account .
+  op readPerson : Person ListId -> Person .
+endfm
+
+
+fmod ACC-FUNCTIONAL is
+  inc ACC-FUNCTIONAL-CONST .
+
+  vars balance debt age i : Int .
+  vars acc newAcc : Account .
+  vars person : Person .
+  vars field fieldWrite fieldRead : Field .
   vars listId listIdWrite listIdRead : ListId .
 
-  op write : Account ListId Int -> Account .
+  *** Writing
+
+  eq write(Account(balance, debt), $balance, i) = Account(i, debt) .
+  eq write(Account(balance, debt), $debt, i) = Account(balance, i) .
+  eq write(Person(age, acc), $age, i) = Person(i, acc) .
+  eq writeAccount(Person(age, acc), $account, newAcc) = Person(age, newAcc).
+
+  **** Writing Lists
+
   eq write(acc, field :: [], i) = write(acc, field, i) .
-
-  op write : Person ListId Int -> Person .
   eq write(person, field :: [], i) = write(person, field, i) .
-
-  op write : Person ListId Int -> Person .
   eq write(Person(age, acc), $account :: listId, i) = Person(age, write(acc, listId, i)) .
 
   *** Reading
 
-  op read : Account AccountField -> Int .
   eq read(Account(balance, debt), $balance) = balance .
-
-  op read : Account AccountField -> Int .
   eq read(Account(balance, debt), $debt) = debt .
-
-  op read : Person PersonField -> Int .
   eq read(Person(age, acc), $age) = age .
-
-  op readAccount : Person PersonField -> Account .
   eq readAccount(Person(age, acc), $account) = acc .
 
   **** Reading Lists
 
-  op read : Account ListId -> Int .
   eq read(acc, field :: []) = read(acc, field) .
-
-  op read : Person ListId -> Int .
   eq read(person, $age :: []) = read(person, $age) .
   eq read(Person(age, acc), $account :: listId) = read(acc, listId) .
-
-  op readAccount : Account ListId -> Account .
   eq readAccount(acc, []) = acc .
-
-  op readPerson : Person ListId -> Person .
   eq readPerson(person, []) = person .
 endfm
 
@@ -116,7 +110,7 @@ fmod Read-After-Write is
 endfm
 
 fmod Read-After-Write-Richard-Solution is
-  inc ACC-FUNCTIONAL .
+  inc ACC-FUNCTIONAL-CONST .
 
   vars balance debt age i : Int .
   vars acc newAcc : Account .
@@ -133,24 +127,24 @@ fmod Read-After-Write-Richard-Solution is
   ceq listsEqual(fieldWrite :: listIdWrite, fieldRead :: listIdRead) = false
     if fieldWrite =/= fieldRead .
   eq listsEqual(field :: listIdWrite, field :: listIdRead) = listsEqual(listIdWrite, listIdRead) .
+  eq listsEqual(field :: listId, []) = false .
+  eq listsEqual([], field :: listId) = false .
 
   ceq read(write(person, fieldWrite, i), fieldRead) = read(person, fieldRead)
     if fieldWrite =/= fieldRead .
   ceq read(write(acc, fieldWrite, i), fieldRead) = read(acc, fieldRead)
     if fieldWrite =/= fieldRead .
 
-
   ceq read(write(person, listIdWrite, i), listIdRead) = i
     if listsEqual(listIdWrite, listIdRead) .
 
   eq read(write(person, listIdWrite, i), listIdRead) = read(person, listIdRead) .
-
   eq read(writeAccount(person, $account, acc), $account :: listId) = read(acc, listId) .
 endfm
 
 
 fmod Create-Constructor is
-  inc ACC-FUNCTIONAL .
+  pr ACC-FUNCTIONAL-CONST .
 
   vars balance debt age i : Int .
   vars acc newAcc : Account .

@@ -1,7 +1,8 @@
 load Account .
 
 fmod ACC-FUNCTIONAL-EXAMPLE is
-  inc Create-Constructor .
+  pr Read-After-Write .
+  pr Create-Constructor .
 endfm
 
 load Examples .
