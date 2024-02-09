@@ -50,7 +50,3 @@ red read(write(bob, $acc$bal, 10), $acc$bal) .
 red read(write(Person(25, accountSymb), $account :: $balance :: [] , 10), $account :: $balance :: []) .
 
 red read(write(personSymbol, $account :: $balance :: [] , 10), $account :: $balance :: []) .
-
-red read(write(defaultAccount, $balance :: [], 1), $balance :: [] ) .
-
-red read(write(defaultPerson, $account :: $balance :: [], 1), $account :: $balance :: [] ) .

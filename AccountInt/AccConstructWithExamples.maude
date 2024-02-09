@@ -5,3 +5,7 @@ fmod ACC-FUNCTIONAL-EXAMPLE is
 endfm
 
 load Examples .
+
+red read(write(defaultAccount, $balance :: [], 1), $balance :: [] ) .
+
+red read(write(defaultPerson, $account :: $balance :: [], 1), $account :: $balance :: [] ) .
