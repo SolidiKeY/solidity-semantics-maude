@@ -94,12 +94,6 @@ fmod Read-After-Write is
   ceq read(write(acc, fieldWrite, i), fieldRead) = read(acc, fieldRead)
     if fieldWrite =/= fieldRead .
 
-  *** c1 :: c2 :: [] = c3 :: c4 :: []
-*** *  read( read( s, p4), p5)              if p2  = p4 :: p5   and p1 = p4 :: p6 this just happens if p5 != p6
-*** p5 can be p6
-
-
-*** if p2  = p4 :: p5   and p1 = p4 :: p6         p5 and p6 can be equal
   eq read(write(person, $account :: listIdWrite, i), $account :: listIdRead) =
         read(write(readAccount(person, $account), listIdWrite, i), listIdRead) .
 
