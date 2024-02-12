@@ -1,0 +1,18 @@
+#+title: Writing and reading vs canonical form
+
+* Advantages of canonical form
++ It is easier to visualize the data struct.
++ The model is exactly the same of the real data struct, so it is easier to not make mistakes.
++ We use pattern match to destruct the terms, and it is easier to understand.
+
+* Advantages of read and write form
++ It is a simpler model and works in more general cases such as arrays.
+** Lazy approach addvantages
++ It is lazy, so it avoids unnecessary writing when it is not necessary.
++ It avoids branching.
+** Not Lazy approach advantages
++ The model is more similar to the real program.
++ The canonical form of writing has a meaning in the definition.
+  In the lazy approach, the sequence of writing has only a meaning after the reading.
++ Sometimes, it is necessary to read in the position to write on it (in case of matrix),
+  so the lazy approach does not work or work poorly in this case.
