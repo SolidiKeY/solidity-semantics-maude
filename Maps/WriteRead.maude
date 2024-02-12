@@ -14,11 +14,6 @@ fmod WRITE-READ-SORTS is
   var map : Map .
 
   eq read(defaultMap, key) = defaultValue .
-
-  eq read(write(map, key, value), key) = value .
-
-  ceq read(write(map, keyWrite, value), keyRead) = read(map, keyRead)
-    if keyWrite =/= keyRead .
 endfm
 
 fmod WRITE-READ is
@@ -27,6 +22,8 @@ fmod WRITE-READ is
   vars key keyWrite keyRead : Key .
   var value : Value .
   var map : Map .
+
+  eq read(write(map, key, value), key) = value .
 
   ceq read(write(map, keyWrite, value), keyRead) = read(map, keyRead)
     if keyWrite =/= keyRead .
