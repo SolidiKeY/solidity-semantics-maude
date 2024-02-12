@@ -12,8 +12,6 @@ fmod WRITE-READ-SORTS is
   vars key keyWrite keyRead : Key .
   var value : Value .
   var map : Map .
-
-  eq read(defaultMap, key) = defaultValue .
 endfm
 
 fmod WRITE-READ is
