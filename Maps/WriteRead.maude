@@ -1,4 +1,4 @@
-fmod WRITE-READ is
+fmod WRITE-READ-SORTS is
   sort Map .
   sort Key .
   sort Value .
@@ -16,6 +16,17 @@ fmod WRITE-READ is
   eq read(defaultMap, key) = defaultValue .
 
   eq read(write(map, key, value), key) = value .
+
+  ceq read(write(map, keyWrite, value), keyRead) = read(map, keyRead)
+    if keyWrite =/= keyRead .
+endfm
+
+fmod WRITE-READ is
+  inc WRITE-READ-SORTS .
+
+  vars key keyWrite keyRead : Key .
+  var value : Value .
+  var map : Map .
 
   ceq read(write(map, keyWrite, value), keyRead) = read(map, keyRead)
     if keyWrite =/= keyRead .
@@ -51,4 +62,6 @@ fmod WRITE-READ-WITH-EXAMPLES is
   op k2 : -> Key .
   op v1 : -> Value .
   op v2 : -> Value .
+
+  op emptyMap : -> Map .
 endfm
