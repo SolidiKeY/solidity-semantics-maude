@@ -1,0 +1,20 @@
+load WriteRead .
+
+fmod Testing is
+  pr WRITE-READ-WITH-EXAMPLES .
+  pr WRITE-READ-BOOL .
+endfm
+
+red read(defaultMap, k1) == defaultValue .
+
+red read(write(defaultMap, k1, v1), k1) == v1 .
+
+red read(write(defaultMap, k1, v1), k2).
+
+red read(write(write(defaultMap, k1, v1), k1, v2), k1) == v2 .
+
+red read(write(write(defaultMap, k1, v1), k1, v2), k2) .
+
+red write(write(defaultMap, k1, v1), k1, v2) .
+
+red read(emptyMap, k1) .

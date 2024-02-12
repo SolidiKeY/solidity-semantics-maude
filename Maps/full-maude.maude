@@ -1,3 +1,4 @@
 load WriteSubstituteTests .
 load WriteTests .
+load WriteReadBool .
 quit() .

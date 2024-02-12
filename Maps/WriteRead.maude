@@ -12,6 +12,8 @@ fmod WRITE-READ-SORTS is
   vars key keyWrite keyRead : Key .
   var value : Value .
   var map : Map .
+
+  eq read(defaultMap, key) = defaultValue .
 endfm
 
 fmod WRITE-READ is
@@ -25,6 +27,45 @@ fmod WRITE-READ is
 
   ceq read(write(map, keyWrite, value), keyRead) = read(map, keyRead)
     if keyWrite =/= keyRead .
+endfm
+
+fmod WRITE-READ-BOOL is
+  inc WRITE-READ-SORTS .
+
+  vars key keyWrite keyRead newKey : Key .
+  var value : Value .
+  var map : Map .
+
+  op isSame : Key Key -> Bool .
+  eq isSame(key, key) = true .
+  eq isSame(keyWrite, keyRead) = false .
+
+  op notSame : Key Key -> Bool .
+  eq isSame(keyWrite, keyRead) = not(isSame(keyWrite, keyRead)) .
+
+  ceq read(write(map, keyWrite, value), keyRead) = value
+    if isSame(keyWrite, keyRead) .
+
+  ceq read(write(map, keyWrite, value), keyRead) = read(map, keyRead)
+    if notSame(keyWrite, keyRead) .
+
+  ceq removeFirstKey(write(map, keyWrite, value), keyRead) = map
+    if isSame(keyWrite, keyRead) .
+
+  op removeFirstKey : Map Key -> Map .
+
+  ceq removeFirstKey(write(map, keyWrite, value), newKey) = write(removeFirstKey(map, newKey), keyWrite, value)
+    if notSame(keyWrite, newKey) .
+
+  op keyInMap : Map Key -> Bool .
+
+  eq keyInMap(defaultMap, key) = false .
+  ceq keyInMap(write(map, keyWrite, value), keyRead) = true
+    if isSame(keyWrite, keyRead) .
+
+  ceq keyInMap(write(map, keyWrite, value), newKey) = keyInMap(map, newKey)
+    if notSame(keyWrite, newKey) .
+
 endfm
 
 fmod WRITE-SUBSTITUTE is
@@ -52,7 +93,7 @@ fmod WRITE-SUBSTITUTE is
 endfm
 
 fmod WRITE-READ-WITH-EXAMPLES is
-  pr WRITE-READ .
+  pr WRITE-READ-SORTS .
   op k1 : -> Key .
   op k2 : -> Key .
   op v1 : -> Value .

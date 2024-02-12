@@ -2,6 +2,7 @@ load WriteRead .
 
 fmod Testing is
   pr WRITE-READ-WITH-EXAMPLES .
+  pr WRITE-READ .
 endfm
 
 load TestExamples .
