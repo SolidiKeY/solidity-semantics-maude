@@ -1,0 +1,90 @@
+fmod WRITE-READ-SORTS is
+  sort Key .
+  sort Value .
+  sort KeyValue .
+
+  op <_,_> : Key Value -> KeyValue .
+
+  op defaultValue : -> Value .
+endfm
+
+view KeyValue from TRIV to WRITE-READ-SORTS is
+  sort Elt to KeyValue .
+endv
+
+fmod READ is
+  inc WRITE-READ-SORTS .
+  pr LIST{KeyValue} .
+
+  op write : List{KeyValue} Key Value -> List{KeyValue} .
+  op read : List{KeyValue} Key -> Value .
+
+  vars key keyRead : Key .
+  var value : Value .
+  var list : List{KeyValue} .
+
+  eq read(nil, key) = defaultValue .
+  eq read(< key , value > list, key) = value .
+  ceq read(< key , value > list, keyRead) = read(list, keyRead)
+    if key =/= keyRead .
+endfm
+
+fmod WRITE-READ is
+  inc READ .
+
+  var key keyWrite : Key .
+  var value valueWrite : Value .
+  var list : List{KeyValue} .
+
+  eq write(nil, key, valueWrite) = < key , valueWrite > .
+  eq write(< key , value > list, key, valueWrite) = < key , valueWrite > list .
+  ceq write(< key , value > list, keyWrite, valueWrite) = < key , value > write(list, keyWrite, valueWrite)
+    if key =/= keyWrite .
+endfm
+
+fmod WRITE-READ-LAZY is
+  inc READ .
+
+  var key keyWrite : Key .
+  var value valueWrite : Value .
+  var list : List{KeyValue} .
+
+  eq write(list, key, valueWrite) = < key , valueWrite > list .
+endfm
+
+fmod Examples-constants is
+  pr WRITE-READ-SORTS .
+  op k1 : -> Key .
+  op k2 : -> Key .
+  op v1 : -> Value .
+  op v2 : -> Value .
+  op v3 : -> Value .
+endfm
+
+fmod Examples is
+  pr Examples-constants .
+  pr WRITE-READ .
+endfm
+
+red read(nil, k1) .
+red read(< k1 , v1 >, k1) .
+red read(< k1 , v1 > < k2 , v2 >, k1) .
+red read(< k1 , v1 > < k2 , v2 >, k2) .
+
+red read(< k1 , v1 > < k1 , v2 >, k1) .
+red read(< k1 , v1 > < k1 , v2 >, k2) .
+
+red write(nil, k1, v1) .
+red write(< k1 , v1 >, k1, v2) .
+red write(< k1 , v1 > < k2 , v2 > , k1 , v3).
+red write(< k1 , v1 > < k2 , v2 > , k2 , v3).
+
+fmod Examples-Lazy is
+  pr Examples-constants .
+  pr WRITE-READ-LAZY .
+endfm
+
+red write(nil, k1, v1) .
+red write(< k1 , v1 >, k1, v2) .
+red write(< k1 , v1 > < k2 , v2 > , k1 , v3).
+red write(< k1 , v1 > < k2 , v2 > , k2 , v3).
