@@ -96,5 +96,35 @@ red write(< k1 , v1 >, k1, v2) .
 red write(< k1 , v1 > < k2 , v2 > , k1 , v3) .
 red write(< k1 , v1 > < k2 , v2 > , k2 , v3) .
 
-*** Lazy approach works
+red write(< k1 , v1 > < k2 , v2 > unknowList , k3 , v3) .
+red read(write(< k1 , v1 > < k2 , v2 > unknowList , k3 , v3), k3) .
+
+fmod WRITE-READ-REMOVE is
+  inc READ .
+
+  var key keyWrite : Key .
+  var value valueWrite : Value .
+  var list : List{KeyValue} .
+
+  op remove : List{KeyValue} Key -> List{KeyValue} .
+
+  eq remove(nil, key) = nil .
+  eq remove(< key , value > list, key) = remove(list, key) .
+  ceq remove(< key , value > list, keyWrite) = < key , value > remove(list, keyWrite)
+    if key =/= keyWrite .
+
+  eq write(list, key , value) = < key , value > remove(list, key) .
+endfm
+
+fmod Examples-Remove is
+  pr Examples-constants .
+  pr WRITE-READ-REMOVE .
+endfm
+
+red write(nil, k1, v1) .
+red write(< k1 , v1 >, k1, v2) .
+red write(< k1 , v1 > < k2 , v2 > , k1 , v3) .
+red write(< k1 , v1 > < k2 , v2 > , k2 , v3) .
+
+red write(< k1 , v1 > < k2 , v2 > unknowList , k3 , v3) .
 red read(write(< k1 , v1 > < k2 , v2 > unknowList , k3 , v3), k3) .
