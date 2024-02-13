@@ -1,10 +1,7 @@
 fmod WRITE-READ-SORTS is
-  sort Key .
-  sort Value .
-  sort KeyValue .
+  sort Key Value KeyValue .
 
   op <_,_> : Key Value -> KeyValue .
-
   op defaultValue : -> Value .
 endfm
 
