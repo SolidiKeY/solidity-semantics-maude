@@ -37,6 +37,7 @@ fmod WRITE-READ is
   eq write(< key , value > list, key, valueWrite) = < key , valueWrite > list .
   ceq write(< key , value > list, keyWrite, valueWrite) = < key , value > write(list, keyWrite, valueWrite)
     if key =/= keyWrite .
+  eq write(list, key, valueWrite) = < key , valueWrite > list .
 endfm
 
 fmod WRITE-READ-LAZY is
@@ -78,12 +79,11 @@ red read(< k1 , v1 > < k1 , v2 >, k2) .
 
 red write(nil, k1, v1) .
 red write(< k1 , v1 >, k1, v2) .
-red write(< k1 , v1 > < k2 , v2 > , k1 , v3).
-red write(< k1 , v1 > < k2 , v2 > , k2 , v3).
+red write(< k1 , v1 > < k2 , v2 > , k1 , v3) .
+red write(< k1 , v1 > < k2 , v2 > , k2 , v3) .
 
-red write(< k1 , v1 > < k2 , v2 > unknowList , k3 , v3).
+red write(< k1 , v1 > < k2 , v2 > unknowList , k3 , v3) .
 
-*** It does not work
 red read(write(< k1 , v1 > < k2 , v2 > unknowList , k3 , v3), k3) .
 
 fmod Examples-Lazy is
@@ -93,8 +93,8 @@ endfm
 
 red write(nil, k1, v1) .
 red write(< k1 , v1 >, k1, v2) .
-red write(< k1 , v1 > < k2 , v2 > , k1 , v3).
-red write(< k1 , v1 > < k2 , v2 > , k2 , v3).
+red write(< k1 , v1 > < k2 , v2 > , k1 , v3) .
+red write(< k1 , v1 > < k2 , v2 > , k2 , v3) .
 
 *** Lazy approach works
 red read(write(< k1 , v1 > < k2 , v2 > unknowList , k3 , v3), k3) .
