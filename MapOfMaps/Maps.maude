@@ -1,0 +1,49 @@
+fmod MAPS-SORT is
+  sort Row Column RowColumn Value Map Vec MapVec .
+
+  subsort Row Column < RowColumn .
+  subsort Map Vec < MapVec .
+
+  op emptyMap : -> Map .
+  op defaultValue : -> Value .
+
+  op <_,_> : Row Column -> RowColumn .
+
+  op write : MapVec RowColumn Value -> MapVec .
+  op read : MapVec RowColumn -> Value .
+
+  vars row rowRead : Row .
+  var column columnRead : Column .
+  var rowColumn : RowColumn .
+  var map : MapVec .
+  var value : Value .
+
+  eq read(emptyMap, rowColumn) = defaultValue .
+  eq read(write(map, rowColumn, value), rowColumn) = value .
+
+  ceq read(write(map, < row , column > , value), < rowRead , columnRead >) = read(map , < rowRead , columnRead >)
+    if row =/= rowRead .
+endfm
+
+fmod EXAMPLE is
+  pr MAPS-SORT .
+
+  op r1 : -> Row .
+  op r2 : -> Row .
+  op c1 : -> Column .
+  op c2 : -> Column .
+  op v1 : -> Value .
+  op v2 : -> Value .
+
+  op unknowMap : -> Map .
+endfm
+
+red read(emptyMap, < r1 , c1 >) .
+
+red read(write(unknowMap, < r1 , c1 >, v1), < r1 , c1 >) .
+
+red read(write(unknowMap, < r1 , c1 >, v1), < r2 , c2 >) .
+
+red read(write(write(unknowMap, < r1 , c1 > , v1 ), < r2 , c2 >, v2), < r1 , c1 >) .
+
+red read(write(write(unknowMap, < r1 , c1 > , v1 ), < r2 , c2 >, v2), < r2 , c2 >) .
