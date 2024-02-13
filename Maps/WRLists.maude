@@ -54,11 +54,16 @@ endfm
 
 fmod Examples-constants is
   pr WRITE-READ-SORTS .
+  pr LIST{KeyValue} .
+
   op k1 : -> Key .
   op k2 : -> Key .
+  op k3 : -> Key .
   op v1 : -> Value .
   op v2 : -> Value .
   op v3 : -> Value .
+
+  op unknowList : -> List{KeyValue} .
 endfm
 
 fmod Examples is
@@ -79,6 +84,11 @@ red write(< k1 , v1 >, k1, v2) .
 red write(< k1 , v1 > < k2 , v2 > , k1 , v3).
 red write(< k1 , v1 > < k2 , v2 > , k2 , v3).
 
+red write(< k1 , v1 > < k2 , v2 > unknowList , k3 , v3).
+
+*** It does not work
+red read(write(< k1 , v1 > < k2 , v2 > unknowList , k3 , v3), k3) .
+
 fmod Examples-Lazy is
   pr Examples-constants .
   pr WRITE-READ-LAZY .
@@ -88,3 +98,6 @@ red write(nil, k1, v1) .
 red write(< k1 , v1 >, k1, v2) .
 red write(< k1 , v1 > < k2 , v2 > , k1 , v3).
 red write(< k1 , v1 > < k2 , v2 > , k2 , v3).
+
+*** Lazy approach works
+red read(write(< k1 , v1 > < k2 , v2 > unknowList , k3 , v3), k3) .
