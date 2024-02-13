@@ -7,7 +7,7 @@
 
 * Advantages of read and write form
 + It is a simpler model and works in more general cases such as arrays.
-** Lazy approach addvantages
+** Lazy approach advantages
 + It is lazy, so it avoids unnecessary writing when it is not necessary.
 + It avoids branching.
 ** Not Lazy approach advantages
