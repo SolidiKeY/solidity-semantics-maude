@@ -73,3 +73,7 @@ red read(read(emptyMap, r1), c1) .
 red read(read(write(unknowMap, < r1 , c1 > , v1), r1), c1) .
 
 red read(read(write(unknowMap, < r1 , c1 > , v1), r1), c2) .
+
+red read(read(write(write(unknowMap, < r1 , c2 >, v2) , < r1 , c1 > , v1), r1), c2) .
+
+red read(read(write(write(unknowMap, < r2 , c2 >, v2) , < r1 , c1 > , v1), r1), c2) .
