@@ -31,7 +31,7 @@ fmod MAPS-SORT is
   ceq read(write(map, < row , column >, value), rowRead) = read(map, rowRead)
     if row =/= rowRead .
 
-  eq read(write(map, < row , column >, value), row) = write(read(map, row), < row , column >, value) .
+  eq read(write(map, < row , column >, value), row) = write(read(map, row), column, value) .
 
 endfm
 
@@ -67,3 +67,5 @@ red read(write(unknowMap, < r1 , c1 > , v1), r1) .
 red read(emptyMap, r1) .
 
 red read(read(emptyMap, r1), c1) .
+
+red read(read(write(unknowMap, < r1 , c1 > , v1), r1), c1) .
