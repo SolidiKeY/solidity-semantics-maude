@@ -33,6 +33,8 @@ fmod MAPS-SORT is
 
   eq read(write(map, < row , column >, value), row) = write(read(map, row), column, value) .
 
+  ceq read(write(map, column, value), columnRead) = read(map, columnRead)
+    if column =/= columnRead .
 endfm
 
 fmod EXAMPLE is
@@ -69,3 +71,5 @@ red read(emptyMap, r1) .
 red read(read(emptyMap, r1), c1) .
 
 red read(read(write(unknowMap, < r1 , c1 > , v1), r1), c1) .
+
+red read(read(write(unknowMap, < r1 , c1 > , v1), r1), c2) .
