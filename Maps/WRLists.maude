@@ -114,6 +114,8 @@ fmod WRITE-READ-REMOVE is
     if key =/= keyWrite .
 
   eq write(list, key , value) = < key , value > remove(list, key) .
+
+  eq read(remove(list, key), key) = defaultValue .
 endfm
 
 fmod Examples-Remove is
@@ -128,3 +130,5 @@ red write(< k1 , v1 > < k2 , v2 > , k2 , v3) .
 
 red write(< k1 , v1 > < k2 , v2 > unknowList , k3 , v3) .
 red read(write(< k1 , v1 > < k2 , v2 > unknowList , k3 , v3), k3) .
+
+red read(remove(unknowList, k3), k3) .
