@@ -43,8 +43,8 @@ endfm
 fmod WRITE-READ-LAZY is
   inc READ .
 
-  var key keyWrite : Key .
-  var value valueWrite : Value .
+  vars key keyWrite : Key .
+  vars value valueWrite : Value .
   var list : List{KeyValue} .
 
   eq write(list, key, valueWrite) = < key , valueWrite > list .
@@ -54,12 +54,8 @@ fmod Examples-constants is
   pr WRITE-READ-SORTS .
   pr LIST{KeyValue} .
 
-  op k1 : -> Key .
-  op k2 : -> Key .
-  op k3 : -> Key .
-  op v1 : -> Value .
-  op v2 : -> Value .
-  op v3 : -> Value .
+  ops k1 k2 k3 : -> Key .
+  ops v1 v2 v3 : -> Value .
 
   op unknowList : -> List{KeyValue} .
 endfm
@@ -102,9 +98,9 @@ red read(write(< k1 , v1 > < k2 , v2 > unknowList , k3 , v3), k3) .
 fmod WRITE-READ-REMOVE is
   inc READ .
 
-  var key keyWrite : Key .
-  var value valueWrite : Value .
-  var list : List{KeyValue} .
+  vars key keyWrite : Key .
+  vars value valueWrite : Value .
+  vars list : List{KeyValue} .
 
   op remove : List{KeyValue} Key -> List{KeyValue} .
 

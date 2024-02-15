@@ -94,10 +94,8 @@ endfm
 
 fmod WRITE-READ-WITH-EXAMPLES is
   pr WRITE-READ-SORTS .
-  op k1 : -> Key .
-  op k2 : -> Key .
-  op v1 : -> Value .
-  op v2 : -> Value .
+  ops k1 k2 : -> Key .
+  ops v1 v2 : -> Value .
 
   op emptyMap : -> Map .
 endfm

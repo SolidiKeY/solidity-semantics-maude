@@ -6,8 +6,7 @@ fmod ACC-FUNCTIONAL is
 
 
   sort AccountField .
-  op $balance : -> AccountField [ctor] .
-  op $isOpen : -> AccountField [ctor] .
+  ops $balance $isOpen : -> AccountField [ctor] .
 
   vars balance i : Int .
   vars isOpen b : Bool .
@@ -16,12 +15,11 @@ fmod ACC-FUNCTIONAL is
   sort Person .
   op Person : String Account -> Person [ctor] .
 
-  vars person : Person .
+  var person : Person .
   vars name newName : String .
 
   sort PersonField .
-  op $name : -> PersonField [ctor] .
-  op $account : -> PersonField [ctor] .
+  ops $name $account : -> PersonField [ctor] .
 
   sort Field .
   subsort AccountField PersonField < Field .
@@ -104,19 +102,13 @@ endfm
 
 fmod ACC-TESTE is
   pr ACC-FUNCTIONAL .
-  op aliceAcc : -> Account .
+  ops aliceAcc bobAcc accountSymb : -> Account .
+  ops alice bob : -> Person .
+
   eq aliceAcc = Account(10, true) .
-
-  op alice : -> Person .
   eq alice = Person("Alice", aliceAcc) .
-
-  op bobAcc : -> Account .
   eq bobAcc = Account(20, false) .
-
-  op bob : -> Person .
   eq bob = Person("Bob", bobAcc) .
-
-  op accountSymb : -> Account .
 endfm
 
 
