@@ -115,14 +115,13 @@ fmod Read-After-Write-Richard-Solution is
   eq read(write(person, field, i), field) = i .
   eq read(write(acc, field, i), field) = i .
 
-  op listsEqual : ListId ListId -> Bool .
+  op listsEqual : ListId ListId -> Bool [comm] .
 
   eq listsEqual([], []) = true .
   ceq listsEqual(fieldWrite :: listIdWrite, fieldRead :: listIdRead) = false
     if fieldWrite =/= fieldRead .
   eq listsEqual(field :: listIdWrite, field :: listIdRead) = listsEqual(listIdWrite, listIdRead) .
   eq listsEqual(field :: listId, []) = false .
-  eq listsEqual([], field :: listId) = false .
 
   ceq read(write(person, fieldWrite, i), fieldRead) = read(person, fieldRead)
     if fieldWrite =/= fieldRead .
@@ -132,7 +131,8 @@ fmod Read-After-Write-Richard-Solution is
   ceq read(write(person, listIdWrite, i), listIdRead) = i
     if listsEqual(listIdWrite, listIdRead) .
 
-  eq read(write(person, listIdWrite, i), listIdRead) = read(person, listIdRead) .
+  ceq read(write(person, listIdWrite, i), listIdRead) = read(person, listIdRead)
+    if not(listsEqual(listIdWrite, listIdRead)) .
   eq read(writeAccount(person, $account, acc), $account :: listId) = read(acc, listId) .
 endfm
 

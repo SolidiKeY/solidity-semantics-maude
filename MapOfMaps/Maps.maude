@@ -4,9 +4,9 @@ fmod MAPS-SORT is
   subsort Row Column < RowColumn .
   subsort Map Vec Value < MapVec .
 
-  op emptyMap : -> Map .
+  op defaultTwoMap : -> MapVec .
   op defaultValue : -> Value .
-  op defaultMap : -> Value .
+  op defaultMap : -> Map .
 
   op <_,_> : Row Column -> RowColumn .
 
@@ -14,13 +14,13 @@ fmod MAPS-SORT is
   op read : MapVec RowColumn -> Value .
 
   vars row rowRead : Row .
-  var column columnRead : Column .
+  vars column columnRead : Column .
   var rowColumn : RowColumn .
   var map : MapVec .
   var value : Value .
 
-  eq read(emptyMap, < row , column >) = defaultValue .
-  eq read(emptyMap, row) = defaultMap .
+  eq read(defaultTwoMap, < row , column >) = defaultValue .
+  eq read(defaultTwoMap, row) = defaultMap .
   eq read(defaultMap, column) = defaultValue .
 
   eq read(write(map, rowColumn, value), rowColumn) = value .
@@ -40,17 +40,14 @@ endfm
 fmod EXAMPLE is
   pr MAPS-SORT .
 
-  op r1 : -> Row .
-  op r2 : -> Row .
-  op c1 : -> Column .
-  op c2 : -> Column .
-  op v1 : -> Value .
-  op v2 : -> Value .
+  ops r1 r2 : -> Row .
+  ops c1 c2 : -> Column .
+  ops v1 v2 : -> Value .
 
-  op unknowMap : -> Map .
+  op unknowMap : -> MapVec .
 endfm
 
-red read(emptyMap, < r1 , c1 >) .
+red read(defaultTwoMap, < r1 , c1 >) .
 
 red read(write(unknowMap, < r1 , c1 >, v1), < r1 , c1 >) .
 
@@ -66,9 +63,9 @@ red read(write(unknowMap, < r1 , c1 > , v1), r2) .
 
 red read(write(unknowMap, < r1 , c1 > , v1), r1) .
 
-red read(emptyMap, r1) .
+red read(defaultTwoMap, r1) .
 
-red read(read(emptyMap, r1), c1) .
+red read(read(defaultTwoMap, r1), c1) .
 
 red read(read(write(unknowMap, < r1 , c1 > , v1), r1), c1) .
 
@@ -77,3 +74,5 @@ red read(read(write(unknowMap, < r1 , c1 > , v1), r1), c2) .
 red read(read(write(write(unknowMap, < r1 , c2 >, v2) , < r1 , c1 > , v1), r1), c2) .
 
 red read(read(write(write(unknowMap, < r2 , c2 >, v2) , < r1 , c1 > , v1), r1), c2) .
+
+red read(read(write(write(defaultTwoMap, < r2 , c2 >, v2) , < r1 , c1 > , v1), r1), c2) .

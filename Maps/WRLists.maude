@@ -29,8 +29,8 @@ endfm
 fmod WRITE-READ is
   inc READ .
 
-  var key keyWrite : Key .
-  var value valueWrite : Value .
+  vars key keyWrite : Key .
+  vars value valueWrite : Value .
   var list : List{KeyValue} .
 
   eq write(nil, key, valueWrite) = < key , valueWrite > .

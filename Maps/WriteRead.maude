@@ -1,7 +1,5 @@
 fmod WRITE-READ-SORTS is
-  sort Map .
-  sort Key .
-  sort Value .
+  sorts Map Key Value .
 
   op defaultValue : -> Value .
   op defaultMap : -> Map .
