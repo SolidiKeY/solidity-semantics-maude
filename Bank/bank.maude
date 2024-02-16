@@ -1,14 +1,15 @@
 fmod BANK-SORT is
     pr INT .
 
-    sort Account Bank Person Struct BankPersonSelector PersonSelector Selector Name Status Value .
-    subsort Account Bank Person Name Int Status < Value .
+    sort Account Map Person Struct BankPersonSelector PersonSelector Selector Name Status Value .
+    subsort Account Map Person Name Int Status < Value .
     subsort PersonSelector BankPersonSelector Int < Selector .
 
     ops Alice Bob Carol : -> Name .
     ops open closed : -> Status .
 
-    ops $bank $alice $bob $carol : -> BankPersonSelector [ctor] .
+    ops $alice $bob $carol : -> PersonSelector [ctor] .
+    ops $bank : -> BankPersonSelector [ctor] .
     ops $name $accountNr : -> PersonSelector [ctor] .
 
     ops Person : Name Int -> Person .
@@ -29,12 +30,28 @@ fmod BANK is
     vars struct value : Value .
     var $sel $selWrite $selRead : Selector .
     var list listWrite listRead : List{Selector} .
+    var i : Int .
+    var $person : PersonSelector .
 
     ceq read(write(struct, $selWrite listWrite, value), $selRead listRead) = read(struct, $selRead listRead)
         if $selWrite =/= $selRead .
     eq read(write(struct, $sel, value), $sel) = value .
 
     eq read(write(struct, $sel listWrite, value), $sel listRead) = read(write(read(struct, $sel), listWrite, value), listRead).
+
+    op defaultMap : -> Map .
+    op defaultAccount : -> Account .
+    op defaultPerson : -> Person .
+    op defaultName : -> Person .
+    op defaultStruct : -> Value .
+
+    eq read(defaultMap, i) = 0 .
+    eq read(defaultPerson, $name) = defaultName .
+    eq read(defaultPerson, $accountNr) = 0 .
+    eq read(defaultStruct, $person) = defaultPerson .
+    eq read(defaultStruct, $person list) = read(defaultPerson, list) .
+    eq read(defaultStruct, $bank) = defaultMap .
+    eq read(defaultStruct, $bank list) = read(defaultMap, list) .
 endfm
 
 fmod TEST-BANK is
@@ -56,3 +73,9 @@ red write(unknown, $bank 10, 100) .
 red aliceWithBank .
 
 red read(aliceWithBank, $bank aliceAccountNr) .
+
+red read(defaultStruct, $bank 0) .
+
+red read(defaultStruct, $alice $name) .
+
+red read(defaultStruct, $alice $accountNr) .
