@@ -1,0 +1,39 @@
+fmod BANK-SORT is
+    pr INT .
+
+    sort Account Bank Person Struct BankPersonSelect Selector Name Status Value .
+    subsort Account Bank Person < Struct < Value .
+    subsort BankPersonSelect < Selector .
+    subsort Name Int Status < Value .
+
+    ops Alice Bob Carol : -> Name .
+    ops open closed : -> Status .
+
+    ops $bank $person : -> BankPersonSelect [ctor] .
+
+    ops Person : Name Int -> Person .
+    ops Account : Int Status -> Account .
+endfm
+
+view Selector from TRIV to BANK-SORT is
+  sort Elt to Selector .
+endv
+
+fmod BANK is
+    pr BANK-SORT .
+    pr LIST{Selector} .
+
+    ops write : Struct List{Selector} Value -> Struct .
+    ops read : Struct List{Selector} -> Value .
+
+    var struct : Struct .
+    var $sel $selWrite $selRead : Selector .
+    var list listWrite listRead : List{Selector} .
+    var value : Value .
+
+    ceq read(write(struct, $selWrite listWrite, value), $selRead listRead) = read(struct, $selRead listRead)
+        if $selWrite =/= $selRead .
+    eq read(write(struct, $sel, value), $sel) = value .
+
+    eq read(write(struct, $sel listWrite, value), $sel listRead) = read(write(read(struct, $sel), listWrite, value), listRead).
+endfm

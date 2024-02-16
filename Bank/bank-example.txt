@@ -1,5 +1,5 @@
-Person ( account )
-Account (accountNr, isOpen)
-Bank( map: AccountNr -> Balance)
+Person ( Name , accountNr )
+Account (balance, isOpen)
+Bank( map: AccountNr -> Account)
 person.bank.transfer(person.account, 500)
 bank.getAccount(person.accountNr).setBalance(500)
