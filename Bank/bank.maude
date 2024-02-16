@@ -1,15 +1,15 @@
 fmod BANK-SORT is
     pr INT .
 
-    sort Account Bank Person Struct BankPersonSelect Selector Name Status Value .
-    subsort Account Bank Person < Struct < Value .
-    subsort BankPersonSelect < Selector .
-    subsort Name Int Status < Value .
+    sort Account Bank Person Struct BankPersonSelector PersonSelector Selector Name Status Value .
+    subsort Account Bank Person Name Int Status < Value .
+    subsort PersonSelector BankPersonSelector Int < Selector .
 
     ops Alice Bob Carol : -> Name .
     ops open closed : -> Status .
 
-    ops $bank $person : -> BankPersonSelect [ctor] .
+    ops $bank $alice $bob $carol : -> BankPersonSelector [ctor] .
+    ops $name $accountNr : -> PersonSelector [ctor] .
 
     ops Person : Name Int -> Person .
     ops Account : Int Status -> Account .
@@ -23,13 +23,12 @@ fmod BANK is
     pr BANK-SORT .
     pr LIST{Selector} .
 
-    ops write : Struct List{Selector} Value -> Struct .
-    ops read : Struct List{Selector} -> Value .
+    ops write : Value List{Selector} Value -> Value .
+    ops read : Value List{Selector} -> Value .
 
-    var struct : Struct .
+    vars struct value : Value .
     var $sel $selWrite $selRead : Selector .
     var list listWrite listRead : List{Selector} .
-    var value : Value .
 
     ceq read(write(struct, $selWrite listWrite, value), $selRead listRead) = read(struct, $selRead listRead)
         if $selWrite =/= $selRead .
@@ -37,3 +36,23 @@ fmod BANK is
 
     eq read(write(struct, $sel listWrite, value), $sel listRead) = read(write(read(struct, $sel), listWrite, value), listRead).
 endfm
+
+fmod TEST-BANK is
+    pr BANK .
+
+    ops unknown aliceWithBank : -> Value .
+    ops aliceAccountNr : -> Int .
+
+    eq aliceWithBank  = write(write(unknown, $alice $accountNr, 10), $bank 10, 100) .
+    eq aliceAccountNr = read(aliceWithBank, $alice $accountNr) .
+endfm
+
+red write(unknown, $alice $name, Alice) .
+
+red read(write(unknown, $alice $name, Alice), $alice $name) .
+
+red write(unknown, $bank 10, 100) .
+
+red aliceWithBank .
+
+red read(aliceWithBank, $bank aliceAccountNr) .
