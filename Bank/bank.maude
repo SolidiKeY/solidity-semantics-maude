@@ -24,6 +24,8 @@ fmod BANK is
     pr BANK-SORT .
     pr LIST{Selector} .
 
+    sort Tuple .
+
     ops write : Value List{Selector} Value -> Value .
     ops read : Value List{Selector} -> Value .
 
@@ -52,6 +54,11 @@ fmod BANK is
     eq read(defaultStruct, $person list) = read(defaultPerson, list) .
     eq read(defaultStruct, $bank) = defaultMap .
     eq read(defaultStruct, $bank list) = read(defaultMap, list) .
+
+    op _<-_ : List{Selector} Value -> Tuple [prec 30] .
+    op _;_ : Value Tuple -> Value .
+
+    eq struct ; list <- value = write(struct, list, value) .
 endfm
 
 fmod TEST-BANK is
@@ -60,9 +67,11 @@ fmod TEST-BANK is
     ops unknown aliceWithBank : -> Value .
     ops aliceAccountNr : -> Int .
 
-    eq aliceWithBank  = write(write(unknown, $alice $accountNr, 10), $bank 10, 100) .
+    eq aliceWithBank  = unknown ; $alice $accountNr <- 10 ; $bank 10 <- 100 .
     eq aliceAccountNr = read(aliceWithBank, $alice $accountNr) .
 endfm
+
+red unknown ; $alice $accountNr <- 10 ; $bank 10 <- 100 .
 
 red write(unknown, $alice $name, Alice) .
 
