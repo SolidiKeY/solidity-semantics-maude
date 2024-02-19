@@ -22,7 +22,7 @@ fmod MAP-TEST is
 endfm
 
 
-red write(emptyMap, 0, (1 + 1)) .
+red write(emptyMap, 0, 1 + 1) .
 
 red write(write(emptyMap, 0, 1), 0, 2) .
 
