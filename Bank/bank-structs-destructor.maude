@@ -1,0 +1,103 @@
+fmod BANK-SORT is
+    pr INT .
+
+    sort Account Map Person Struct BankPersonSelector BankSelector PersonSelector Selector Name Status Value .
+    subsort Account Map Person Name Int Status < Value .
+    subsort PersonSelector BankPersonSelector BankSelector Int < Selector .
+
+    ops Bank : Map -> Value .
+    ops This : Person Person Person Map -> Value .
+
+    ops Alice Bob Carol : -> Name .
+    ops open closed : -> Status .
+
+    ops $alice $bob $carol : -> PersonSelector [ctor] .
+    ops $bank : -> BankPersonSelector [ctor] .
+    ops $name $accountNr : -> PersonSelector [ctor] .
+    ops $map : -> BankSelector [ctor] .
+
+    ops Person : Name Int -> Person .
+    ops Account : Int Status -> Account .
+endfm
+
+view Selector from TRIV to BANK-SORT is
+    sort Elt to Selector .
+endv
+
+fmod BANK is
+    pr BANK-SORT .
+    pr LIST{Selector} .
+
+    sort Tuple .
+
+    ops write : Value List{Selector} Value -> Value .
+    ops read : Value List{Selector} -> Value .
+
+    vars struct value : Value .
+    vars map bank : Map .
+    var $sel $selWrite $selRead : Selector .
+    var list listWrite listRead : List{Selector} .
+    var i : Int .
+    var $person : PersonSelector .
+    vars alice bob carol : Person .
+
+    eq read(value, nil) = value .
+
+    eq read(This(alice, bob, carol, bank), $bank) = bank .
+    eq read(This(alice, bob, carol, bank), $alice) = alice .
+    eq read(This(alice, bob, carol, bank), $bob) = bob .
+    eq read(This(alice, bob, carol, bank), $carol) = carol .
+    eq read(Bank(map), $map) = map .
+
+    *** ceq read(write(struct, $selWrite listWrite, value), $selRead listRead) = read(struct, $selRead listRead)
+    ***     if $selWrite =/= $selRead .
+    *** eq read(write(struct, $sel, value), $sel) = value .
+
+    *** eq read(write(struct, $sel listWrite, value), $sel listRead) = read(write(read(struct, $sel), listWrite, value), listRead) .
+
+    *** op defaultMap : -> Map .
+    *** op defaultAccount : -> Account .
+    *** ops defaultPerson defaultName : -> Person .
+    *** op defaultStruct : -> Value .
+
+    *** eq read(defaultMap, i) = 0 .
+    *** eq read(defaultPerson, $name) = defaultName .
+    *** eq read(defaultPerson, $accountNr) = 0 .
+    *** eq read(defaultStruct, $person) = defaultPerson .
+    *** eq read(defaultStruct, $person list) = read(defaultPerson, list) .
+    *** eq read(defaultStruct, $bank) = defaultMap .
+    *** eq read(defaultStruct, $bank list) = read(defaultMap, list) .
+
+    *** op _<-_ : List{Selector} Value -> Tuple [prec 30] .
+    *** op _;_ : Value Tuple -> Value .
+
+    *** eq struct ; list <- value = write(struct, list, value) .
+endfm
+
+*** fmod TEST-BANK is
+***     pr BANK .
+
+***     ops unknown aliceWithBank : -> Value .
+***     ops aliceAccountNr : -> Int .
+
+***     eq aliceWithBank  = unknown ; $alice $accountNr <- 10 ; $bank 10 <- 100 .
+***     eq aliceAccountNr = read(aliceWithBank, $alice $accountNr) .
+*** endfm
+
+*** red unknown ; $alice $accountNr <- 10 ; $bank 10 <- 100 .
+
+*** red write(unknown, $alice $name, Alice) .
+
+*** red read(write(unknown, $alice $name, Alice), $alice $name) .
+
+*** red write(unknown, $bank 10, 100) .
+
+*** red aliceWithBank .
+
+*** red read(aliceWithBank, $bank aliceAccountNr) .
+
+*** red read(defaultStruct, $bank 0) .
+
+*** red read(defaultStruct, $alice $name) .
+
+*** red read(defaultStruct, $alice $accountNr) .
