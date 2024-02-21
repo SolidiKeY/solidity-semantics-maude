@@ -30,8 +30,9 @@ fmod BANK is
 
     sort Tuple .
 
-    ops write : Value List{Selector} Value -> Value .
-    ops read : Value List{Selector} -> Value .
+    op write : Value List{Selector} Value -> Value .
+    op write : Map List{Selector} Int -> Map .
+    op read : Value List{Selector} -> Value .
 
     vars struct value : Value .
     var map : Map .
@@ -52,7 +53,6 @@ fmod BANK is
     eq read(Person(name, i), $accountNr) = i .
     eq read(bank, nil) = bank .
     eq read(Bank(map), $accounts list) = read(map, list) .
-
     eq read(write(map, i, value), i) = value .
     ceq read(write(map, i, value), j) = read(map, j)
         if i =/= j .
@@ -88,11 +88,12 @@ endfm
 fmod TEST-BANK is
     pr BANK .
 
+    op balances : -> Map .
     op exStruct : -> Value .
     op aliceAccountNr : -> Int .
 
-    eq exStruct = This(Person(Alice, 0), Person(Bob, 1), Bank(defaultMap)) .
-
+    eq balances = write(defaultMap, 10, 100) .
+    eq exStruct = This(Person(Alice, 10), Person(Bob, 11), Bank(balances)) .
     eq aliceAccountNr = read(exStruct, $alice $accountNr) .
 
     *** ops unknown aliceWithBank : -> Value .
