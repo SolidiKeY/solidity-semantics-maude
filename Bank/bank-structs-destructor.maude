@@ -90,11 +90,13 @@ fmod TEST-BANK is
 
     op balances : -> Map .
     op exStruct : -> Value .
-    op aliceAccountNr : -> Int .
+    ops aliceAccountNr bobAccountNr : -> Int .
 
-    eq balances = write(defaultMap, 10, 100) .
+    eq balances = write(write(defaultMap, 10, 100), 11, 200) .
     eq exStruct = This(Person(Alice, 10), Person(Bob, 11), Bank(balances)) .
+
     eq aliceAccountNr = read(exStruct, $alice $accountNr) .
+    eq bobAccountNr = read(exStruct, $bob $accountNr) .
 
     *** ops unknown aliceWithBank : -> Value .
     *** ops aliceAccountNr : -> Int .
@@ -109,6 +111,10 @@ red read(exStruct, $alice $name) .
 red read(exStruct, $alice $accountNr) .
 
 red read(exStruct, $bank $accounts aliceAccountNr) .
+
+red read(exStruct, $bank $accounts bobAccountNr) .
+
+red read(exStruct, $bank $accounts 20) .
 
 *** red unknown ; $alice $accountNr <- 10 ; $bank 10 <- 100 .
 
