@@ -1,13 +1,13 @@
 fmod STATIC-ARRAY is
     pr INT .
 
-    sorts Map Array Value .
-    subsorts Map < Array .
+    sorts Map Array MapArray Value .
+    subsort Map Array < MapArray .
 
-    op read : Array Int -> Value .
+    op read : MapArray Int -> Value .
     op length : Array -> Int .
     op write : Array Int Value -> Array .
-    op writeMap : Map Int Value -> Map .
+    op write : Map Int Value -> Map .
 
     op Array : Int Map -> Array .
 
@@ -18,18 +18,18 @@ fmod STATIC-ARRAY is
 
     eq read(Array(size, map), i) = read(map, i) .
 
-    eq read(writeMap(map, i, val), i) = val .
-    ceq read(writeMap(map, i, val), j) = read(map, j)
+    eq read(write(map, i, val), i) = val .
+    ceq read(write(map, i, val), j) = read(map, j)
         if i =/= j .
 
-    eq length(Array(size, array)) = size .
+    eq length(Array(size, map)) = size .
 
-    eq write(Array(size, map), i, val) = Array(size, writeMap(map, i, val)) .
+    eq write(Array(size, map), i, val) = Array(size, write(map, i, val)) .
 
     op sizeF : Array -> Int .
     op mapF : Array -> Map .
 
-    eq write(array, i, val) = Array(sizeF(array), writeMap(mapF(array), i, val)) .
+    eq write(array, i, val) = Array(sizeF(array), write(mapF(array), i, val)) .
 
     op emptyMap : -> Map .
     op defaultValue : -> Value .
@@ -49,6 +49,8 @@ fmod TEST-STATIC-ARRAY is
 endfm
 
 red read(Array(10, emptyMap), 1) .
+
+red exArray .
 
 red read(exArray, 1) .
 
