@@ -1,0 +1,67 @@
+fmod STATIC-ARRAY is
+    pr INT .
+
+    sorts Map Array Value .
+    subsorts Map < Array .
+
+    op read : Array Int -> Value .
+    op length : Array -> Int .
+    op write : Array Int Value -> Array .
+    op writeMap : Map Int Value -> Map .
+
+    op Array : Int Map -> Array .
+
+    vars i j size : Int .
+    var array : Array .
+    var val : Value .
+    var map : Map .
+
+    eq read(Array(size, map), i) = read(map, i) .
+
+    eq read(writeMap(map, i, val), i) = val .
+    ceq read(writeMap(map, i, val), j) = read(map, j)
+        if i =/= j .
+
+    eq length(Array(size, array)) = size .
+
+    eq write(Array(size, map), i, val) = Array(size, writeMap(map, i, val)) .
+
+    op sizeF : Array -> Int .
+    op mapF : Array -> Map .
+
+    eq write(array, i, val) = Array(sizeF(array), writeMap(mapF(array), i, val)) .
+
+    op emptyMap : -> Map .
+    op defaultValue : -> Value .
+
+    eq read(emptyMap, i) = defaultValue .
+endfm
+
+fmod TEST-STATIC-ARRAY is
+    pr STATIC-ARRAY .
+
+    ops v1 v2 : -> Value .
+
+    ops exArray unknown unknownArray : -> Array .
+    eq exArray = write(Array(10, emptyMap), 1, v1) .
+
+    eq unknown = write(write(unknownArray, 1, v1), 2, v2) .
+endfm
+
+red read(Array(10, emptyMap), 1) .
+
+red read(exArray, 1) .
+
+red read(exArray, 2) .
+
+red length(Array(20, emptyMap)) .
+
+red length(exArray) .
+
+red read(unknown, 0) .
+red read(unknown, 1) .
+red read(unknown, 2) .
+
+red length(unknown) .
+red length(write(unknownArray, 1, v1)) .
+red length(write(unknownArray, 1, v1)) == length(unknown) .
