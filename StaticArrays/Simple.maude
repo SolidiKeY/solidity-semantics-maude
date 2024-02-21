@@ -1,0 +1,56 @@
+fmod STATIC-ARRAY is
+    pr INT .
+
+    sorts Array Value .
+
+    op read : Array Int -> Value .
+    op write : Array Int Value -> Array .
+
+
+    vars i j size : Int .
+    var array : Array .
+    var val : Value .
+
+    eq read(write(array, i, val), i) = val .
+    ceq read(write(array, i, val), j) = read(array, j)
+        if i =/= j .
+
+    op emptyArray : Int -> Array .
+    op defaultValue : -> Value .
+
+    eq read(emptyArray(size), i) = defaultValue .
+
+    op length : Array -> Int .
+
+    eq length(emptyArray(size)) = size .
+    eq length(write(array, i, val)) = length(array) .
+endfm
+
+fmod TEST-STATIC-ARRAY is
+    pr STATIC-ARRAY .
+
+    ops v1 v2 : -> Value .
+
+    ops exArray unknown unknownArray : -> Array .
+    eq exArray = write(emptyArray(10), 1, v1) .
+
+    eq unknown = write(write(unknownArray, 1, v1), 2, v2) .
+endfm
+
+red read(emptyArray(10), 1) .
+
+red read(exArray, 1) .
+
+red read(exArray, 2) .
+
+red length(emptyArray(20)) .
+
+red length(exArray) .
+
+red read(unknown, 0) .
+red read(unknown, 1) .
+red read(unknown, 2) .
+
+red length(unknown) .
+red length(write(unknownArray, 1, v1)) .
+red length(write(unknownArray, 1, v1)) == length(unknown) .
