@@ -6,12 +6,12 @@ fmod BANK-SORT is
     subsort PersonSelector BankPersonSelector BankSelector Int < Selector .
 
     ops Bank : Map -> Value .
-    ops This : Person Person Person Map -> Value .
+    ops This : Person Person Map -> Value .
 
-    ops Alice Bob Carol : -> Name .
+    ops Alice Bob : -> Name .
     ops open closed : -> Status .
 
-    ops $alice $bob $carol : -> PersonSelector [ctor] .
+    ops $alice $bob : -> PersonSelector [ctor] .
     ops $bank : -> BankPersonSelector [ctor] .
     ops $name $accountNr : -> PersonSelector [ctor] .
     ops $map : -> BankSelector [ctor] .
@@ -39,14 +39,13 @@ fmod BANK is
     var list listWrite listRead : List{Selector} .
     var i : Int .
     var $person : PersonSelector .
-    vars alice bob carol : Person .
+    vars alice bob  : Person .
 
     eq read(value, nil) = value .
 
-    eq read(This(alice, bob, carol, bank), $bank) = bank .
-    eq read(This(alice, bob, carol, bank), $alice) = alice .
-    eq read(This(alice, bob, carol, bank), $bob) = bob .
-    eq read(This(alice, bob, carol, bank), $carol) = carol .
+    eq read(This(alice, bob, bank), $bank) = bank .
+    eq read(This(alice, bob, bank), $alice) = alice .
+    eq read(This(alice, bob, bank), $bob) = bob .
     eq read(Bank(map), $map) = map .
 
     *** ceq read(write(struct, $selWrite listWrite, value), $selRead listRead) = read(struct, $selRead listRead)
