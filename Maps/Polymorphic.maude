@@ -1,12 +1,12 @@
 fmod MAP{Key :: TRIV, Value :: TRIV} is
-    sort Map .
+    sort Map{Key, Value} .
 
-    var map : Map .
+    var map : Map{Key, Value} .
     vars key keyWrite keyRead : Key$Elt .
     var val : Value$Elt .
 
-    op write : Map Key$Elt Value$Elt -> Map .
-    op read : Map Key$Elt -> Value$Elt .
+    op write : Map{Key, Value} Key$Elt Value$Elt -> Map{Key, Value} .
+    op read : Map{Key, Value} Key$Elt -> Value$Elt .
 
     eq read(write(map, key, val), key) = val .
     ceq read(write(map, keyWrite, val), keyRead) = read(map, keyRead)
@@ -16,7 +16,7 @@ endfm
 fmod DEFAULT-MAP{Key :: TRIV, Value :: TRIV} is
     inc MAP{Key, Value} .
 
-    op emptyMap : -> Map .
+    op emptyMap : -> Map{Key, Value} .
     op defaultValue : -> Value$Elt .
 
     var key : Key$Elt .
@@ -25,7 +25,7 @@ fmod DEFAULT-MAP{Key :: TRIV, Value :: TRIV} is
 endfm
 
 fmod TEST-MAP is
-    pr DEFAULT-MAP{Int, Int} .
+    pr DEFAULT-MAP{Int, Int} * (sort Map{Int, Int} to Map) .
 
     op ex : -> Map .
 

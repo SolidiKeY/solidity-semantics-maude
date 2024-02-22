@@ -1,6 +1,6 @@
 fmod STACK{Value :: TRIV} is
     pr NAT .
-    pr DEFAULT-MAP{Nat, Value} .
+    pr DEFAULT-MAP{Nat, Value} * (sort Map{Nat, Value} to Map) .
 
     sorts Stack .
 
