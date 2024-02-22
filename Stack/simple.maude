@@ -1,0 +1,46 @@
+fmod STACK is
+    pr INT .
+
+    sort Value Stack .
+
+    op emptyStack : -> Stack .
+    op push : Stack Value -> Stack .
+    op pop : Stack -> Stack .
+    op top : Stack -> Value .
+    op length : Stack -> Int .
+    op defaultValue : -> Value .
+
+    var stack : Stack .
+    var i : Int .
+    var val : Value .
+
+    eq top(push(stack, val)) = val .
+    eq pop(push(stack, val)) = stack .
+    eq length(emptyStack) = 0 .
+    eq length(push(stack, val)) = length(stack) + 1 .
+
+    eq top(emptyStack) = defaultValue .
+endfm
+
+fmod TEST-STACK is
+    pr STACK .
+
+    ops v1 v2 : -> Value .
+    ops unknownStack simpleStack unknownEx : -> Stack .
+
+    eq simpleStack = push(push(emptyStack, v1), v2) .
+
+    eq unknownEx = push(push(unknownStack, v1), v2) .
+endfm
+
+red length(simpleStack) .
+
+red top(simpleStack) .
+
+red top(pop(simpleStack)) .
+
+red top(emptyStack) .
+
+red top(unknownEx) .
+
+red length(unknownEx) .
