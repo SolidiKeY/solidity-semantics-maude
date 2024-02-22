@@ -1,0 +1,73 @@
+fmod STACK{Value :: TRIV} is
+    pr NAT .
+    pr DEFAULT-MAP{Nat, Value} .
+
+    sorts Stack .
+
+    op Stack : Map Nat -> Stack .
+    op getMap : Stack -> Map .
+    op length : Stack -> Nat .
+
+    op emptyStack : -> Stack .
+    op push : Stack Value$Elt -> Stack .
+    op pop : Stack -> Stack .
+    op top : Stack -> Value$Elt .
+
+    var map : Map .
+    var stack : Stack .
+    vars i j size : Nat .
+    var val : Value$Elt .
+
+    op norm : Nat -> Nat .
+    op findOne : Nat -> Bool .
+    op removeOne : Nat -> Nat .
+    op pred : Nat -> Nat .
+
+    eq pred(s i) = i .
+
+    eq getMap(Stack(map, size)) = map .
+    eq length(Stack(map, size)) = size .
+
+    eq emptyStack = Stack(emptyMap, 0) .
+    eq push(stack, val) = Stack(write(getMap(stack), length(stack), val), s length(stack)) .
+    eq pop(stack) = Stack(write(getMap(stack), pred(length(stack)), defaultValue), pred(length(stack))) .
+    eq top(stack) = read(getMap(stack), pred(length(stack))) .
+endfm
+
+fmod TEST-STACK{Value :: TRIV} is
+    pr STACK{Value} .
+
+    ops v1 v2 : -> Value$Elt .
+    ops unknownStack exUnknown exUnknown2 exStack : -> Stack .
+
+    eq exUnknown = push(unknownStack, v1) .
+    eq exUnknown2 = push(push(unknownStack, v1), v2) .
+
+    eq exStack = push(push(emptyStack, v1), v2) .
+endfm
+
+red exStack .
+
+red pop(exStack) .
+
+red top(exStack) .
+
+red top(pop(exStack)) .
+
+red top(pop(pop(exStack))) .
+
+red exUnknown .
+
+red top(exUnknown) .
+
+red pop(exUnknown) .
+
+red top(pop(exUnknown)) .
+
+red exUnknown2 .
+
+red top(exUnknown2) .
+
+red pop(exUnknown2) .
+
+red top(pop(exUnknown2)) .
