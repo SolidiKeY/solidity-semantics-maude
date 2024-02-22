@@ -17,7 +17,7 @@ fmod BANK-SORT is
     ops $accounts : -> BankSelector [ctor] .
 
     ops Person : Name Int -> Person .
-    ops Account : Int Status -> Account .
+    *** ops Account : Int Status -> Account .
 endfm
 
 view Selector from TRIV to BANK-SORT is
@@ -42,42 +42,47 @@ fmod BANK is
     var list listWrite listRead : List{Selector} .
     var i j : Int .
     var $person : PersonSelector .
-    vars alice bob  : Person .
+    vars alice bob person : Person .
+
+    ops getAlice getBob : Value -> Person .
+    op getBank : Value -> Bank .
+    op getName : Person -> Name .
+    op getAccountNr : Person -> Int .
+    op getMap : Bank -> Map .
+
+    eq getAlice(This(alice, bob, bank)) = alice .
+    eq getBob(This(alice, bob, bank)) = bob .
+    eq getBank(This(alice, bob, bank)) = bank .
+    eq getName(Person(name, i)) = name .
+    eq getAccountNr(Person(name, i)) = i .
+    eq getMap(Bank(map)) = map .
 
     eq read(value, nil) = value .
 
-    eq read(This(alice, bob, bank), $bank list) = read(bank, list) .
-    eq read(This(alice, bob, bank), $alice list) = read(alice, list) .
-    eq read(This(alice, bob, bank), $bob list) = read(bob, list) .
-    eq read(Person(name, i), $name) = name .
-    eq read(Person(name, i), $accountNr) = i .
-    eq read(bank, nil) = bank .
-    eq read(Bank(map), $accounts list) = read(map, list) .
+    eq read(struct, $alice list) = read(getAlice(struct), list) .
+    eq read(struct, $bob list) = read(getBob(struct), list) .
+    eq read(struct, $bank list) = read(getBank(struct), list) .
+
+    eq read(person, $name) = getName(person) .
+    eq read(person, $accountNr) = getAccountNr(person) .
+
+    eq read(bank, $accounts list) = read(getMap(bank), list) .
     eq read(write(map, i, value), i) = value .
     ceq read(write(map, i, value), j) = read(map, j)
         if i =/= j .
 
-    *** ceq read(write(struct, $selWrite listWrite, value), $selRead listRead) = read(struct, $selRead listRead)
-    ***     if $selWrite =/= $selRead .
-    *** eq read(write(struct, $sel, value), $sel) = value .
 
-    *** eq read(write(struct, $sel listWrite, value), $sel listRead) = read(write(read(struct, $sel), listWrite, value), listRead) .
 
     op defaultMap : -> Map .
-    op defaultBank : -> Struct .
-    op defaultAccount : -> Account .
-    ops defaultPerson defaultName : -> Person .
+    op defaultBank : -> Bank .
+    op defaultPerson : -> Person .
+    op defaultName : -> Name .
     op defaultStruct : -> Value .
 
     eq read(defaultMap, i) = 0 .
-    *** eq read(defaultPerson, nil) = defaultPerson .
-    *** eq read(Person(), $name) = defaultName .
-    *** eq read(defaultPerson, $accountNr) = 0 .
-    *** eq read(defaultStruct, nil) = defaultStruct .
-    *** eq read(defaultStruct, $person list) = read(defaultPerson, list) .
-    *** eq read(defaultStruct, $bank list) = read(defaultMap, list) .
-    *** eq read(defaultBank, nil) = defaultBank .
-    *** eq read(defaultBank, $accounts list) = defaultBank .
+    eq defaultBank = Bank(defaultMap) .
+    eq defaultPerson = Person(defaultName, 0) .
+    eq defaultStruct = This(defaultPerson, defaultPerson, defaultBank) .
 
     op _<-_ : List{Selector} Value -> Tuple [prec 30] .
     op _;_ : Value Tuple -> Value .
@@ -98,11 +103,11 @@ fmod TEST-BANK is
     eq aliceAccountNr = read(exStruct, $alice $accountNr) .
     eq bobAccountNr = read(exStruct, $bob $accountNr) .
 
-    *** ops unknown aliceWithBank : -> Value .
-    *** ops aliceAccountNr : -> Int .
+    ops unknown aliceWithBank : -> Value .
+    ops aliceAccountNr : -> Int .
 
-    *** eq aliceWithBank  = unknown ; $alice $accountNr <- 10 ; $bank 10 <- 100 .
-    *** eq aliceAccountNr = read(aliceWithBank, $alice $accountNr) .
+    eq aliceWithBank  = unknown ; $alice $accountNr <- 10 ; $bank $accounts 10 <- 100 .
+    eq aliceAccountNr = read(aliceWithBank, $alice $accountNr) .
 endfm
 
 
@@ -116,20 +121,20 @@ red read(exStruct, $bank $accounts bobAccountNr) .
 
 red read(exStruct, $bank $accounts 20) .
 
-*** red unknown ; $alice $accountNr <- 10 ; $bank 10 <- 100 .
+red unknown ; $alice $accountNr <- 10 ; $bank 10 <- 100 .
 
-*** red write(unknown, $alice $name, Alice) .
+red write(unknown, $alice $name, Alice) .
 
-*** red read(write(unknown, $alice $name, Alice), $alice $name) .
+red read(write(unknown, $alice $name, Alice), $alice $name) .
 
-*** red write(unknown, $bank 10, 100) .
+red write(unknown, $bank 10, 100) .
 
-*** red aliceWithBank .
+red aliceWithBank .
 
-*** red read(aliceWithBank, $bank aliceAccountNr) .
+red read(aliceWithBank, $bank $accounts aliceAccountNr) .
 
-*** red read(defaultStruct, $bank 0) .
+red read(defaultStruct, $bank $accounts 0) .
 
-*** red read(defaultStruct, $alice $name) .
+red read(defaultStruct, $alice $name) .
 
-*** red read(defaultStruct, $alice $accountNr) .
+red read(defaultStruct, $alice $accountNr) .
