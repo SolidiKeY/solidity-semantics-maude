@@ -16,12 +16,12 @@ endfm
 fmod DEFAULT-MAP{Key :: TRIV, Value :: TRIV} is
     inc MAP{Key, Value} .
 
-    op defaultMap : -> Map .
+    op emptyMap : -> Map .
     op defaultValue : -> Value$Elt .
 
     var key : Key$Elt .
 
-    eq read(defaultMap, key) = defaultValue .
+    eq read(emptyMap, key) = defaultValue .
 endfm
 
 fmod TEST-MAP is
@@ -29,10 +29,10 @@ fmod TEST-MAP is
 
     op ex : -> Map .
 
-    eq ex = write(write(defaultMap, 0, 1), 2, 3) .
+    eq ex = write(write(emptyMap, 0, 1), 2, 3) .
 endfm
 
-red read(write(defaultMap, 0, 1), 0) .
+red read(write(emptyMap, 0, 1), 0) .
 red read(ex, 0) .
 red read(ex, 1) .
 red read(ex, 2) .
