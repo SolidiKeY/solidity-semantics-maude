@@ -1,16 +1,16 @@
 fmod STACK is
-    pr NAT .
+    pr INT .
 
     sorts Value Stack Map .
 
-    op Stack : Map Nat -> Stack .
+    op Stack : Map Int -> Stack .
     op getMap : Stack -> Map .
-    op length : Stack -> Nat .
+    op length : Stack -> Int .
 
 
     op emptyMap : -> Map .
-    op write : Map Nat Value -> Map .
-    op read : Map Nat -> Value .
+    op write : Map Int Value -> Map .
+    op read : Map Int -> Value .
 
     op emptyStack : -> Stack .
     op push : Stack Value -> Stack .
@@ -20,27 +20,35 @@ fmod STACK is
 
     var map : Map .
     var stack : Stack .
-    vars i j size : Nat .
+    vars i j size : Int .
     var val : Value .
 
-    op norm : Nat -> Nat .
-    op findOne : Nat -> Bool .
-    op removeOne : Nat -> Nat .
-    op pred : Nat -> Nat .
+    op norm : Int -> Int .
+    op findOne : Int -> Bool .
+    op removeOne : Int -> Int .
 
-    eq pred(s i) = i .
+    eq findOne(i + 1) = true .
+    eq findOne(i - 1) = findOne(i) .
+    eq findOne(i) = false .
+
+    eq removeOne(i + 1) = i .
+    eq removeOne(i - 1) = removeOne(i) .
+
+    ceq norm(i - 1) = norm(removeOne(i))
+        if findOne(i) .
 
     eq getMap(Stack(map, size)) = map .
     eq length(Stack(map, size)) = size .
 
-    eq read(write(map, i, val), i) = val .
+    ceq read(write(map, i, val), j) = val
+        if norm(i) == norm(j) .
     ceq read(write(map, i, val), j) = read(map, j)
-        if i =/= j .
+        if norm(i) =/= norm(j) .
 
     eq emptyStack = Stack(emptyMap, 0) .
-    eq push(stack, val) = Stack(write(getMap(stack), length(stack), val), s length(stack)) .
-    eq pop(stack) = Stack(write(getMap(stack), pred(length(stack)), defaultValue), pred(length(stack))) .
-    eq top(stack) = read(getMap(stack), pred(length(stack))) .
+    eq push(stack, val) = Stack(write(getMap(stack), length(stack), val), length(stack) + 1) .
+    eq pop(stack) = Stack(write(getMap(stack), length(stack) - 1, defaultValue), length(stack) - 1) .
+    eq top(stack) = read(getMap(stack), length(stack) - 1) .
 endfm
 
 fmod TEST-STACK is
