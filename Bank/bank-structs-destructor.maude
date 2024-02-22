@@ -17,7 +17,6 @@ fmod BANK-SORT is
     ops $accounts : -> BankSelector [ctor] .
 
     ops Person : Name Int -> Person .
-    *** ops Account : Int Status -> Account .
 endfm
 
 view Selector from TRIV to BANK-SORT is
@@ -72,6 +71,14 @@ fmod BANK is
         if i =/= j .
 
 
+    eq write(struct, nil, value) = value .
+    eq write(struct, $alice list, value) = This(write(getAlice(struct), list, value), getBob(struct), getBank(struct)) .
+    eq write(struct, $bob list, value) = This(getAlice(struct), write(getBob(struct), list, value), getBank(struct)) .
+    eq write(struct, $bank list, value) = This(getAlice(struct), getBob(struct), write(getBank(struct), list, value)) .
+    eq write(person, $name, name) = Person(name, getAccountNr(person)) .
+    eq write(person, $accountNr, i) = Person(getName(person), i) .
+    eq write(bank, $accounts list, value) = Bank(write(getMap(bank), list, value)) .
+
 
     op defaultMap : -> Map .
     op defaultBank : -> Bank .
@@ -121,13 +128,11 @@ red read(exStruct, $bank $accounts bobAccountNr) .
 
 red read(exStruct, $bank $accounts 20) .
 
-red unknown ; $alice $accountNr <- 10 ; $bank 10 <- 100 .
-
 red write(unknown, $alice $name, Alice) .
 
 red read(write(unknown, $alice $name, Alice), $alice $name) .
 
-red write(unknown, $bank 10, 100) .
+red write(unknown, $bank $accounts 10, 100) .
 
 red aliceWithBank .
 
@@ -138,3 +143,5 @@ red read(defaultStruct, $bank $accounts 0) .
 red read(defaultStruct, $alice $name) .
 
 red read(defaultStruct, $alice $accountNr) .
+
+red unknown ; $alice $accountNr <- 10 ; $bank $accounts 10 <- 100 .
