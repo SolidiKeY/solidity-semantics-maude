@@ -55,6 +55,8 @@ fmod TEST-STACK is
     eq exStack = push(push(emptyStack, v1), v2) .
 endfm
 
+red top(emptyStack) .
+
 red exStack .
 
 red pop(exStack) .

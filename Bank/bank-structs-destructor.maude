@@ -111,12 +111,10 @@ fmod TEST-BANK is
     eq bobAccountNr = read(exStruct, $bob $accountNr) .
 
     ops unknown aliceWithBank : -> Value .
-    ops aliceAccountNr : -> Int .
 
     eq aliceWithBank  = unknown ; $alice $accountNr <- 10 ; $bank $accounts 10 <- 100 .
-    eq aliceAccountNr = read(aliceWithBank, $alice $accountNr) .
+    eq aliceAccountNr = read(exStruct, $alice $accountNr) .
 endfm
-
 
 red read(exStruct, $alice $name) .
 
@@ -145,3 +143,10 @@ red read(defaultStruct, $alice $name) .
 red read(defaultStruct, $alice $accountNr) .
 
 red unknown ; $alice $accountNr <- 10 ; $bank $accounts 10 <- 100 .
+
+red write(exStruct, $bank $accounts read(exStruct, $alice $accountNr), 500) .
+
+red read(write(exStruct, $bank $accounts read(exStruct, $alice $accountNr), 500),
+    $bank $accounts read(
+    write(exStruct, $bank $accounts read(exStruct, $alice $accountNr), 500)
+    , $alice $accountNr)) .

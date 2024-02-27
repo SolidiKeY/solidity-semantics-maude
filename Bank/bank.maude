@@ -87,3 +87,10 @@ red read(defaultStruct, $bank 0) .
 red read(defaultStruct, $alice $name) .
 
 red read(defaultStruct, $alice $accountNr) .
+
+red read(aliceWithBank, $bank aliceAccountNr) .
+
+red read(write(aliceWithBank, $bank read(aliceWithBank, $alice $accountNr), 500),
+    $bank read(
+    write(aliceWithBank, $bank read(aliceWithBank, $alice $accountNr), 500)
+    , $alice $accountNr)) .
