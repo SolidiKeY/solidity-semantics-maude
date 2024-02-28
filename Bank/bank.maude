@@ -1,15 +1,16 @@
 fmod BANK-SORT is
     pr INT .
 
-    sort Account Map Person Struct BankPersonSelector PersonSelector Selector Name Status Value .
-    subsort Account Map Person Name Int Status < Value .
-    subsort PersonSelector BankPersonSelector Int < Selector .
+    sort Account Map Person Struct BankPersonSelector AccountsSelector PersonSelector Accounts Selector Name Status Value .
+    subsort Account Accounts Map Person Name Int Status < Value .
+    subsort PersonSelector AccountsSelector BankPersonSelector Int < Selector .
 
     ops Alice Bob Carol : -> Name .
     ops open closed : -> Status .
 
     ops $alice $bob $carol : -> PersonSelector [ctor] .
-    ops $bank : -> BankPersonSelector [ctor] .
+    op $bank : -> BankPersonSelector [ctor] .
+    op $accounts : -> AccountsSelector [ctor] .
     ops $name $accountNr : -> PersonSelector [ctor] .
 
     ops Person : Name Int -> Person .
@@ -42,6 +43,7 @@ fmod BANK is
     eq read(write(struct, $sel listWrite, value), $sel listRead) = read(write(read(struct, $sel), listWrite, value), listRead) .
 
     op defaultMap : -> Map .
+    op defaultAccounts : -> Accounts .
     op defaultAccount : -> Account .
     ops defaultPerson defaultName : -> Person .
     op defaultStruct : -> Value .
@@ -51,8 +53,10 @@ fmod BANK is
     eq read(defaultPerson, $accountNr) = 0 .
     eq read(defaultStruct, $person) = defaultPerson .
     eq read(defaultStruct, $person list) = read(defaultPerson, list) .
-    eq read(defaultStruct, $bank) = defaultMap .
-    eq read(defaultStruct, $bank list) = read(defaultMap, list) .
+    eq read(defaultStruct, $bank) = defaultAccounts .
+    eq read(defaultAccounts, $accounts) = defaultMap .
+    eq read(defaultStruct, $bank list) = read(defaultAccounts, list) .
+    eq read(defaultAccounts, $accounts list) = read(defaultMap, list)  .
 
     op _<-_ : List{Selector} Value -> Tuple [prec 30] .
     op _;_ : Value Tuple -> Value .
@@ -66,23 +70,23 @@ fmod TEST-BANK is
     ops unknown aliceWithBank : -> Value .
     ops aliceAccountNr : -> Int .
 
-    eq aliceWithBank  = unknown ; $alice $accountNr <- 10 ; $bank 10 <- 100 .
+    eq aliceWithBank  = unknown ; $alice $accountNr <- 10 ; $bank $accounts 10 <- 100 .
     eq aliceAccountNr = read(aliceWithBank, $alice $accountNr) .
 endfm
 
-red unknown ; $alice $accountNr <- 10 ; $bank 10 <- 100 .
+red unknown ; $alice $accountNr <- 10 ; $bank $accounts 10 <- 100 .
 
 red write(unknown, $alice $name, Alice) .
 
 red read(write(unknown, $alice $name, Alice), $alice $name) .
 
-red write(unknown, $bank 10, 100) .
+red write(unknown, $bank $accounts 10, 100) .
 
 red aliceWithBank .
 
-red read(aliceWithBank, $bank aliceAccountNr) .
+red read(aliceWithBank, $bank $accounts aliceAccountNr) .
 
-red read(defaultStruct, $bank 0) .
+red read(defaultStruct, $bank $accounts 0) .
 
 red read(defaultStruct, $alice $name) .
 
