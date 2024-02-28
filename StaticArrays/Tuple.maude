@@ -17,7 +17,11 @@ fmod STATIC-ARRAY is
     var val : Value .
     var map : Map .
 
-    eq read(array, i) = read(getMap(array), i) .
+    ceq read(array, i) = read(getMap(array), i)
+        if i < length(array) .
+
+    ceq read(array, i) = outOfBox
+        if i >= length(array) .
 
     eq read(write(map, i, val), i) = val .
     ceq read(write(map, i, val), j) = read(map, j)
@@ -29,7 +33,7 @@ fmod STATIC-ARRAY is
     eq write(array, i, val) = Array(length(array), write(getMap(array), i, val)) .
 
     op emptyMap : -> Map .
-    op defaultValue : -> Value .
+    ops defaultValue outOfBox : -> Value .
     op emptyArray : Int -> Array .
 
     eq read(emptyMap, i) = defaultValue .
@@ -46,6 +50,8 @@ fmod TEST-STATIC-ARRAY is
 
     eq unknown = write(write(unknownArray, 1, v1), 2, v2) .
 endfm
+
+red read(Array(5, emptyMap), 10) .
 
 red read(Array(10, emptyMap), 1) .
 
