@@ -40,5 +40,15 @@ fmod Identities{Key :: TRIV, Value :: TRIV, Variable :: TRIV} is
     eq replace(vLocation, idToMap, v, i, val) = write(idToMap, vLocation, write(read(idToMap, vLocation) , i, val)) .
 
     eq write(memory, v, i, val) = Memory(length(memory), mapVarId(memory),
-          replace(read(mapVarId(memory), v), mapIdKey(memory), v, i , val)).
+          replace(read(mapVarId(memory), v), mapIdKey(memory), v, i, val)).
+
+    eq read(memory, v, i) = read(read(mapIdKey(memory), read(mapVarId(memory), v)), i) .
+
+    eq assign(memory, u, v) = Memory(length(memory)
+          , write(mapVarId(memory), u, read(mapVarId(memory), v))
+          , mapIdKey(memory)) .
+
+    op new : Memory Variable$Elt -> Memory .
+
+    eq new(memory, v) = Memory(s length(memory), write(mapVarId(memory), v, length(memory)) ,mapIdKey(memory)) .
 endfm
