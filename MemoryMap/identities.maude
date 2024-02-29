@@ -1,0 +1,44 @@
+load ../Maps/Polymorphic .
+
+fmod Identities{Key :: TRIV, Value :: TRIV, Variable :: TRIV} is
+    pr NAT .
+
+    sorts Memory .
+
+    pr MAP{Key, Value} .
+    pr MAP{Variable, Nat} .
+    pr MAP{Nat, Map{Key, Value}} .
+
+    op Memory : Nat Map{Variable, Nat} Map{Nat, Map{Key, Value}} -> Memory .
+
+    op length : Memory -> Nat .
+    op mapVarId : Memory -> Map{Variable, Nat} .
+    op mapIdKey : Memory -> Map{Nat, Map{Key, Value}} .
+
+    var size : Nat .
+    var mapToId : Map{Variable, Nat} .
+    var mapToKey : Map{Nat, Map{Key, Value}} .
+
+    eq length(Memory(size, mapToId, mapToKey)) = size .
+    eq mapVarId(Memory(size, mapToId, mapToKey)) = mapToId .
+    eq mapIdKey(Memory(size, mapToId, mapToKey)) = mapToKey .
+
+
+    op write : Memory Variable$Elt Key$Elt Value$Elt -> Memory .
+    op assign : Memory Variable$Elt Variable$Elt -> Memory .
+    op read : Memory Variable$Elt Key$Elt -> Value$Elt .
+
+    var memory : Memory .
+    vars u v : Variable$Elt .
+    vars i1 i2 vLocation : Nat .
+    vars i j : Key$Elt .
+    vars val v1 v2 : Value$Elt .
+    var idToMap : Map{Nat, Map{Key, Value}} .
+
+    op replace : Nat Map{Nat, Map{Key, Value}} Variable$Elt Key$Elt Value$Elt -> Map{Nat, Map{Key, Value}} .
+
+    eq replace(vLocation, idToMap, v, i, val) = write(idToMap, vLocation, write(read(idToMap, vLocation) , i, val)) .
+
+    eq write(memory, v, i, val) = Memory(length(memory), mapVarId(memory),
+          replace(read(mapVarId(memory), v), mapIdKey(memory), v, i , val)).
+endfm
