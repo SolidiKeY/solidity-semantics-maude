@@ -1,0 +1,35 @@
+fmod MEMORY is
+    sorts Memory Variable Key Value .
+
+    op write : Memory Variable Key Value -> Memory .
+    op read : Memory Variable Key -> Value .
+
+    var memory : Memory .
+    var var varR varW : Variable .
+    var key keyR keyW : Key .
+    var val : Value .
+
+    eq read(write(memory, var, key, val), var, key) = val .
+    ceq read(write(memory, varW, keyW, val), varR, keyR) = read(memory, varR, keyR)
+        if keyW =/= keyR or varW =/= varR .
+endfm
+
+fmod TEST-MEMORY is
+    pr MEMORY .
+
+    op unknownMemory : -> Memory .
+    ops k1 k2 : -> Key .
+    ops u v : -> Variable .
+    ops v1 v2 : -> Value .
+endfm
+
+
+red read(write(unknownMemory, v, k1, v1), v, k1) .
+red read(write(unknownMemory, v, k1, v1), v, k2) .
+red read(write(unknownMemory, v, k1, v1), u, k1) .
+red read(write(unknownMemory, v, k1, v1), u, k2) .
+
+red read(write(write(unknownMemory, u, k2, v2), v, k1, v1), v, k1) .
+red read(write(write(unknownMemory, u, k2, v2), v, k1, v1), u, k2) .
+red read(write(write(unknownMemory, u, k2, v2), v, k1, v1), v, k2) .
+red read(write(write(unknownMemory, u, k2, v2), v, k1, v1), u, k1) .
