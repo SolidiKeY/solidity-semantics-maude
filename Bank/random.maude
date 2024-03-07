@@ -16,16 +16,57 @@ fmod RANDOM-BANK is
     op toName : Nat -> Name .
 
     op writeRandomName : Value PersonSelector Nat -> Value .
+    op writeRandomAccNr : Value PersonSelector Nat -> Value .
+    op writeRandomPersonAttr : Value Nat -> Value .
+    op writeSomePeople : Value Nat Nat -> Value .
+    op writeSomePeople : Nat Nat -> Value .
 
     var memory : Value .
     var person : PersonSelector .
-    var n : Nat .
+    vars m n : Nat .
 
     eq writeRandomName(memory, person, n) = write(memory, person $name, toName(random(n))) .
+    eq writeRandomAccNr(memory, person, n) = write(memory, person $accountNr, random(n) rem 10) .
 
-    op writeRandomAccNr : Value PersonSelector Nat -> Value .
+    ceq writeRandomPersonAttr(memory, n) = writeRandomName(memory, toPerson(random(n + 1) rem 3), n + 2)
+        if random(n) rem 2 == 0 .
+    ceq writeRandomPersonAttr(memory, n) = writeRandomAccNr(memory, toPerson(random(n + 1) rem 3), n + 2)
+        if random(n) rem 2 == 1 .
 
-    eq writeRandomAccNr(memory, person, n) = write(memory, person $accountNr, random(n)) .
+    eq writeSomePeople(m, n) = writeSomePeople(defaultStruct, m, n) .
+    eq writeSomePeople(memory, 0, n) = memory .
+    eq writeSomePeople(memory, s m, n) = writeRandomPersonAttr(writeSomePeople(memory, m, n + 10), n) .
+
+    op writeBank : Value Nat -> Value .
+    eq writeBank(memory, n) = write(memory, $bank $accounts (random(n) rem 10), random(n + 1)) .
+
+    op writeSomeBank : Value Nat Nat -> Value .
+    op writeSomeBank : Value Nat -> Value .
+    eq writeSomeBank(m, n) = writeSomeBank(defaultStruct, m, n) .
+    eq writeSomeBank(memory, 0, n) = memory .
+    eq writeSomeBank(memory, s m, n) = writeBank(writeSomeBank(memory, m, n + 10), n) .
+
+    op writeSomeMap : Value Nat Nat -> Value .
+    op writeSomeMap : Nat Nat -> Value .
+
+    eq writeSomeMap(m, n) = writeSomeMap(defaultStruct, m, n) .
+    eq writeSomeMap(memory, 0, n) = memory .
+    ceq writeSomeMap(memory, s m, n) = writeBank(writeSomeMap(memory, m, n + 20), n)
+        if random(n) rem 2 == 0 .
+    ceq writeSomeMap(memory, s m, n) = writeRandomPersonAttr(writeSomeMap(memory, m, n + 20), n)
+        if random(n) rem 2 == 1 .
+
+    op bankExample : -> Value .
+    eq bankExample = writeSomeMap(10, 10) .
+
+    op aliceAccNumber : -> Nat .
+    eq aliceAccNumber = read(bankExample, $alice $accountNr) .
+
+    op aliceMoney : -> Nat .
+    eq aliceMoney = read(bankExample, $bank $accounts aliceAccNumber) .
+
+    op carolMoney : -> Nat .
+    eq carolMoney = read(bankExample, $bank $accounts 8) .
 endfm
 
 red 21 quo 2 .
@@ -33,7 +74,20 @@ red 21 rem 2 .
 
 red toPerson(0) .
 
-red writeRandomName(defaultMap, $alice, 0) .
-red writeRandomAccNr(defaultMap, $alice, 1) .
+red writeRandomName(defaultStruct, $alice, 0) .
+red writeRandomAccNr(defaultStruct, $alice, 1) .
 
-red writeRandomAccNr(writeRandomName(defaultMap, $alice, 0), $alice, 1) .
+red writeRandomAccNr(writeRandomName(defaultStruct, $alice, 0), $alice, 1) .
+
+red writeSomePeople(10, 1) .
+red writeSomeBank(10, 1) .
+
+red writeSomeMap(10, 0) .
+
+red bankExample .
+
+red aliceAccNumber .
+
+red aliceMoney .
+
+red carolMoney .
