@@ -41,6 +41,7 @@ fmod BANK is
     eq read(write(struct, $sel, value), $sel) = value .
 
     eq read(write(struct, $sel listWrite, value), $sel listRead) = read(write(read(struct, $sel), listWrite, value), listRead) .
+    eq read(struct, nil) = struct .
 
     op defaultMap : -> Map .
     op defaultAccounts : -> Accounts .
