@@ -1,0 +1,39 @@
+load bank .
+
+fmod RANDOM-BANK is
+    pr RANDOM .
+    pr BANK .
+
+    ops toPerson toPersonSelector : Nat -> PersonSelector .
+
+    eq toPerson(0) = $alice .
+    eq toPerson(1) = $bob .
+    eq toPerson(2) = $carol .
+
+    eq toPersonSelector(0) = $name .
+    eq toPersonSelector(1) = $accountNr .
+
+    op toName : Nat -> Name .
+
+    op writeRandomName : Value PersonSelector Nat -> Value .
+
+    var memory : Value .
+    var person : PersonSelector .
+    var n : Nat .
+
+    eq writeRandomName(memory, person, n) = write(memory, person $name, toName(random(n))) .
+
+    op writeRandomAccNr : Value PersonSelector Nat -> Value .
+
+    eq writeRandomAccNr(memory, person, n) = write(memory, person $accountNr, random(n)) .
+endfm
+
+red 21 quo 2 .
+red 21 rem 2 .
+
+red toPerson(0) .
+
+red writeRandomName(defaultMap, $alice, 0) .
+red writeRandomAccNr(defaultMap, $alice, 1) .
+
+red writeRandomAccNr(writeRandomName(defaultMap, $alice, 0), $alice, 1) .
