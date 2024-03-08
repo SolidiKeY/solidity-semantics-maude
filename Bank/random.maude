@@ -57,7 +57,7 @@ fmod RANDOM-BANK is
         if random(n) rem 2 == 1 .
 
     op bankExample : -> Value .
-    eq bankExample = writeSomeMap(10, 10) .
+    eq bankExample = write(writeSomeMap(1000, 10), $bank $accounts 3, 100)  .
 
     op aliceAccNumber : -> Nat .
     eq aliceAccNumber = read(bankExample, $alice $accountNr) .
@@ -66,8 +66,15 @@ fmod RANDOM-BANK is
     eq aliceMoney = read(bankExample, $bank $accounts aliceAccNumber) .
 
     op carolMoney : -> Nat .
-    eq carolMoney = read(bankExample, $bank $accounts 8) .
+    eq carolMoney = read(bankExample, $bank $accounts 0) .
+
+    op ex : -> Value .
+    eq ex = defaultStruct ; $bank $accounts 0 <- 200 ; $bank $accounts 3 <- 100 .
 endfm
+
+red ex .
+
+red read(ex, $bank $accounts 0) .
 
 red 21 quo 2 .
 red 21 rem 2 .
@@ -84,10 +91,12 @@ red writeSomeBank(10, 1) .
 
 red writeSomeMap(10, 0) .
 
-red bankExample .
+*** red bankExample .
 
 red aliceAccNumber .
 
 red aliceMoney .
 
 red carolMoney .
+
+red ex .
