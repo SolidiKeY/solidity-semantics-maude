@@ -1,8 +1,10 @@
+load bank-sort .
 load bank .
+load bank-structs-destructor .
 
 fmod RANDOM-BANK is
     pr RANDOM .
-    pr BANK .
+    pr BANK-WRITE-READ .
 
     ops toPerson toPersonSelector : Nat -> PersonSelector .
 
@@ -55,6 +57,14 @@ fmod RANDOM-BANK is
         if random(n) rem 2 == 0 .
     ceq writeSomeMap(memory, s m, n) = writeRandomPersonAttr(writeSomeMap(memory, m, n + 20), n + 1)
         if random(n) rem 2 == 1 .
+endfm
+
+fmod EXAMPLES is
+    pr RANDOM-BANK .
+
+    var memory : Value .
+    var person : PersonSelector .
+    vars m n : Nat .
 
     op bankExample : -> Value .
     eq bankExample = write(writeSomeMap(1000, 10), $bank $accounts 3, 100)  .
@@ -70,6 +80,11 @@ fmod RANDOM-BANK is
 
     op ex : -> Value .
     eq ex = defaultStruct ; $bank $accounts 0 <- 200 ; $bank $accounts 3 <- 100 .
+endfm
+
+fmod BANK-RUN is
+    pr EXAMPLES .
+    pr BANK .
 endfm
 
 red ex .
@@ -99,8 +114,46 @@ red carolMoney .
 
 red ex .
 
-set profile on .
+*** set profile on .
 
 red aliceMoney .
 
-show profile .
+*** show profile .
+
+fmod BANK-DESTRUCTOR-RUN is
+    pr EXAMPLES .
+    pr BANK-DESTRUCTOR .
+endfm
+
+red ex .
+
+red read(ex, $bank $accounts 0) .
+
+red 21 quo 2 .
+red 21 rem 2 .
+
+red toPerson(0) .
+
+red writeRandomName(defaultStruct, $alice, 0) .
+red writeRandomAccNr(defaultStruct, $alice, 1) .
+
+red writeRandomAccNr(writeRandomName(defaultStruct, $alice, 0), $alice, 1) .
+
+red writeSomePeople(10, 1) .
+red writeSomeBank(10, 1) .
+
+red writeSomeMap(10, 0) .
+
+*** red bankExample .
+
+red aliceAccNumber .
+
+red carolMoney .
+
+red ex .
+
+*** set profile on .
+
+red aliceMoney .
+
+*** show profile .

@@ -5,7 +5,6 @@ fmod BANK-SORT is
     subsort Account Accounts Map Person Bank Name Int Status < Value .
     subsort PersonSelector AccountsSelector BankPersonSelector Int < Selector .
 
-
     ops Bank : Map -> Bank .
     ops This : Person Person Person Bank -> Value .
 
@@ -40,4 +39,12 @@ fmod BANK-WRITE-READ is
     var list : List{Selector} .
 
     eq struct ; list <- value = write(struct, list, value) .
+
+    op defaultMap : -> Map .
+    op defaultBank : -> Bank .
+    op defaultAccounts : -> Accounts .
+    op defaultAccount : -> Account .
+    ops defaultPerson : -> Person .
+    op defaultName : -> Name .
+    op defaultStruct : -> Value .
 endfm

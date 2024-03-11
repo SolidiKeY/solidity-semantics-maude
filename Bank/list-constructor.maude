@@ -1,6 +1,6 @@
-load bank-structs-destructor .
+load bank .
 
-fmod RANDOM-BANK is
+fmod LIST-CONST is
     pr RANDOM .
     pr BANK .
 
@@ -28,9 +28,9 @@ fmod RANDOM-BANK is
     eq writeRandomName(memory, person, n) = write(memory, person $name, toName(random(n))) .
     eq writeRandomAccNr(memory, person, n) = write(memory, person $accountNr, random(n) rem 10) .
 
-    ceq writeRandomPersonAttr(memory, n) = writeRandomName(memory, toPerson(random(n + 1) rem 2), n + 2)
+    ceq writeRandomPersonAttr(memory, n) = writeRandomName(memory, toPerson(random(n + 1) rem 3), n + 2)
         if random(n) rem 2 == 0 .
-    ceq writeRandomPersonAttr(memory, n) = writeRandomAccNr(memory, toPerson(random(n + 1) rem 2), n + 2)
+    ceq writeRandomPersonAttr(memory, n) = writeRandomAccNr(memory, toPerson(random(n + 1) rem 3), n + 2)
         if random(n) rem 2 == 1 .
 
     eq writeSomePeople(m, n) = writeSomePeople(defaultStruct, m, n) .
@@ -51,13 +51,13 @@ fmod RANDOM-BANK is
 
     eq writeSomeMap(m, n) = writeSomeMap(defaultStruct, m, n) .
     eq writeSomeMap(memory, 0, n) = memory .
-    ceq writeSomeMap(memory, s m, n) = writeBank(writeSomeMap(memory, m, n + 20), n + 1)
+    ceq writeSomeMap(memory, s m, n) = writeBank(writeSomeMap(memory, m, n + 20), n)
         if random(n) rem 2 == 0 .
-    ceq writeSomeMap(memory, s m, n) = writeRandomPersonAttr(writeSomeMap(memory, m, n + 20), n + 1)
+    ceq writeSomeMap(memory, s m, n) = writeRandomPersonAttr(writeSomeMap(memory, m, n + 20), n)
         if random(n) rem 2 == 1 .
 
     op bankExample : -> Value .
-    eq bankExample = writeSomeMap(1000, 0) .
+    eq bankExample = writeSomeMap(10, 10) .
 
     op aliceAccNumber : -> Nat .
     eq aliceAccNumber = read(bankExample, $alice $accountNr) .
@@ -65,9 +65,12 @@ fmod RANDOM-BANK is
     op aliceMoney : -> Nat .
     eq aliceMoney = read(bankExample, $bank $accounts aliceAccNumber) .
 
-    op someoneMoney : -> Nat .
-    eq someoneMoney = read(bankExample, $bank $accounts 8) .
+    op carolMoney : -> Nat .
+    eq carolMoney = read(bankExample, $bank $accounts 8) .
 endfm
+
+red 21 quo 2 .
+red 21 rem 2 .
 
 red toPerson(0) .
 
@@ -76,19 +79,15 @@ red writeRandomAccNr(defaultStruct, $alice, 1) .
 
 red writeRandomAccNr(writeRandomName(defaultStruct, $alice, 0), $alice, 1) .
 
-red writeSomePeople(1, 3) .
+red writeSomePeople(10, 1) .
 red writeSomeBank(10, 1) .
 
-red writeSomeMap(10, 10) .
+red writeSomeMap(10, 0) .
 
-*** red bankExample .
+red bankExample .
 
 red aliceAccNumber .
 
-red someoneMoney .
-
-set profile on .
-
 red aliceMoney .
 
-show profile .
+red carolMoney .
