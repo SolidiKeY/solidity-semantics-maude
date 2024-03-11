@@ -51,9 +51,9 @@ fmod RANDOM-BANK is
 
     eq writeSomeMap(m, n) = writeSomeMap(defaultStruct, m, n) .
     eq writeSomeMap(memory, 0, n) = memory .
-    ceq writeSomeMap(memory, s m, n) = writeBank(writeSomeMap(memory, m, n + 20), n)
+    ceq writeSomeMap(memory, s m, n) = writeBank(writeSomeMap(memory, m, n + 20), n + 1)
         if random(n) rem 2 == 0 .
-    ceq writeSomeMap(memory, s m, n) = writeRandomPersonAttr(writeSomeMap(memory, m, n + 20), n)
+    ceq writeSomeMap(memory, s m, n) = writeRandomPersonAttr(writeSomeMap(memory, m, n + 20), n + 1)
         if random(n) rem 2 == 1 .
 
     op bankExample : -> Value .
@@ -95,8 +95,12 @@ red writeSomeMap(10, 0) .
 
 red aliceAccNumber .
 
-red aliceMoney .
-
 red carolMoney .
 
 red ex .
+
+set profile on .
+
+red aliceMoney .
+
+show profile .
