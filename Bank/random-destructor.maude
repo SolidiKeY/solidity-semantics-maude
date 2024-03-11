@@ -8,6 +8,7 @@ fmod RANDOM-BANK is
 
     eq toPerson(0) = $alice .
     eq toPerson(1) = $bob .
+    eq toPerson(2) = $carol .
 
     eq toPersonSelector(0) = $name .
     eq toPersonSelector(1) = $accountNr .
@@ -64,8 +65,8 @@ fmod RANDOM-BANK is
     op aliceMoney : -> Nat .
     eq aliceMoney = read(bankExample, $bank $accounts aliceAccNumber) .
 
-    op carolMoney : -> Nat .
-    eq carolMoney = read(bankExample, $bank $accounts 8) .
+    op someoneMoney : -> Nat .
+    eq someoneMoney = read(bankExample, $bank $accounts 8) .
 endfm
 
 red toPerson(0) .
@@ -86,4 +87,4 @@ red aliceAccNumber .
 
 red aliceMoney .
 
-red carolMoney .
+red someoneMoney .

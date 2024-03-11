@@ -6,12 +6,12 @@ fmod BANK-SORT is
     subsort PersonSelector BankPersonSelector BankSelector Int < Selector .
 
     ops Bank : Map -> Bank .
-    ops This : Person Person Bank -> Value .
+    ops This : Person Person Person Bank -> Value .
 
-    ops Alice Bob : -> Name .
+    ops Alice Bob Carol : -> Name .
     ops open closed : -> Status .
 
-    ops $alice $bob : -> PersonSelector [ctor] .
+    ops $alice $bob $carol : -> PersonSelector [ctor] .
     ops $bank : -> BankPersonSelector [ctor] .
     ops $name $accountNr : -> PersonSelector [ctor] .
     ops $accounts : -> BankSelector [ctor] .
@@ -41,17 +41,18 @@ fmod BANK is
     var list listWrite listRead : List{Selector} .
     var i j : Int .
     var $person : PersonSelector .
-    vars alice bob person : Person .
+    vars alice bob carol person : Person .
 
-    ops getAlice getBob : Value -> Person .
+    ops getAlice getBob getCarol : Value -> Person .
     op getBank : Value -> Bank .
     op getName : Person -> Name .
     op getAccountNr : Person -> Int .
     op getMap : Bank -> Map .
 
-    eq getAlice(This(alice, bob, bank)) = alice .
-    eq getBob(This(alice, bob, bank)) = bob .
-    eq getBank(This(alice, bob, bank)) = bank .
+    eq getAlice(This(alice, bob, carol, bank)) = alice .
+    eq getBob(This(alice, bob, carol, bank)) = bob .
+    eq getBob(This(alice, bob, carol, bank)) = carol .
+    eq getBank(This(alice, bob, carol, bank)) = bank .
     eq getName(Person(name, i)) = name .
     eq getAccountNr(Person(name, i)) = i .
     eq getMap(Bank(map)) = map .
@@ -60,6 +61,7 @@ fmod BANK is
 
     eq read(struct, $alice list) = read(getAlice(struct), list) .
     eq read(struct, $bob list) = read(getBob(struct), list) .
+    eq read(struct, $carol list) = read(getCarol(struct), list) .
     eq read(struct, $bank list) = read(getBank(struct), list) .
 
     eq read(person, $name) = getName(person) .
@@ -72,9 +74,10 @@ fmod BANK is
 
 
     eq write(struct, nil, value) = value .
-    eq write(struct, $alice list, value) = This(write(getAlice(struct), list, value), getBob(struct), getBank(struct)) .
-    eq write(struct, $bob list, value) = This(getAlice(struct), write(getBob(struct), list, value), getBank(struct)) .
-    eq write(struct, $bank list, value) = This(getAlice(struct), getBob(struct), write(getBank(struct), list, value)) .
+    eq write(struct, $alice list, value) = This(write(getAlice(struct), list, value), getBob(struct), getCarol(struct), getBank(struct)) .
+    eq write(struct, $bob list, value) = This(getAlice(struct), write(getBob(struct), list, value), getCarol(struct), getBank(struct)) .
+    eq write(struct, $carol list, value) = This(getAlice(struct), getBob(struct), write(getCarol(struct), list, value), getBank(struct)) .
+    eq write(struct, $bank list, value) = This(getAlice(struct), getBob(struct), getCarol(struct), write(getBank(struct), list, value)) .
     eq write(person, $name, name) = Person(name, getAccountNr(person)) .
     eq write(person, $accountNr, i) = Person(getName(person), i) .
     eq write(bank, $accounts list, value) = Bank(write(getMap(bank), list, value)) .
@@ -89,7 +92,7 @@ fmod BANK is
     eq read(defaultMap, i) = 0 .
     eq defaultBank = Bank(defaultMap) .
     eq defaultPerson = Person(defaultName, 0) .
-    eq defaultStruct = This(defaultPerson, defaultPerson, defaultBank) .
+    eq defaultStruct = This(defaultPerson, defaultPerson, defaultPerson, defaultBank) .
 
     op _<-_ : List{Selector} Value -> Tuple [prec 30] .
     op _;_ : Value Tuple -> Value .
@@ -105,7 +108,7 @@ fmod TEST-BANK is
     ops aliceAccountNr bobAccountNr : -> Int .
 
     eq balances = write(write(defaultMap, 10, 100), 11, 200) .
-    eq exStruct = This(Person(Alice, 10), Person(Bob, 11), Bank(balances)) .
+    eq exStruct = This(Person(Alice, 10), Person(Bob, 11), Person(Carol, 12), Bank(balances)) .
 
     eq aliceAccountNr = read(exStruct, $alice $accountNr) .
     eq bobAccountNr = read(exStruct, $bob $accountNr) .
