@@ -129,9 +129,6 @@ red ex .
 
 red read(ex, $bank $accounts 0) .
 
-red 21 quo 2 .
-red 21 rem 2 .
-
 red toPerson(0) .
 
 red writeRandomName(defaultStruct, $alice, 0) .

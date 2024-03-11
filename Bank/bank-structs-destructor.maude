@@ -21,7 +21,7 @@ fmod BANK-DESTRUCTOR is
 
     eq getAlice(This(alice, bob, carol, bank)) = alice .
     eq getBob(This(alice, bob, carol, bank)) = bob .
-    eq getBob(This(alice, bob, carol, bank)) = carol .
+    eq getCarol(This(alice, bob, carol, bank)) = carol .
     eq getBank(This(alice, bob, carol, bank)) = bank .
     eq getName(Person(name, i)) = name .
     eq getAccountNr(Person(name, i)) = i .
