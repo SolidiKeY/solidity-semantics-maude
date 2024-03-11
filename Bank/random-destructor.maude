@@ -85,6 +85,10 @@ red writeSomeMap(10, 10) .
 
 red aliceAccNumber .
 
+red someoneMoney .
+
+set profile on .
+
 red aliceMoney .
 
-red someoneMoney .
+show profile .
