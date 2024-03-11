@@ -1,7 +1,7 @@
 fmod BANK-SORT is
     pr INT .
 
-    sort Account Map Person Struct Bank BankPersonSelector AccountsSelector PersonSelector Accounts Selector Name Status Value .
+    sort Account Map Person Struct Bank BankPersonSelector AccountsSelector PersonSelector Accounts Selector Name Status Value Tuple .
     subsort Account Accounts Map Person Bank Name Int Status < Value .
     subsort PersonSelector AccountsSelector BankPersonSelector Int < Selector .
 
@@ -24,3 +24,20 @@ endfm
 view Selector from TRIV to BANK-SORT is
     sort Elt to Selector .
 endv
+
+fmod BANK-WRITE-READ is
+    pr BANK-SORT .
+    pr LIST{Selector} .
+
+    op write : Value List{Selector} Value -> Value .
+    op write : Map List{Selector} Int -> Map .
+    op read : Value List{Selector} -> Value .
+
+    op _<-_ : List{Selector} Value -> Tuple [prec 30] .
+    op _;_ : Value Tuple -> Value .
+
+    vars struct value : Value .
+    var list : List{Selector} .
+
+    eq struct ; list <- value = write(struct, list, value) .
+endfm

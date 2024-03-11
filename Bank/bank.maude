@@ -1,13 +1,7 @@
 load bank-sort .
 
 fmod BANK is
-    pr BANK-SORT .
-    pr LIST{Selector} .
-
-    sort Tuple .
-
-    ops write : Value List{Selector} Value -> Value .
-    ops read : Value List{Selector} -> Value .
+    pr BANK-WRITE-READ .
 
     vars struct value : Value .
     var $sel $selWrite $selRead : Selector .
@@ -37,11 +31,6 @@ fmod BANK is
     eq read(defaultAccounts, $accounts) = defaultMap .
     eq read(defaultStruct, $bank list) = read(defaultAccounts, list) .
     eq read(defaultAccounts, $accounts list) = read(defaultMap, list)  .
-
-    op _<-_ : List{Selector} Value -> Tuple [prec 30] .
-    op _;_ : Value Tuple -> Value .
-
-    eq struct ; list <- value = write(struct, list, value) .
 endfm
 
 fmod TEST-BANK is
