@@ -1,27 +1,4 @@
-fmod BANK-SORT is
-    pr INT .
-
-    sort Account Map Person Struct Bank BankPersonSelector BankSelector PersonSelector Selector Name Status Value .
-    subsort Account Map Person Bank Name Int Status < Value .
-    subsort PersonSelector BankPersonSelector BankSelector Int < Selector .
-
-    ops Bank : Map -> Bank .
-    ops This : Person Person Person Bank -> Value .
-
-    ops Alice Bob Carol : -> Name .
-    ops open closed : -> Status .
-
-    ops $alice $bob $carol : -> PersonSelector [ctor] .
-    ops $bank : -> BankPersonSelector [ctor] .
-    ops $name $accountNr : -> PersonSelector [ctor] .
-    ops $accounts : -> BankSelector [ctor] .
-
-    ops Person : Name Int -> Person .
-endfm
-
-view Selector from TRIV to BANK-SORT is
-    sort Elt to Selector .
-endv
+load bank-sort .
 
 fmod BANK is
     pr BANK-SORT .
