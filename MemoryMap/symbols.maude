@@ -67,7 +67,7 @@ fmod IDENTITIES{SymbolKey :: TRIV, Value :: TRIV, Variable :: TRIV, Symbol :: TR
     eq write(memory, v, i, val) = Memory(length(memory), unequalSymbols(memory), mapVarId(memory),
           replace(read(mapVarId(memory), v), mapIdKey(memory), i, val)) .
 
-    eq read(memory, v, i) = read(mapIdKey(memory), SymbolKey(read(mapVarId(memory), v), i)) .
+    eq read(memory, v, i) = readS(unequalSymbols(memory), mapIdKey(memory), read(mapVarId(memory), v), i) .
 
     eq assign(memory, u, v) = Memory(length(memory), unequalSymbols(memory)
           , write(mapVarId(memory), u, read(mapVarId(memory), v))
