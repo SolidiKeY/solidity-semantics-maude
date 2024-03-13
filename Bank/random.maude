@@ -25,6 +25,7 @@ fmod RANDOM-BANK is
 
     var memory : Value .
     var person : PersonSelector .
+    var name : Name .
     vars m n : Nat .
 
     eq writeRandomName(memory, person, n) = write(memory, person $name, toName(random(n))) .
@@ -57,6 +58,18 @@ fmod RANDOM-BANK is
         if random(n) rem 2 == 0 .
     ceq writeSomeMap(memory, s m, n) = writeRandomPersonAttr(writeSomeMap(memory, m, n + 20), n + 1)
         if random(n) rem 2 == 1 .
+
+    op nameToNat : Name -> Nat .
+    eq nameToNat(name) = 0 .
+
+    op readSomeMap : Value Nat Nat -> Nat .
+    eq readSomeMap(memory, 0, n) = 0 .
+    ceq readSomeMap(memory, s m, n) = (read(memory, $bank $accounts (random(n + 1) rem 10)) + readSomeMap(memory, m, n + 2)) rem 100
+        if random(n) rem 3 == 0 .
+    ceq readSomeMap(memory, s m, n) = (read(memory, toPerson(random(n + 1) rem 3) $accountNr) + readSomeMap(memory, m, n + 2)) rem 100
+        if random(n) rem 3 == 1 .
+    ceq readSomeMap(memory, s m, n) = (nameToNat(read(memory, toPerson(random(n + 1) rem 3) $name)) + readSomeMap(memory, m, n + 2)) rem 100
+        if random(n) rem 3 == 2 .
 endfm
 
 fmod EXAMPLES is
@@ -73,7 +86,7 @@ fmod EXAMPLES is
     eq aliceAccNumber = read(bankExample, $alice $accountNr) .
 
     op aliceMoney : -> Nat .
-    eq aliceMoney = read(bankExample, $bank $accounts aliceAccNumber) .
+    eq aliceMoney = read(bankExample, $bank $accounts read(bankExample, $alice $accountNr)) .
 
     op carolMoney : -> Nat .
     eq carolMoney = read(bankExample, $bank $accounts 0) .
@@ -120,6 +133,8 @@ red aliceMoney .
 
 *** show profile .
 
+red readSomeMap(bankExample, 100, 0) .
+
 fmod BANK-DESTRUCTOR-RUN is
     pr EXAMPLES .
     pr BANK-DESTRUCTOR .
@@ -149,8 +164,13 @@ red carolMoney .
 
 red ex .
 
-*** set profile on .
+
+red aliceAccNumber .
 
 red aliceMoney .
 
 *** show profile .
+
+*** set profile on .
+
+red readSomeMap(bankExample, 100, 0) .
