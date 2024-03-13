@@ -1,0 +1,115 @@
+load ../Maps/Polymorphic .
+
+fmod IDENTITIES{SymbolKey :: TRIV, Value :: TRIV, Variable :: TRIV, Symbol :: TRIV, PairSymbol :: TRIV} is
+    pr NAT .
+
+    sorts Memory Key .
+
+    pr DEFAULT-MAP{Variable, Symbol} .
+    pr DEFAULT-MAP{SymbolKey, Value} .
+    pr LIST{PairSymbol} .
+
+    op Memory : Nat List{PairSymbol} Map{Variable, Symbol} Map{SymbolKey, Value} -> Memory .
+    op SymbolKey : Symbol$Elt Key -> SymbolKey$Elt .
+    op gSym : Nat -> Symbol$Elt .
+
+    op length : Memory -> Nat .
+    op unequalSymbols : Memory -> List{PairSymbol} .
+    op mapVarId : Memory -> Map{Variable, Symbol} .
+    op mapIdKey : Memory -> Map{SymbolKey, Value} .
+
+    var size : Nat .
+    var uSymbols : List{PairSymbol} .
+    var mapToId : Map{Variable, Symbol} .
+    var mapToKey : Map{SymbolKey, Value} .
+
+    eq length(Memory(size, uSymbols, mapToId, mapToKey)) = size .
+    eq unequalSymbols(Memory(size, uSymbols, mapToId, mapToKey)) = uSymbols .
+    eq mapVarId(Memory(size, uSymbols, mapToId, mapToKey)) = mapToId .
+    eq mapIdKey(Memory(size, uSymbols, mapToId, mapToKey)) = mapToKey .
+
+    op write : Memory Variable$Elt Key Value$Elt -> Memory .
+    op assign : Memory Variable$Elt Variable$Elt -> Memory .
+    op read : Memory Variable$Elt Key -> Value$Elt .
+
+    var memory : Memory .
+    var symbol : Symbol$Elt .
+    vars u v : Variable$Elt .
+    vars i1 i2 vLocation : Nat .
+    vars i j : Key .
+    vars val v1 v2 : Value$Elt .
+    var idToMap : Map{SymbolKey, Value} .
+
+    op toNat : SymbolKey$Elt -> Symbol$Elt .
+    eq toNat(SymbolKey(symbol, i)) = symbol .
+
+    op toKey : SymbolKey$Elt -> Key .
+    eq toKey(SymbolKey(symbol, i)) = i .
+
+    op replace : Symbol$Elt Map{SymbolKey, Value} Key Value$Elt -> Map{SymbolKey, Value} .
+
+    eq replace(symbol, idToMap, i, val) = write(idToMap, SymbolKey(symbol, i), val) .
+
+    eq write(memory, v, i, val) = Memory(length(memory), unequalSymbols(memory), mapVarId(memory),
+          replace(read(mapVarId(memory), v), mapIdKey(memory), i, val)) .
+
+    eq read(memory, v, i) = read(mapIdKey(memory), SymbolKey(read(mapVarId(memory), v), i)) .
+
+    eq assign(memory, u, v) = Memory(length(memory), unequalSymbols(memory)
+          , write(mapVarId(memory), u, read(mapVarId(memory), v))
+          , mapIdKey(memory)) .
+
+    op new : Memory Variable$Elt -> Memory .
+
+    eq new(memory, v) = Memory(s length(memory), unequalSymbols(memory), write(mapVarId(memory), v, gSym(length(memory))), mapIdKey(memory)) .
+
+    op emptyMemory : -> Memory .
+    eq emptyMemory = Memory(0, nil, emptyMap, emptyMap) .
+endfm
+
+fmod TEST-IDENTITIES{SymbolKey :: TRIV, Value :: TRIV, Variable :: TRIV, Symbol :: TRIV, PairSymbol :: TRIV} is
+    pr IDENTITIES{SymbolKey, Value, Variable, Symbol, PairSymbol} .
+
+    op memory : -> Memory .
+    ops u v : -> Variable$Elt .
+    ops i j : -> Key .
+    ops val v1 v2 : -> Value$Elt .
+
+    var memoryVar : Memory .
+
+    op memoryWrites : Memory -> Memory .
+    eq memoryWrites(memoryVar) = write(write(memoryVar, v, i, v1), u, j, v2) .
+
+    op memoryEx : -> Memory .
+    eq memoryEx = memoryWrites(memory) .
+
+    op memoryEx2 : -> Memory .
+    eq memoryEx2 = memoryWrites(assign(memory, u, v)) .
+
+    op memoryEx3 : -> Memory .
+    eq memoryEx3 = memoryWrites(new(new(emptyMemory, u), v)) .
+endfm
+
+red read(memoryEx, u, j) .
+
+red read(memoryEx, v, i) .
+
+red read(memoryEx, u, i) .
+
+red read(memoryEx, v, j) .
+
+red read(memoryEx2, u, j) .
+
+red read(memoryEx2, v, i) .
+
+red read(memoryEx2, u, i) .
+
+red read(memoryEx2, v, j) .
+
+red read(memoryEx3, u, j) .
+
+red read(memoryEx3, v, i) .
+
+red read(memoryEx3, u, i) .
+
+red read(memoryEx3, v, j) .
