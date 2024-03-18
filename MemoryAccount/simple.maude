@@ -1,0 +1,71 @@
+load ../Maps/Polymorphic .
+
+fmod ACCOUNT{Account :: TRIV} is
+    pr NAT .
+    pr INT .
+    pr STRING .
+    pr MAP{Nat, Account} .
+    sort Person .
+
+    sort Heap .
+
+    op Heap : Nat Map{Nat, Account} -> Heap .
+    op size : Heap -> Nat .
+    op accounts : Heap -> Map{Nat, Account} .
+
+    var length : Nat .
+    var accs : Map{Nat, Account} .
+
+    eq size(Heap(length, accs)) = length .
+    eq accounts(Heap(length, accs)) = accs .
+
+    op Person : Nat String -> Person .
+    op accNr : Person -> Nat .
+    op name : Person -> String .
+
+    var n : Nat .
+    var nameV : String .
+
+    eq accNr(Person(n, nameV)) = n .
+    eq name(Person(n, nameV)) = nameV .
+
+    op Account : Int Bool -> Account$Elt .
+    op balance : Account$Elt -> Int .
+    op isOpen : Account$Elt -> Bool .
+
+    var i : Int .
+    var open : Bool .
+
+    eq balance(Account(i, open)) = i .
+    eq isOpen(Account(i, open)) = open .
+
+    op new : Heap Account$Elt -> Heap .
+    var heap : Heap .
+    var acc : Account$Elt .
+
+    eq new(heap, acc) = Heap(s size(heap), write(accounts(heap), size(heap), acc)) .
+
+    op readAcc : Heap Nat -> Account$Elt .
+
+    eq readAcc(heap, n) = read(accounts(heap), n) .
+endfm
+
+fmod ACCOUNTS-EX{Account :: TRIV} is
+    pr ACCOUNT{Account} .
+
+    op heap : -> Heap .
+    op newHeap : -> Heap .
+
+
+    op alice : -> Person .
+    op aliceAcc : -> Account$Elt .
+
+    eq aliceAcc = Account(100, false) .
+    eq alice = Person(size(heap), "Alice") .
+    eq newHeap = new(heap, aliceAcc) .
+endfm
+
+red name(alice) .
+red readAcc(newHeap, accNr(alice)) .
+red balance(aliceAcc) .
+red isOpen(aliceAcc) .
