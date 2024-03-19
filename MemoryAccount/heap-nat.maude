@@ -1,28 +1,52 @@
-fmod ACCOUNT is
+fmod ACCOUNT{Selector :: TRIV} is
     pr NAT .
     pr INT .
+    pr LIST{Selector} .
 
-    sorts PersonSelector AccSelector Selector Identity .
-    subsort PersonSelector AccSelector < Selector .
+    sorts PersonSelector AccSelector Selector .
+    subsort PersonSelector AccSelector < Selector$Elt .
 
     ops $account $name : -> PersonSelector .
     ops $balance $open : -> AccSelector .
 
-    sort Heap Name Boolean Value .
+    sort Heap Name Boolean Value Identity .
     ops tt ff : -> Boolean [ctor] .
 
-    subsort Nat Boolean Int < Value .
+    subsort Boolean Name Identity Int < Value .
 
-    op write : Heap Identity Selector Value -> Heap .
-    op read  : Heap Identity Selector -> Value .
+    op write : Heap Identity Selector$Elt Value -> Heap .
+    op read : Heap Identity List{Selector} -> Value .
 
     var heap : Heap .
-    vars idW idR : Identity .
-    vars selector selectorW selectorR : Selector .
+    vars id idW idR : Identity .
+    vars selector selectorW selectorR : Selector$Elt .
     var val : Value .
+    var neList : NeList{Selector} .
+    var selList : List{Selector} .
 
-    eq read(write(heap, idW, selector, val), idR, selector) = val .
-    ceq read(write(heap, idW, selectorW, val), idR, selectorR) = read(heap, idR, selectorR)
+    eq read(write(heap, id, selector, val), id, selector) = val .
+    ceq read(write(heap, idW, selectorW, val), idR, selectorR selList) = read(heap, idR, selectorR selList)
         if selectorW =/= selectorR or idW =/= idR .
 
+    eq read(write(heap, id, selector, idW), id, selector neList) = read(heap, idW, neList) .
 endfm
+
+fmod ACCOUNT-EX{Selector :: TRIV} is
+    pr ACCOUNT{Selector} .
+
+    ops heap heapWritten : -> Heap .
+    op Alice : -> Name .
+    ops idAlice idAccAlice : -> Identity .
+
+    eq heapWritten = write(write(
+          write(write(heap, idAccAlice, $balance, 100), idAccAlice, $open, tt),
+          idAlice, $account, idAccAlice), idAlice, $name, Alice)  .
+endfm
+
+red read(heapWritten, idAlice, $name) .
+red read(heapWritten, idAccAlice, $balance) .
+red read(heapWritten, idAccAlice, $open) .
+red read(heapWritten, idAlice, $account) .
+
+red read(heapWritten, idAlice, $account $balance) .
+red read(heapWritten, idAlice, $account $open) .
