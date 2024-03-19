@@ -2,7 +2,7 @@ fmod ACCOUNT is
     pr NAT .
     pr INT .
 
-    sorts PersonSelector AccSelector Selector .
+    sorts PersonSelector AccSelector Selector Identity .
     subsort PersonSelector AccSelector < Selector .
 
     ops $account $name : -> PersonSelector .
@@ -13,16 +13,16 @@ fmod ACCOUNT is
 
     subsort Nat Boolean Int < Value .
 
-    op write : Heap Nat Selector Value -> Heap .
-    op read  : Heap Nat Selector -> Value .
+    op write : Heap Identity Selector Value -> Heap .
+    op read  : Heap Identity Selector -> Value .
 
     var heap : Heap .
-    vars m n : Nat .
+    vars idW idR : Identity .
     vars selector selectorW selectorR : Selector .
     var val : Value .
 
-    eq read(write(heap, n, selector, val), n, selector) = val .
-    ceq read(write(heap, m, selectorW, val), n, selectorR) = read(heap, n, selectorR)
-        if selectorW =/= selectorR or m =/= n .
+    eq read(write(heap, idW, selector, val), idR, selector) = val .
+    ceq read(write(heap, idW, selectorW, val), idR, selectorR) = read(heap, idR, selectorR)
+        if selectorW =/= selectorR or idW =/= idR .
 
 endfm
