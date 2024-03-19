@@ -1,7 +1,6 @@
 fmod ACCOUNT is
     pr NAT .
     pr INT .
-    pr STRING .
 
     sorts PersonSelector AccSelector Selector .
     subsort PersonSelector AccSelector < Selector .
@@ -9,37 +8,21 @@ fmod ACCOUNT is
     ops $account $name : -> PersonSelector .
     ops $balance $open : -> AccSelector .
 
-    sort Heap Value .
+    sort Heap Name Boolean Value .
+    ops tt ff : -> Boolean [ctor] .
 
-    op write : Heap Nat PersonSelector String -> Heap .
-    op write : Heap Nat PersonSelector Nat -> Heap .
-    op write : Heap Nat AccSelector Int -> Heap .
-    op write : Heap Nat AccSelector Bool -> Heap .
+    subsort Nat Boolean Int < Value .
 
-    op S$read : Heap Nat PersonSelector -> String .
-    op N$read : Heap Nat PersonSelector -> Nat .
-    op I$read : Heap Nat AccSelector -> Int .
-    op B$read : Heap Nat AccSelector -> Bool .
+    op write : Heap Nat Selector Value -> Heap .
+    op read  : Heap Nat Selector -> Value .
 
     var heap : Heap .
-    vars m n p : Nat .
-    var i : Int .
-    var name : String .
-    var open : Bool .
+    vars m n : Nat .
     vars selector selectorW selectorR : Selector .
+    var val : Value .
 
-    eq S$read(write(heap, n, selector, name), n, selector) = name .
-    eq N$read(write(heap, n, selector, m), n, selector) = m .
-    eq I$read(write(heap, n, selector, i), n, selector) = i .
-    eq B$read(write(heap, n, selector, open), n, selector) = open .
-
-    ceq S$read(write(heap, m, selectorW, name), n, selectorR) = S$read(heap, n, selectorR)
-        if selectorW =/= selectorR or m =/= n .
-    ceq N$read(write(heap, m, selectorW, p), n, selectorR) = N$read(heap, n, selectorR)
-        if selectorW =/= selectorR or m =/= n .
-    ceq I$read(write(heap, m, selectorW, i), n, selectorR) = I$read(heap, n, selectorR)
-        if selectorW =/= selectorR or m =/= n .
-    ceq B$read(write(heap, m, selectorW, open), n, selectorR) = B$read(heap, n, selectorR)
+    eq read(write(heap, n, selector, val), n, selector) = val .
+    ceq read(write(heap, m, selectorW, val), n, selectorR) = read(heap, n, selectorR)
         if selectorW =/= selectorR or m =/= n .
 
 endfm
