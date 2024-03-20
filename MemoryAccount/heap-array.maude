@@ -3,8 +3,8 @@ fmod ACCOUNT{Selector :: TRIV} is
     pr INT .
     pr LIST{Selector} .
 
-    sorts IdSelector PersonSelector PrePersonSelector AccSelector Selector .
-    subsort IdSelector PersonSelector AccSelector < Selector$Elt .
+    sorts IdSelector PersonSelector PrePersonSelector AccSelector Selector PrimarySelector .
+    subsort PrimarySelector < IdSelector PersonSelector AccSelector < Selector$Elt .
 
     op $accounts : -> IdSelector .
     op $name : -> PersonSelector .
@@ -24,7 +24,7 @@ fmod ACCOUNT{Selector :: TRIV} is
     subsort Boolean Name Identity Int < Value .
 
     op write : Heap Identity Selector$Elt Value -> Heap .
-    op read : Heap Identity List{Selector} -> Value .
+    op read : Heap Identity NeList{Selector} -> Value .
     op new : Heap Identity Nat -> Heap .
 
     var heap : Heap .
@@ -37,11 +37,18 @@ fmod ACCOUNT{Selector :: TRIV} is
     var selList : List{Selector} .
     var key : Key .
     var idKey : IdKey .
+    var primSelector : PrimarySelector .
 
     eq getId(IdKey(id, key)) = id .
     eq getKey(IdKey(id, key)) = key .
 
-    eq read(new(heap, id, n), id, neList) = defaultSelect(last(neList)) .
+    mb $name    : PrimarySelector .
+    mb $balance : PrimarySelector .
+    mb $open    : PrimarySelector .
+
+    ceq read(new(heap, id, n), id, neList) = defaultSelect(last(neList))
+        if last(neList) :: PrimarySelector .
+
     ceq read(new(heap, id, n), idR, neList) = read(heap, idR, neList)
         if id =/= idR .
 
@@ -49,7 +56,8 @@ fmod ACCOUNT{Selector :: TRIV} is
     ceq read(write(heap, idW, selectorW, val), idR, selectorR) = read(heap, idR, selectorR)
         if selectorW =/= selectorR or idW =/= idR .
 
-    eq read(heap, id, idSel neList) = read(heap, read(heap, id, idSel), neList) .
+    ceq read(heap, id, idSel neList) = read(heap, read(heap, id, idSel), neList)
+        if read(heap, id, idSel) :: Identity .
     eq read(write(heap, id, selector, idW), id, selector neList) = read(heap, idW, neList) .
 
     op assignAcc : Heap Identity Identity -> Heap .
@@ -57,7 +65,7 @@ fmod ACCOUNT{Selector :: TRIV} is
 
     op defaultName : -> Name .
 
-    op defaultSelect : Selector$Elt -> Value .
+    op defaultSelect : PrimarySelector -> Value .
     eq defaultSelect($name) = defaultName .
     eq defaultSelect($balance) = 0 .
     eq defaultSelect($open) = ff .
