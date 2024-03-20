@@ -79,8 +79,7 @@ fmod ACCOUNT{Selector :: TRIV} is
     eq heap ; id [ selector ]<- val = write(heap, id, selector, val) .
     eq heap ; idV [ selector ]<- val = write(heap, idV, selector, val) .
 
-    ceq read(new(heap, idV, n), id, neList) = defaultSelect(last(neList))
-        if last(neList) :: PrimarySelector .
+    eq read(new(heap, idV, n), idV, primSelector) = defaultSelect(primSelector) .
 
     ceq read(new(heap, idV, n), idRV, neList) = read(heap, idRV, neList)
         if idV =/= idRV .
