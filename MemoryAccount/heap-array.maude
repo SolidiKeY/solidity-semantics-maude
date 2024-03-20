@@ -44,20 +44,6 @@ fmod ACCOUNT{Selector :: TRIV} is
     ceq read(heap, id, primSelector) = defaultSelect(primSelector)
         if isNewId(id) .
 
-    op assignAcc : Heap Value Value -> Heap .
-    eq assignAcc(heap, idW, idR) = write(heap, idW, $accounts, read(heap, idR, $accounts)) .
-
-    op defaultName : -> Name .
-
-    op defaultSelect : PrimarySelector -> Value .
-    eq defaultSelect($name) = defaultName .
-    eq defaultSelect($balance) = 0 .
-    eq defaultSelect($open) = ff .
-
-    sort WriteArgs .
-    op _[_]<-_ : Value Selector$Elt Value -> WriteArgs [prec 30] .
-    op _;_ : Heap WriteArgs -> Heap .
-
     eq heap ; id [ selector ]<- val = write(heap, id, selector, val) .
     eq heap ; id [ selector ]<- val = write(heap, id, selector, val) .
 
@@ -73,6 +59,20 @@ fmod ACCOUNT{Selector :: TRIV} is
     ceq read(heap, id, idSel neList) = read(heap, read(heap, id, idSel), neList)
         if read(heap, id, idSel) :: Value .
     eq read(write(heap, id, selector, idW), id, selector neList) = read(heap, idW, neList) .
+
+    op assignAcc : Heap Value Value -> Heap .
+    eq assignAcc(heap, idW, idR) = write(heap, idW, $accounts, read(heap, idR, $accounts)) .
+
+    op defaultName : -> Name .
+
+    op defaultSelect : PrimarySelector -> Value .
+    eq defaultSelect($name) = defaultName .
+    eq defaultSelect($balance) = 0 .
+    eq defaultSelect($open) = ff .
+
+    sort WriteArgs .
+    op _[_]<-_ : Value Selector$Elt Value -> WriteArgs [prec 30] .
+    op _;_ : Heap WriteArgs -> Heap .
 endfm
 
 fmod ACCOUNT-EX{Selector :: TRIV} is
