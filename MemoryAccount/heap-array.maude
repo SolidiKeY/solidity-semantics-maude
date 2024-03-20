@@ -38,19 +38,28 @@ fmod ACCOUNT{Selector :: TRIV} is
     mb $balance : PrimarySelector .
     mb $open    : PrimarySelector .
 
-    ceq read(new(heap, id, n), id, neList) = defaultSelect(last(neList))
-        if last(neList) :: PrimarySelector .
+    op isNewId : Value -> Bool .
 
-    ceq read(new(heap, id, n), idR, neList) = read(heap, idR, neList)
-        if id =/= idR .
+    eq isNewId(read(new(heap, id, n), idR, neList)) = true .
+    ceq isNewId(read(heap, idRV, neList)) = true
+        if isNewId(idRV) .
 
-    eq read(write(heap, id, selector, val), id, selector) = val .
-    ceq read(write(heap, idW, selectorW, val), idR, selectorR) = read(heap, idR, selectorR)
-        if selectorW =/= selectorR or idW =/= idR .
+    ceq read(heap, idV, primSelector) = defaultSelect(primSelector)
+        if isNewId(idV) .
 
-    ceq read(heap, id, idSel neList) = read(heap, read(heap, id, idSel), neList)
-        if read(heap, id, idSel) :: Identity .
-    eq read(write(heap, id, selector, idW), id, selector neList) = read(heap, idW, neList) .
+    *** ceq read(new(heap, id, n), id, neList) = defaultSelect(last(neList))
+    ***     if last(neList) :: PrimarySelector .
+
+    *** ceq read(new(heap, id, n), idR, neList) = read(heap, idR, neList)
+    ***     if id =/= idR .
+
+    *** eq read(write(heap, id, selector, val), id, selector) = val .
+    *** ceq read(write(heap, idW, selectorW, val), idR, selectorR) = read(heap, idR, selectorR)
+    ***     if selectorW =/= selectorR or idW =/= idR .
+
+    *** ceq read(heap, id, idSel neList) = read(heap, read(heap, id, idSel), neList)
+    ***     if read(heap, id, idSel) :: Identity .
+    *** eq read(write(heap, id, selector, idW), id, selector neList) = read(heap, idW, neList) .
 
     op assignAcc : Heap Identity Identity -> Heap .
     eq assignAcc(heap, idW, idR) = write(heap, idW, $accounts, read(heap, idR, $accounts)) .
@@ -119,6 +128,7 @@ red read(heapWritten, idAlice, $accounts 10 $open) .
 red read(heapNew, newId, $accounts 10 $open) .
 red read(heapNew, newId, $accounts 10 $balance) .
 red read(heapNew, newId, $name) .
+red read(heapNew, read(heapNew, newId, $accounts 10), $balance) .
 
 red read(heapBob, idBob, $accounts 10) .
 red read(heapBob, idBob, $accounts 10 $balance) .
