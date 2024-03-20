@@ -11,35 +11,28 @@ fmod ACCOUNT{Selector :: TRIV} is
     op $name : -> PersonSelector .
     ops $balance $open : -> AccSelector .
 
-    sort Heap Name Boolean Value Identity Key IdKey .
+    sort Heap Name Boolean Value Identity Key .
     ops tt ff : -> Boolean [ctor] .
-
-    subsort IdKey < Identity .
-
-    op IdKey : Identity Key -> IdKey .
-    op getId : IdKey -> Identity .
-    op getKey : IdKey -> Key .
 
     subsort Boolean Name Identity Int < Value .
 
     op write : Heap Identity Selector$Elt Value -> Heap .
+    op write : Heap Value Selector$Elt Value -> Heap .
     op read : Heap Identity NeList{Selector} -> Value .
+    op read : Heap Value NeList{Selector} -> Value .
     op new : Heap Identity Nat -> Heap .
 
     var heap : Heap .
     var n : Nat .
     vars id idW idR : Identity .
+    vars idV idWV idRV idSelV : Value .
     vars selector selectorW selectorR : Selector$Elt .
     var idSel : IdSelector .
     var val : Value .
     var neList : NeList{Selector} .
     var selList : List{Selector} .
     var key : Key .
-    var idKey : IdKey .
     var primSelector : PrimarySelector .
-
-    eq getId(IdKey(id, key)) = id .
-    eq getKey(IdKey(id, key)) = key .
 
     mb $name    : PrimarySelector .
     mb $balance : PrimarySelector .
@@ -70,18 +63,34 @@ fmod ACCOUNT{Selector :: TRIV} is
     eq defaultSelect($open) = ff .
 
     sort WriteArgs .
+    op _[_]<-_ : Value Selector$Elt Value -> WriteArgs [prec 30] .
     op _[_]<-_ : Identity Selector$Elt Value -> WriteArgs [prec 30] .
     op _;_ : Heap WriteArgs -> Heap .
 
     eq heap ; id [ selector ]<- val = write(heap, id, selector, val) .
+    eq heap ; idV [ selector ]<- val = write(heap, idV, selector, val) .
+
+    ceq read(new(heap, idV, n), id, neList) = defaultSelect(last(neList))
+        if last(neList) :: PrimarySelector .
+
+    ceq read(new(heap, idV, n), idRV, neList) = read(heap, idRV, neList)
+        if idV =/= idRV .
+
+    eq read(write(heap, idV, selector, val), idV, selector) = val .
+    ceq read(write(heap, idWV, selectorW, val), idRV, selectorR) = read(heap, idRV, selectorR)
+        if selectorW =/= selectorR or idWV =/= idRV .
+
+    ceq read(heap, idV, idSel neList) = read(heap, read(heap, idV, idSel), neList)
+        if read(heap, idV, idSel) :: Value .
+    eq read(write(heap, idV, selector, idWV), idV, selector neList) = read(heap, idWV, neList) .
 endfm
 
 fmod ACCOUNT-EX{Selector :: TRIV} is
     pr ACCOUNT{Selector} .
 
-    ops heap heapWritten heapNew heapNew2 heapBob : -> Heap .
+    ops heap heapWritten heapNew heapNew2 heapBob heapWritten2 : -> Heap .
     ops Alice NName : -> Name .
-    ops idAlice rId idAccAlice idBob newId : -> Identity .
+    ops idAlice rId idAccAlice idBob newId rIdS idAccAliceS : -> Identity .
 
     eq heapWritten = heap ; idAccAlice [ $balance ]<- 100 ; idAccAlice [ $open ]<- tt ;
           idAlice [ $accounts ]<- rId ; rId [ 10 ]<- idAccAlice ; idAlice [ $name ]<- Alice  .
@@ -90,6 +99,10 @@ fmod ACCOUNT-EX{Selector :: TRIV} is
     eq heapBob = assignAcc(heapWritten, idBob, idAlice) .
 
     eq heapNew2 = heapNew ; newId [ $name ]<- NName .
+
+    eq rIdS = read(heap, idAlice, $accounts).
+    eq idAccAliceS = read(heap, rIdS, 10).
+    eq heapWritten2 = heap ; idAccAliceS [ $balance ]<- 100 ; idAccAliceS [ $open ]<- tt ; idAlice [ $name ]<- Alice  .
 endfm
 
 red read(heapWritten, idAlice, $name) .
@@ -111,3 +124,6 @@ red read(heapBob, idBob, $accounts 10) .
 red read(heapBob, idBob, $accounts 10 $balance) .
 
 red read(heapNew2, newId, $name) .
+
+red read(heapWritten2, idAlice, $name) .
+red read(heapWritten2, idAlice, $accounts 10 $balance) .
