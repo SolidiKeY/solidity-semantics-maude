@@ -11,7 +11,7 @@ fmod ACCOUNT{Selector :: TRIV} is
     op $name : -> PersonSelector .
     ops $balance $open : -> AccSelector .
 
-    sort Heap Name Boolean Value Key .
+    sort Heap Name Boolean Value .
     ops tt ff : -> Boolean [ctor] .
 
     subsort Boolean Name Int < Value .
@@ -27,8 +27,6 @@ fmod ACCOUNT{Selector :: TRIV} is
     var idSel : IdSelector .
     var val : Value .
     var neList : NeList{Selector} .
-    var selList : List{Selector} .
-    var key : Key .
     var primSelector : PrimarySelector .
 
     mb $name    : PrimarySelector .
