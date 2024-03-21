@@ -42,9 +42,6 @@ fmod ACCOUNT{Selector :: TRIV} is
     ceq read(heap, id, primSelector) = defaultSelect(primSelector)
         if isNewId(id) .
 
-    eq heap ; id [ selector ]<- val = write(heap, id, selector, val) .
-    eq heap ; id [ selector ]<- val = write(heap, id, selector, val) .
-
     eq read(new(heap, id, n), id, primSelector) = defaultSelect(primSelector) .
 
     ceq read(new(heap, id, n), idR, neList) = read(heap, idR, neList)
@@ -71,12 +68,14 @@ fmod ACCOUNT{Selector :: TRIV} is
     sort WriteArgs .
     op _[_]<-_ : Value Selector$Elt Value -> WriteArgs [prec 30] .
     op _;_ : Heap WriteArgs -> Heap .
+
+    eq heap ; id [ selector ]<- val = write(heap, id, selector, val) .
 endfm
 
 fmod ACCOUNT-EX{Selector :: TRIV} is
     pr ACCOUNT{Selector} .
 
-    ops heap heapWritten heapNew heapNew2 heapBob heapWritten2 : -> Heap .
+    ops heap heapWritten heapNew heapNew2 heapBob heapCarol heapWritten2 : -> Heap .
     ops Alice NName : -> Name .
     ops idAlice rId idAccAlice idBob newId rIdS idAccAliceS : -> Value .
 
@@ -84,12 +83,16 @@ fmod ACCOUNT-EX{Selector :: TRIV} is
           idAlice [ $accounts ]<- rId ; rId [ 10 ]<- idAccAlice ; idAlice [ $name ]<- Alice  .
 
     eq heapNew = new(heapWritten, newId, 10) .
+
     eq heapBob = assignAcc(heapWritten, idBob, idAlice) .
+    eq heapCarol = heapWritten ; read(heap, idBob, $accounts) [ 11 ] <- idAccAlice .
+    *** carol.accounts[10] = alice.accounts[10]
 
     eq heapNew2 = heapNew ; newId [ $name ]<- NName .
 
-    eq rIdS = read(heap, idAlice, $accounts).
-    eq idAccAliceS = read(heap, rIdS, 10).
+    eq rIdS = read(heap, idAlice, $accounts) .
+    eq idAccAliceS = read(heap, rIdS, 10) .
+
     eq heapWritten2 = heap ; idAccAliceS [ $balance ]<- 100 ; idAccAliceS [ $open ]<- tt ; idAlice [ $name ]<- Alice  .
 endfm
 
@@ -103,6 +106,7 @@ red read(heapWritten, idAlice, $accounts) .
 red read(heapWritten, idAlice, $accounts 10) .
 red read(heapWritten, idAlice, $accounts 10 $balance) .
 red read(heapWritten, idAlice, $accounts 10 $open) .
+*** alice.accounts[10].open
 
 red read(heapNew, newId, $accounts 10 $open) .
 red read(heapNew, newId, $accounts 10 $balance) .
@@ -111,6 +115,9 @@ red read(heapNew, read(heapNew, newId, $accounts 10), $balance) .
 
 red read(heapBob, idBob, $accounts 10) .
 red read(heapBob, idBob, $accounts 10 $balance) .
+
+red read(heapCarol, idBob, $accounts 11) .
+red read(heapCarol, idBob, $accounts 11 $balance) .
 
 red read(heapNew2, newId, $name) .
 
