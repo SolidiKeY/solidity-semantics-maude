@@ -66,6 +66,11 @@ fmod ACCOUNT{Selector :: TRIV} is
     eq defaultSelect($balance) = 0 .
     eq defaultSelect($open) = ff .
 
+    op emptyHeap : -> Heap .
+
+    eq read(emptyHeap, id, primSelector) = defaultSelect(primSelector) .
+
+
     sort WriteArgs .
     op _[_]<-_ : Value Selector$Elt Value -> WriteArgs [prec 30] .
     op _;_ : Heap WriteArgs -> Heap .
@@ -128,3 +133,7 @@ red read(heapWritten2, idAlice, $name) .
 red read(heapWritten2, idAlice, $accounts 10 $balance) .
 
 red read(heapNew3, newId, $accounts 10 $balance) .
+
+red read(emptyHeap, newId, $balance) .
+red read(emptyHeap, newId, $name) .
+red read(emptyHeap, newId, $open) .
