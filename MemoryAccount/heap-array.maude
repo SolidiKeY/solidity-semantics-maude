@@ -33,19 +33,20 @@ fmod ACCOUNT{Selector :: TRIV} is
     mb $balance : PrimarySelector .
     mb $open    : PrimarySelector .
 
+    op isFromSameId : Value Value -> Bool [comm] .
     op isNewId : Value -> Bool .
 
     eq isNewId(read(new(heap, id, n), idR, neList)) = true .
     ceq isNewId(read(heap, idR, neList)) = true
         if isNewId(idR) .
 
-    ceq read(heap, id, primSelector) = defaultSelect(primSelector)
-        if isNewId(id) .
+    eq isFromSameId(id, id) = true .
+    eq isFromSameId(id, read(heap, idR, neList)) = isFromSameId(id, idR) .
+
+    ceq read(new(heap, id, n), idR, primSelector) = defaultSelect(primSelector)
+        if isFromSameId(id, idR) .
 
     eq read(new(heap, id, n), id, primSelector) = defaultSelect(primSelector) .
-
-    ceq read(new(heap, id, n), idR, neList) = read(heap, idR, neList)
-        if id =/= idR .
 
     eq read(write(heap, id, selector, val), id, selector) = val .
     ceq read(write(heap, idW, selectorW, val), idR, selectorR) = read(heap, idR, selectorR)
@@ -75,7 +76,7 @@ endfm
 fmod ACCOUNT-EX{Selector :: TRIV} is
     pr ACCOUNT{Selector} .
 
-    ops heap heapWritten heapNew heapNew2 heapBob heapCarol heapWritten2 : -> Heap .
+    ops heap heapWritten heapNew heapNew2 heapNew3 heapBob heapCarol heapWritten2 : -> Heap .
     ops Alice NName : -> Name .
     ops idAlice rId idAccAlice idBob newId rIdS idAccAliceS : -> Value .
 
@@ -94,6 +95,8 @@ fmod ACCOUNT-EX{Selector :: TRIV} is
     eq idAccAliceS = read(heap, rIdS, 10) .
 
     eq heapWritten2 = heap ; idAccAliceS [ $balance ]<- 100 ; idAccAliceS [ $open ]<- tt ; idAlice [ $name ]<- Alice  .
+
+    eq heapNew3 = new(heap, newId, 10) .
 endfm
 
 red read(heapWritten, idAlice, $name) .
@@ -123,3 +126,5 @@ red read(heapNew2, newId, $name) .
 
 red read(heapWritten2, idAlice, $name) .
 red read(heapWritten2, idAlice, $accounts 10 $balance) .
+
+red read(heapNew3, newId, $accounts 10 $balance) .
