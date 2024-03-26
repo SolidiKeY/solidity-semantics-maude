@@ -33,18 +33,14 @@ fmod ACCOUNT{Selector :: TRIV} is
     mb $balance : PrimarySelector .
     mb $open    : PrimarySelector .
 
-    op isFromSameId : Value Value -> Bool [comm] .
-    op isNewId : Value -> Bool .
+    op isNewId : Heap Value Value -> Bool .
 
-    eq isNewId(read(new(heap, id, n), idR, neList)) = true .
-    ceq isNewId(read(heap, idR, neList)) = true
-        if isNewId(idR) .
-
-    eq isFromSameId(id, id) = true .
-    eq isFromSameId(id, read(heap, idR, neList)) = isFromSameId(id, idR) .
+    eq isNewId(heap, id, id) = true .
+    ceq isNewId(heap, id, read(heap, idR, selector)) = true
+        if isNewId(heap, id, idR) .
 
     ceq read(new(heap, id, n), idR, primSelector) = defaultSelect(primSelector)
-        if isFromSameId(id, idR) .
+        if isNewId(new(heap, id, n), id, idR) .
 
     eq read(new(heap, id, n), id, primSelector) = defaultSelect(primSelector) .
 
