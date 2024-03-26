@@ -42,8 +42,6 @@ fmod ACCOUNT{Selector :: TRIV} is
     ceq read(new(heap, id, n), idR, primSelector) = defaultSelect(primSelector)
         if isNewId(new(heap, id, n), id, idR) .
 
-    eq read(new(heap, id, n), id, primSelector) = defaultSelect(primSelector) .
-
     eq read(write(heap, id, selector, val), id, selector) = val .
     ceq read(write(heap, idW, selectorW, val), idR, selectorR) = read(heap, idR, selectorR)
         if selectorW =/= selectorR or idW =/= idR .
