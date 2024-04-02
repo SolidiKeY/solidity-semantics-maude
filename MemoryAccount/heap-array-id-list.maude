@@ -39,6 +39,7 @@ fmod ACCOUNT{Selector :: TRIV} is
     eq idInEnd(id, id) = true .
     ceq idInEnd(id, idR :: selector) = true
         if idInEnd(id, idR) .
+    eq idInEnd(id, selector) = false .
 
     ceq read(new(heap, id, n), idR, primSelector) = defaultSelect(primSelector)
         if idInEnd(id, idR) .
@@ -46,6 +47,8 @@ fmod ACCOUNT{Selector :: TRIV} is
     ceq read(new(heap, id, n), idR, selector) = idR :: selector
         if idInEnd(id, idR) .
 
+    ceq read(new(heap, id, n), idR, selector) = read(heap, idR, selector)
+        if not(idInEnd(id, idR)) .
 
     eq read(write(heap, id, selector, val), id, selector) = val .
     ceq read(write(heap, idW, selectorW, val), idR, selectorR) = read(heap, idR, selectorR)
