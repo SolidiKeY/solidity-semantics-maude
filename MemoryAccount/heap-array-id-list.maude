@@ -33,17 +33,17 @@ fmod ACCOUNT{Selector :: TRIV} is
     mb $balance : PrimarySelector .
     mb $open    : PrimarySelector .
 
-    op _::_ : Selector$Elt Value -> Value .
+    op _::_ : Value Selector$Elt -> Value .
     op idInEnd : Value Value -> Bool .
 
     eq idInEnd(id, id) = true .
-    ceq idInEnd(id, selector :: idR) = true
+    ceq idInEnd(id, idR :: selector) = true
         if idInEnd(id, idR) .
 
     ceq read(new(heap, id, n), idR, primSelector) = defaultSelect(primSelector)
         if idInEnd(id, idR) .
 
-    ceq read(new(heap, id, n), idR, selector) = selector :: idR
+    ceq read(new(heap, id, n), idR, selector) = idR :: selector
         if idInEnd(id, idR) .
 
 
