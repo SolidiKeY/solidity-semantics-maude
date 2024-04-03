@@ -72,6 +72,13 @@ fmod ACCOUNT{Selector :: TRIV} is
 
     eq read(emptyHeap, id, primSelector) = defaultSelect(primSelector) .
 
+    op build : Heap Value -> Heap .
+
+    ceq read(build(heap, id), idR, selector) = idR :: selector
+        if idInEnd(id, idR) and not(selector :: PrimarySelector) .
+
+    ceq read(build(heap, id), idR, selector) = read(heap, idR, selector)
+        if not(idInEnd(id, idR)) .
 
     sort WriteArgs .
     op _[_]<-_ : Value Selector$Elt Value -> WriteArgs [prec 30] .
@@ -105,6 +112,10 @@ fmod ACCOUNT-EX{Selector :: TRIV} is
 
     eq heapNew3 = new(heap, newId, 10) .
     eq heapNew4 = new(heapNew3, idBob, 10) .
+
+    op heapBuild : -> Heap .
+
+    eq heapBuild = build(heap, newId) .
 endfm
 
 red read(heapWritten, idAlice, $name) .
@@ -142,3 +153,7 @@ red read(emptyHeap, newId, $name) .
 red read(emptyHeap, newId, $open) .
 
 red read(heapNew4, newId, $accounts 10 $balance) .
+
+red read(heapBuild, newId, $accounts) .
+red read(heapBuild, newId, $accounts 10) .
+red read(heapBuild, newId, $accounts 10 $balance) .
