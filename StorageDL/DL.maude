@@ -1,0 +1,28 @@
+fmod DYNAMIC is
+    sorts Type KeySimple KeyComplex Key Value KeyValue KeyValuePair Updates Assign Program Left .
+
+    subsort KeyValuePair < Updates .
+    subsort KeySimple KeyComplex < Key .
+    subsort Key < Left .
+    subsort Key Value < KeyValue .
+
+    op {_}<_> : Updates Program -> Updates .
+    op _||_ : Updates Updates -> Updates [prec 33 assoc] .
+    op _:=_ : Key Value -> KeyValuePair [prec 31] .
+    op _,_ : Key Key -> KeyComplex [prec 30 assoc] .
+    op <_> : Program -> Updates .
+    ops <> nil : -> Program .
+    op _;_ : Assign Program -> Program [prec 37] .
+    op _<-_ : Left KeyValue -> Assign [prec 35] .
+    ops Person Account Int : -> Type .
+    op _storage_ : Type Key -> Left [prec 31] .
+
+endfm
+
+fmod DYNAMIC-TEST is
+    pr DYNAMIC .
+    ops accS account balance v carol : -> KeySimple .
+    op x0 : -> Value .
+endfm
+
+red < accS,balance <- x0 ; carol,account <- accS ; v <- carol,account,balance ; nil > .
