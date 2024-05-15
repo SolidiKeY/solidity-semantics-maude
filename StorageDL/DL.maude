@@ -30,7 +30,7 @@ fmod DYNAMIC is
     vars sL sRR : KeySimple .
     var a : Field .
     var cR : KeyComplex .
-    var sR : KeyValue .
+    var sLs sR : Key .
     var prog : Program .
     var updated : Updates .
     var val : Value .
@@ -45,6 +45,7 @@ fmod DYNAMIC is
     eq < sL <- sRR,a ; prog > = { sL := read(Storage, fieldApp(sRR, a)) }< prog > .
     eq < cR,a <- val ; prog > = < Int storage freshVar <- cR ; freshVar,a <- val ; prog > .
     eq < type storage sL <- sR,a ; prog > = { sL := fieldApp(sR, a) }< prog > .
+    eq < sLs <- cR ; prog > = < Account storage freshVar <- cR ; sLs <- freshVar ; prog > .
 endfm
 
 fmod DYNAMIC-TEST is
@@ -56,4 +57,3 @@ endfm
 
 red < accS,balance <- x0 ; carol,account <- accS ; v <- carol,account,balance > .
 red < carol,account,balance <- x0 ; alice,account <- carol,account ; v <- alice,account,balance > .
-red < alice,account <- carol,account > .
