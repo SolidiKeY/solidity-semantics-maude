@@ -1,8 +1,7 @@
 fmod DYNAMIC is
-    sorts Type KeySimple KeyComplex Key Value KeyValue KeyValuePair Updates Assign Program NeProgram Left Right .
+    sorts Type KeySimple KeyComplex Key Field Value KeyValue KeyValuePair Updates Assign Program NeProgram Left Right .
 
     subsort KeyValuePair < Updates .
-    *** subsort Assign < Program .
     subsort KeySimple KeyComplex < Key .
     subsort Key Value < KeyValue .
     subsort KeyValue < Left Right .
@@ -11,7 +10,7 @@ fmod DYNAMIC is
     op {_}_ : Updates Updates -> Updates .
     op _||_ : Updates Updates -> Updates [prec 33 assoc] .
     op _:=_ : Key KeyValue -> KeyValuePair [prec 31] .
-    op _,_ : Key Key -> KeyComplex [prec 30 assoc] .
+    op _,_ : Key Field -> KeyComplex [prec 30] .
     op <_> : Program -> Updates .
     ops <> nil : -> Program .
     op nil : -> Updates .
@@ -25,25 +24,36 @@ fmod DYNAMIC is
     op Storage : -> KeySimple .
     op store : KeySimple Key KeyValue -> KeyValue .
     op read : KeySimple Key -> KeyValue .
-    op fieldApp : KeySimple KeySimple -> KeySimple .
+    op fieldApp : KeySimple Field -> KeySimple .
     op freshVar : -> KeySimple .
 
-    vars sL sRR a : KeySimple .
+    vars sL sRR : KeySimple .
+    var a : Field .
     var cR : KeyComplex .
     var sR : KeyValue .
     var prog : Program .
     var updated : Updates .
+    var val : Value .
+    var type : Type .
 
-    eq < sL,a <- sR ; prog > = { Storage := store(Storage, fieldApp(sL, a), sR) }< prog > .
+    eq < sL,a <- val ; prog > = { Storage := store(Storage, fieldApp(sL, a), val) }< prog > .
+    eq < sL,a <- sRR ; prog > =
+        { freshVar := read(Storage, sRR) }
+          { Storage := store(Storage, fieldApp(sL, a), freshVar) } < prog > .
     eq < sL <- cR,a ; prog > = < Account storage freshVar <- cR ; sL <- freshVar,a ; prog > .
     eq < Account storage sL <- sRR,a ; prog > = { sL := fieldApp(sRR, a) }< prog > .
     eq < sL <- sRR,a ; prog > = { sL := read(Storage, fieldApp(sRR, a)) }< prog > .
+    eq < cR,a <- val ; prog > = < Int storage freshVar <- cR ; freshVar,a <- val ; prog > .
+    eq < type storage sL <- sR,a ; prog > = { sL := fieldApp(sR, a) }< prog > .
 endfm
 
 fmod DYNAMIC-TEST is
     pr DYNAMIC .
-    ops accS account balance v carol : -> KeySimple .
+    ops account balance : -> Field .
+    ops accS v alice carol : -> KeySimple .
     op x0 : -> Value .
 endfm
 
 red < accS,balance <- x0 ; carol,account <- accS ; v <- carol,account,balance > .
+red < carol,account,balance <- x0 ; alice,account <- carol,account ; v <- alice,account,balance > .
+red < alice,account <- carol,account > .
