@@ -1,9 +1,15 @@
 fmod DYNAMIC is
     pr NAT .
-    sorts Type KeySimple KeyComplex Key Field Value KeyValue KeyValuePair Updates Assign Program NeProgram Left Right .
+    sorts Type KeySimple KeyComplex Key FieldStorage FieldConcrete Field Value
+        KeyStorage KeyConcrete KeyValue KeyValuePair Updates Assign Program NeProgram Left Right
+        KeyStorageComplex KeyConcreteComplex KeySimpleStorage KeySimpleConcrete .
 
     subsort KeyValuePair < Updates .
+    subsort FieldStorage FieldConcrete < Field .
+    subsort KeySimpleStorage KeySimpleConcrete < KeySimple .
+    subsort KeyStorageComplex KeyConcreteComplex < KeyComplex .
     subsort KeySimple KeyComplex < Key .
+    subsort KeySimpleConcrete < Value .
     subsort Key Value < KeyValue .
     subsort KeyValue < Left Right .
     subsort Assign < NeProgram < Program .
@@ -11,7 +17,8 @@ fmod DYNAMIC is
     op {_}_ : Updates Updates -> Updates .
     op _||_ : Updates Updates -> Updates [prec 33 assoc] .
     op _:=_ : Key KeyValue -> KeyValuePair [prec 31] .
-    op _,_ : Key Field -> KeyComplex [prec 30] .
+    op _,_ : Key FieldStorage -> KeyStorageComplex [prec 30] .
+    op _,_ : Key FieldConcrete -> KeyConcreteComplex [prec 30] .
     op <_> : Program -> Updates .
     ops <> nil : -> Program .
     op nil : -> Updates .
@@ -29,19 +36,25 @@ fmod DYNAMIC is
     op fieldApp : KeySimple Field -> KeySimple .
     op Cp : Program -> KeySimple .
     op C  : Nat -> KeySimple .
-    op K : -> KeySimple .
+    op K : -> KeySimpleConcrete .
+    op Ks : -> KeySimpleStorage .
 
     vars sL sRR : KeySimple .
     var a : Field .
+    var aC : FieldConcrete .
     var cL cR : KeyComplex .
     var kvL kvR : KeyValue .
     var sLs sR : Key .
     var prog : Program .
     var updated : Updates .
     var val : Value .
+    var kval : KeyValue .
     var type : Type .
     var assign : Assign .
     var n : Nat .
+    var stC : KeyStorageComplex .
+    var ksStorL ksStorR : KeySimpleStorage .
+    var kcC : KeyConcreteComplex .
 
     eq progHash(nil) = 0 .
     eq progHash(kvL <- C(n) ; prog) = progHash(prog) + 1000 .
@@ -50,25 +63,48 @@ fmod DYNAMIC is
     eq Cp(prog) = C(progHash(prog)) .
     eq C(n) = K .
 
-    eq < sL,a <- val ; prog > = { Storage := store(Storage, fieldApp(sL, a), val) }< prog > .
-    eq < sL,a <- sRR ; prog > =
-        { Cp(sL,a <- sRR ; prog) := read(Storage, sRR) }
-          { Storage := store(Storage, fieldApp(sL, a), Cp(sL,a <- sRR ; prog)) } < prog > .
-    eq < sL <- cR,a ; prog > = < Account storage Cp(sL <- cR,a ; prog) <- cR ; sL <- Cp(sL <- cR,a ; prog),a ; prog > .
+    *** Right Part in Storage
+    eq < sLs <- stC ; prog > = < Account storage Ks <- stC ; sLs <- Ks ; prog > .
     eq < type storage sL <- sRR,a ; prog > = { sL := fieldApp(sRR, a) }< prog > .
-    eq < sL <- sRR,a ; prog > = { sL := read(Storage, fieldApp(sRR, a)) }< prog > .
-    eq < cR,a <- val ; prog > = < Int storage Cp(cR,a <- val ; prog) <- cR ; Cp(cR,a <- val ; prog),a <- val ; prog > .
-    eq < type storage sL <- sRR,a ; prog > = { sL := fieldApp(sRR, a) }< prog > .
-    eq < sLs <- cR ; prog > = < Account storage Cp(sLs <- cR ; prog) <- cR ; sLs <- Cp(sLs <- cR ; prog) ; prog > .
-    eq < type storage sL <- cR,a ; prog > = < type storage Cp(type storage sL <- cR,a ; prog) <- cR ;
-        type storage sL <- Cp(type storage sL <- cR,a ; prog),a ; prog > .
-    eq < cL,a <- sRR ; prog > = < Account storage Cp(cL,a <- sRR ; prog) <- cL ; Cp(cL,a <- sRR ; prog),a <- sRR ; prog > .
+    eq < ksStorL <- ksStorR ; prog > = { K := read(Storage, ksStorR) } { Storage := store(Storage, ksStorL, K) } < prog > .
+
+    *** Right Part Concrete in Storage
+    eq < sLs <- stC,aC ; prog > = < Account storage Ks <- stC ; sLs <- Ks,aC ; prog > .
+    eq < cL <- kcC ; prog > = < K <- kcC ; cL <- K ; prog > .
+    eq < sL <- ksStorR,aC ; prog > = { sL := read(Storage, fieldApp(ksStorR, aC)) } < prog > .
+
+
+    *** Left Part Complex in Storage
+    eq < stC <- ksStorR ; prog > = < Account storage Ks <- stC ; Ks <- ksStorR ; prog > .
+    eq < stC,aC <- kval ; prog > = < Account storage Ks <- stC ; Ks,aC <- kval ; prog > .
+
+    *** Left Part Simple in Storage
+    eq < sL,aC <- val ; prog > = { Storage := store(Storage, fieldApp(sL, aC), val) }< prog > .
+    *** eq < sL,aC <- ksStorR ; prog > =
+    ***     { K := read(Storage, ksStorR) }
+    ***         { Storage := store(Storage, fieldApp(sL, aC), K) }< prog > .
+    eq < type storage sL <- cR,a ; prog > = < type storage Ks <- cR ;
+        type storage sL <- Ks,a ; prog > .
+
+
+
+    *** eq < sL,a <- sRR ; prog > =
+    ***     { Cp(sL,a <- sRR ; prog) := read(Storage, sRR) }
+    ***       { Storage := store(Storage, fieldApp(sL, a), Cp(sL,a <- sRR ; prog)) } < prog > .
+    *** eq < sL <- cR,a ; prog > = < Account storage Cp(sL <- cR,a ; prog) <- cR ; sL <- Cp(sL <- cR,a ; prog),a ; prog > .
+    *** eq < type storage sL <- sRR,a ; prog > = { sL := fieldApp(sRR, a) }< prog > .
+    *** eq < sL <- sRR,a ; prog > = { sL := read(Storage, fieldApp(sRR, a)) }< prog > .
+    *** eq < cR,a <- val ; prog > = < Int storage Cp(cR,a <- val ; prog) <- cR ; Cp(cR,a <- val ; prog),a <- val ; prog > .
+    *** eq < sLs <- cR ; prog > = < Account storage Cp(sLs <- cR ; prog) <- cR ; sLs <- Cp(sLs <- cR ; prog) ; prog > .
+    *** eq < cL,a <- sRR ; prog > = < Account storage Cp(cL,a <- sRR ; prog) <- cL ; Cp(cL,a <- sRR ; prog),a <- sRR ; prog > .
 endfm
 
 fmod DYNAMIC-TEST is
     pr DYNAMIC .
-    ops subAccount account balance : -> Field .
-    ops accS v alice carol : -> KeySimple .
+    ops subAccount account : -> FieldStorage .
+    ops balance : -> FieldConcrete .
+    ops accS alice carol : -> KeySimpleStorage .
+    ops v : -> KeySimpleConcrete .
     op x0 : -> Value .
 endfm
 
@@ -76,3 +112,9 @@ red < accS,balance <- x0 ; carol,account <- accS ; v <- carol,account,balance > 
 red < carol,account,balance <- x0 ; alice,account <- carol,account ; v <- alice,account,balance > .
 red < alice,account,subAccount <- carol,account,subAccount > .
 red < alice,account,subAccount <- carol,account > .
+
+red < accS <- carol,account > .
+red < carol,account <- accS > .
+red < carol,account,balance <- x0 > .
+red < accS,balance <- x0 > .
+red < alice,account,balance <- accS,balance > .
