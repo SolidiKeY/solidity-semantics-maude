@@ -28,7 +28,6 @@ fmod DYNAMIC is
     op _<-_ : Left Right -> Assign [prec 35] .
     ops Person Account Int : -> Type .
     op _storage_ : Type Key -> Left [prec 31] .
-    op progHash : Program -> Nat .
 
     op Storage : -> KeySimple .
     op store : KeySimple Key KeyValue -> KeyValue .
@@ -56,13 +55,6 @@ fmod DYNAMIC is
     var ksStorL ksStorR : KeySimpleStorage .
     var kcC : KeyConcreteComplex .
 
-    eq progHash(nil) = 0 .
-    eq progHash(kvL <- C(n) ; prog) = progHash(prog) + 1000 .
-    eq progHash(kvL <- kvR ; prog) = progHash(prog) + 1 .
-    eq progHash(type storage kvL <- kvR ; prog) = progHash(prog) + 100 .
-    eq Cp(prog) = C(progHash(prog)) .
-    eq C(n) = K .
-
     *** Right Part in Storage
     eq < sLs <- stC ; prog > = < Account storage Ks <- stC ; sLs <- Ks ; prog > .
     eq < type storage sL <- sRR,a ; prog > = { sL := fieldApp(sRR, a) }< prog > .
@@ -80,23 +72,8 @@ fmod DYNAMIC is
 
     *** Left Part Simple in Storage
     eq < sL,aC <- val ; prog > = { Storage := store(Storage, fieldApp(sL, aC), val) }< prog > .
-    *** eq < sL,aC <- ksStorR ; prog > =
-    ***     { K := read(Storage, ksStorR) }
-    ***         { Storage := store(Storage, fieldApp(sL, aC), K) }< prog > .
     eq < type storage sL <- cR,a ; prog > = < type storage Ks <- cR ;
         type storage sL <- Ks,a ; prog > .
-
-
-
-    *** eq < sL,a <- sRR ; prog > =
-    ***     { Cp(sL,a <- sRR ; prog) := read(Storage, sRR) }
-    ***       { Storage := store(Storage, fieldApp(sL, a), Cp(sL,a <- sRR ; prog)) } < prog > .
-    *** eq < sL <- cR,a ; prog > = < Account storage Cp(sL <- cR,a ; prog) <- cR ; sL <- Cp(sL <- cR,a ; prog),a ; prog > .
-    *** eq < type storage sL <- sRR,a ; prog > = { sL := fieldApp(sRR, a) }< prog > .
-    *** eq < sL <- sRR,a ; prog > = { sL := read(Storage, fieldApp(sRR, a)) }< prog > .
-    *** eq < cR,a <- val ; prog > = < Int storage Cp(cR,a <- val ; prog) <- cR ; Cp(cR,a <- val ; prog),a <- val ; prog > .
-    *** eq < sLs <- cR ; prog > = < Account storage Cp(sLs <- cR ; prog) <- cR ; sLs <- Cp(sLs <- cR ; prog) ; prog > .
-    *** eq < cL,a <- sRR ; prog > = < Account storage Cp(cL,a <- sRR ; prog) <- cL ; Cp(cL,a <- sRR ; prog),a <- sRR ; prog > .
 endfm
 
 fmod DYNAMIC-TEST is
