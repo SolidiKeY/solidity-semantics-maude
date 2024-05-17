@@ -1,12 +1,14 @@
 fmod DYNAMIC is
     pr NAT .
     sorts Type KeySimple KeyComplex Key FieldStorage FieldConcrete Field Value
-        KeyStorage KeyConcrete KeyValue KeyValuePair Updates Assign Program NeProgram Left Right
-        KeyStorageComplex KeyConcreteComplex KeySimpleStorage KeySimpleConcrete .
+        Updates Assign Program NeProgram Left Right
+        KeyStorage KeyConcrete KeyValue KeyValuePair KeyStoragePath
+        KeyStorageComplex KeyConcreteComplex KeySimpleStorage KeySimpleStorageBoth KeySimpleConcrete .
 
     subsort KeyValuePair < Updates .
     subsort FieldStorage FieldConcrete < Field .
-    subsort KeySimpleStorage KeySimpleConcrete < KeySimple .
+    subsort KeySimpleStorage KeyStoragePath KeySimpleConcrete < KeySimple .
+    subsort KeySimpleStorage KeyStoragePath < KeySimpleStorageBoth .
     subsort KeyStorageComplex KeyConcreteComplex < KeyComplex .
     subsort KeySimple KeyComplex < Key .
     subsort KeySimpleConcrete < Value .
@@ -31,16 +33,17 @@ fmod DYNAMIC is
 
     op Storage : -> KeySimple .
     op store : KeySimple Key KeyValue -> KeyValue .
-    op read : KeySimple Key -> KeyValue .
-    op fieldApp : KeySimple Field -> KeySimple .
+    op select : KeySimple Key -> KeyValue .
+    op _:_ : KeySimple Field -> KeySimple [prec 30] .
     op Cp : Program -> KeySimple .
     op C  : Nat -> KeySimple .
     op K : -> KeySimpleConcrete .
-    op Ks : -> KeySimpleStorage .
+    op Ks : -> KeyStoragePath .
 
     vars sL sRR : KeySimple .
     var a : Field .
     var aC : FieldConcrete .
+    var aS : FieldStorage .
     var cL cR : KeyComplex .
     var kvL kvR : KeyValue .
     var sLs sR : Key .
@@ -52,28 +55,30 @@ fmod DYNAMIC is
     var assign : Assign .
     var n : Nat .
     var stC : KeyStorageComplex .
-    var ksStorL ksStorR : KeySimpleStorage .
+    var ksStorL : KeySimpleStorage .
+    var ksStorB ksStorR : KeySimpleStorageBoth .
     var kcC : KeyConcreteComplex .
+    var stP : KeyStoragePath .
 
     *** Right Part in Storage
-    eq < sLs <- stC ; prog > = < Account storage Ks <- stC ; sLs <- Ks ; prog > .
-    eq < type storage sL <- sRR,a ; prog > = { sL := fieldApp(sRR, a) }< prog > .
-    eq < ksStorL <- ksStorR ; prog > = { K := read(Storage, ksStorR) } { Storage := store(Storage, ksStorL, K) } < prog > .
+    ceq < sLs <- stC ; prog > = < Ks <- stC ; sLs <- Ks ; prog >
+        if not (sLs :: KeyStoragePath) .
+    eq < stP <- sRR,a ; prog > = { stP := sRR : a }< prog > .
 
     *** Right Part Concrete in Storage
-    eq < sLs <- stC,aC ; prog > = < Account storage Ks <- stC ; sLs <- Ks,aC ; prog > .
+    eq < sLs <- stC,aC ; prog > = < Ks <- stC ; sLs <- Ks,aC ; prog > .
     eq < cL <- kcC ; prog > = < K <- kcC ; cL <- K ; prog > .
-    eq < sL <- ksStorR,aC ; prog > = { sL := read(Storage, fieldApp(ksStorR, aC)) } < prog > .
+    eq < sL <- ksStorB,aC ; prog > = { sL := select(Storage, ksStorB : aC) } < prog > .
 
 
     *** Left Part Complex in Storage
-    eq < stC <- ksStorR ; prog > = < Account storage Ks <- stC ; Ks <- ksStorR ; prog > .
-    eq < stC,aC <- kval ; prog > = < Account storage Ks <- stC ; Ks,aC <- kval ; prog > .
+    eq < stC,a <- kval ; prog > = < Ks <- stC ; Ks,a <- kval ; prog > .
 
     *** Left Part Simple in Storage
-    eq < sL,aC <- val ; prog > = { Storage := store(Storage, fieldApp(sL, aC), val) }< prog > .
-    eq < type storage sL <- cR,a ; prog > = < type storage Ks <- cR ;
-        type storage sL <- Ks,a ; prog > .
+    eq < ksStorB,aC <- val ; prog > = { Storage := store(Storage, ksStorB : aC, val) }< prog > .
+    eq < ksStorB,aS <- ksStorR ; prog > = { K := select(Storage, ksStorR) } { Storage := store(Storage, ksStorB, K) } < prog > .
+    eq < stP <- cR,a ; prog > = < Ks <- cR ; stP <- Ks,a ; prog > .
+    eq < ksStorL <- ksStorB ; prog > = { K := select(Storage, ksStorB) } { Storage := store(Storage, ksStorL, K) } < prog > .
 endfm
 
 fmod DYNAMIC-TEST is
@@ -95,3 +100,4 @@ red < carol,account <- accS > .
 red < carol,account,balance <- x0 > .
 red < accS,balance <- x0 > .
 red < alice,account,balance <- accS,balance > .
+red < v <- carol,account,balance > .
