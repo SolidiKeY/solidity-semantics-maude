@@ -58,7 +58,7 @@ fmod DYNAMIC is
     var ksStorL : KeySimpleStorage .
     var ksStorB ksStorR : KeySimpleStorageBoth .
     var kcC : KeyConcreteComplex .
-    var stP : KeyStoragePath .
+    var stP stPr : KeyStoragePath .
 
     *** Right Part in Storage
     ceq < sLs <- stC ; prog > = < Ks <- stC ; sLs <- Ks ; prog >
@@ -79,6 +79,9 @@ fmod DYNAMIC is
     eq < ksStorB,aS <- ksStorR ; prog > = { K := select(Storage, ksStorR) } { Storage := store(Storage, ksStorB, K) } < prog > .
     eq < stP <- cR,a ; prog > = < Ks <- cR ; stP <- Ks,a ; prog > .
     eq < ksStorL <- ksStorB ; prog > = { K := select(Storage, ksStorB) } { Storage := store(Storage, ksStorL, K) } < prog > .
+
+    *** Storage paths
+    eq < stP <- stPr ; prog > = { stP := stPr } < prog > .
 endfm
 
 fmod DYNAMIC-TEST is
@@ -88,6 +91,7 @@ fmod DYNAMIC-TEST is
     ops accS alice carol : -> KeySimpleStorage .
     ops v : -> KeySimpleConcrete .
     op x0 : -> Value .
+    ops alicePath bobPath accPath : -> KeyStoragePath .
 endfm
 
 red < accS,balance <- x0 ; carol,account <- accS ; v <- carol,account,balance > .
@@ -101,3 +105,7 @@ red < carol,account,balance <- x0 > .
 red < accS,balance <- x0 > .
 red < alice,account,balance <- accS,balance > .
 red < v <- carol,account,balance > .
+
+red < alicePath <- bobPath > .
+red < alicePath <- bobPath,account > .
+red < alicePath,account <- accPath > .
