@@ -16,12 +16,12 @@ fmod DYNAMIC is
     subsort KeyValue < Left Right .
     subsort Assign < NeProgram < Program .
 
-    op {_}_ : Updates Updates -> Updates .
+    op {_}_ : Updates Updates -> Updates [format (ni s s ++t d)] .
     op _||_ : Updates Updates -> Updates [prec 33 assoc] .
-    op _:=_ : Key KeyValue -> KeyValuePair [prec 31] .
+    op _:=_ : Key KeyValue -> KeyValuePair [format (b! o o o) prec 31] .
     op _,_ : Key FieldStorage -> KeyStorageComplex [prec 30] .
     op _,_ : Key FieldConcrete -> KeyConcreteComplex [prec 30] .
-    op <_> : Program -> Updates .
+    op <_> : Program -> Updates [format (nt d d d)] .
     ops <> nil : -> Program .
     op nil : -> Updates .
     op _;_ : Program Program -> Program [ctor assoc id: nil prec 37] .
@@ -31,7 +31,7 @@ fmod DYNAMIC is
     ops Person Account Int : -> Type .
     op _storage_ : Type Key -> Left [prec 31] .
 
-    op Storage : -> KeySimple .
+    op Storage : -> KeySimple [format (b! o)] .
     op store : KeySimple Key KeyValue -> KeyValue .
     op select : KeySimple Key -> KeyValue .
     op _:_ : KeySimple Field -> KeySimple [prec 30] .
