@@ -45,15 +45,14 @@ fmod TEST-STATIC-ARRAY is
     pr STATIC-ARRAY .
 
     ops memory wMemory cMemory : -> Memory .
-    ops idU id1 id2 idV1 idV2 : -> Identity .
-    op pS : -> PrimSelector .
-    op idS : -> IdSelector .
-    ops iS1 is2 : -> IdSelector .
+    ops bob bAcc : -> Identity .
+    op $balance : -> PrimSelector .
+    op $account : -> IdSelector .
 
-    eq wMemory = write(write(memory, id2 , idS , id1), id1, pS, 1) .
+    eq wMemory = write(write(memory, bob , $account , bAcc), bAcc, $balance, 1) .
     eq cMemory = clear(wMemory) .
 endfm
 
-red read(wMemory, id2, idS) .
-red read(cMemory, id2, idS) .
-red read(cMemory, id1, pS) .
+red read(wMemory, bob, $account) .
+red read(cMemory, bob, $account) .
+red read(cMemory, bAcc, $balance) .
