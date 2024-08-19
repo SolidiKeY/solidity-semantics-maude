@@ -40,6 +40,9 @@ fmod STATIC-ARRAY is
 
     eq read(clear(memory), id, pSel) = read(memory, id, pSel) .
     eq read(clear(memory), id1 : sel, pSel) = read(memory, read(memory, id1, sel), pSel) .
+
+    eq read(emptyMemory, id1, pSel) = 0 .
+    eq read(emptyMemory, id1, idS) = id1 : idS .
 endfm
 
 fmod TEST-STATIC-ARRAY is
@@ -53,6 +56,9 @@ fmod TEST-STATIC-ARRAY is
     eq wMemory = write(write(emptyMemory, bob , $account , bAcc), bAcc, $balance, 1) .
     eq cMemory = clear(wMemory) .
 endfm
+
+red read(emptyMemory, bAcc, $balance) .
+red read(emptyMemory, bob, $account) .
 
 red read(wMemory, bob, $account) .
 red read(cMemory, bob, $account) .
