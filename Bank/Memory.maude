@@ -1,19 +1,22 @@
-fmod STATIC-ARRAY is
+fmod STATIC-ARRAY{Field :: TRIV} is
     pr INT .
+    pr LIST{Field} .
 
     sorts Memory PrimIdentity Identity Value .
-    sorts PrimSelector IdSelector Selector .
-    subsort PrimSelector IdSelector < Selector .
+    sorts PrimField IdField .
+    subsort PrimField IdField < Field$Elt .
     subsort Int Identity < Value .
-    subsort PrimIdentity < Identity .
 
-    op new : Memory Identity -> Memory .
-    op read : Memory Identity Selector -> Value .
-    op write : Memory Identity Selector Value -> Memory .
-    op _:_ : Identity Selector -> Identity .
+    pr LIST{Field} .
 
-    op first : Identity -> PrimIdentity .
+    op new : Memory PrimIdentity -> Memory .
+    op read : Memory Identity Field$Elt -> Value .
+    op write : Memory Identity Field$Elt Value -> Memory .
+    op idC : PrimIdentity List{Field} -> Identity .
+
+    op root : Identity -> PrimIdentity .
     op clear : Memory -> Memory .
+    op _:_ : Identity Field$Elt -> Identity .
 
     op emptyMemory : -> Memory .
 
@@ -22,36 +25,43 @@ fmod STATIC-ARRAY is
     vars id : PrimIdentity .
     var idComplex id1 id2 : Identity .
     var val : Value .
-    var sel sel1 sel2 : Selector .
-    var pSel : PrimSelector .
-    var idS : IdSelector .
+    var sel sel1 sel2 : Field$Elt .
+    var pSel : PrimField .
+    var idS : IdField .
+    var ls : List{Field} .
+
+    eq idC(id, ls) : sel = idC(id, sel ls) .
 
     eq read(write(memory, id1, sel, val), id1, sel) = val .
     ceq read(write(memory, id1, sel1, val), id2, sel2) = read(memory, id2, sel2)
         if id1 =/= id2 or sel1 =/= sel2 .
 
-    eq first(id) = id .
-    eq first(idComplex : sel) = first(idComplex) .
+    eq root(idC(id, ls)) = id .
 
     ceq read(new(memory, id), idComplex, pSel) = 0
-        if id == first(idComplex) .
+        if id == root(idComplex) .
 
-    eq read(clear(memory), id1, idS) = id1 : idS .
+    eq read(clear(memory), idC(id, ls) , idS) = idC(id, idS ls) .
 
-    eq read(clear(memory), id, pSel) = read(memory, id, pSel) .
-    eq read(clear(memory), id1 : sel, pSel) = read(memory, read(memory, id1, sel), pSel) .
+    eq read(clear(memory), idC(id, nil) , pSel) = read(memory, idC(id, nil) , pSel) .
+
+    eq read(clear(memory), idC(id, sel ls), pSel) = read(memory, read(memory, idC(id, ls), sel), pSel) .
 
     eq read(emptyMemory, id1, pSel) = 0 .
     eq read(emptyMemory, id1, idS) = id1 : idS .
 endfm
 
-fmod TEST-STATIC-ARRAY is
-    pr STATIC-ARRAY .
+fmod TEST-STATIC-ARRAY{Field :: TRIV} is
+    pr STATIC-ARRAY{Field} .
 
     ops memory wMemory cMemory : -> Memory .
-    ops bob bAcc : -> PrimIdentity .
-    op $balance : -> PrimSelector .
-    op $account : -> IdSelector .
+    ops bobC bAccC : -> PrimIdentity .
+    ops bob bAcc : -> Identity .
+    op $balance : -> PrimField .
+    op $account : -> IdField .
+
+    eq bob = idC(bobC, nil) .
+    eq bAcc = idC(bAccC, nil) .
 
     eq wMemory = write(write(emptyMemory, bob , $account , bAcc), bAcc, $balance, 1) .
     eq cMemory = clear(wMemory) .
@@ -64,4 +74,6 @@ red read(wMemory, bob, $account) .
 red read(cMemory, bob, $account) .
 red read(cMemory, bAcc, $balance) .
 
-red read(cMemory, bob : $account, $balance) .
+red read(cMemory, idC(bobC, $account), $balance) .
+
+red read(emptyMemory, bob, $account)  .
