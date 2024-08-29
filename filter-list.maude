@@ -1,0 +1,26 @@
+fmod FILTER{P :: TRIV} is
+    pr LIST{P} .
+
+    sorts X Y .
+
+    op _,,_ : X Y -> P$Elt .
+    op fst : P$Elt -> X .
+    op snd : P$Elt -> Y .
+
+    op filterNot : List{P} X -> List{P} .
+    op if_then_else_ : Bool List{P} List{P} -> List{P} .
+
+    var x x1 x2 : X .
+    var y : Y .
+    var ps ps2 : List{P} .
+
+    eq fst(x,, y) = x .
+    eq snd(x,, y) = y .
+
+    op eqq : X X -> Bool .
+
+    eq eqq(x1, x2) = x1 == x2 .
+
+    eq filterNot(ps, x) = if eqq(fst(head(ps)), x) then tail(ps) else ps .
+
+endfm
