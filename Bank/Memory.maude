@@ -12,11 +12,12 @@ fmod STATIC-ARRAY{Field :: TRIV} is
     op new : Memory PrimIdentity -> Memory .
     op read : Memory Identity Field$Elt -> Value .
     op write : Memory Identity Field$Elt Value -> Memory .
+    op delete : Memory Identity -> Memory .
     op idC : PrimIdentity List{Field} -> Identity .
 
-    op root : Identity -> PrimIdentity .
     op clear : Memory -> Memory .
     op _:_ : Identity Field$Elt -> Identity .
+    op _isPrefixOf_ : List{Field} List{Field} -> Bool .
 
     op emptyMemory : -> Memory .
 
@@ -28,7 +29,7 @@ fmod STATIC-ARRAY{Field :: TRIV} is
     var sel sel1 sel2 : Field$Elt .
     var pSel : PrimField .
     var idS : IdField .
-    var ls : List{Field} .
+    var ls ls1 ls2 : List{Field} .
 
     eq idC(id, ls) : sel = idC(id, sel ls) .
 
@@ -36,19 +37,21 @@ fmod STATIC-ARRAY{Field :: TRIV} is
     ceq read(write(memory, id1, sel1, val), id2, sel2) = read(memory, id2, sel2)
         if id1 =/= id2 or sel1 =/= sel2 .
 
-    eq root(idC(id, ls)) = id .
-
-    ceq read(new(memory, id), idComplex, pSel) = 0
-        if id == root(idComplex) .
+    eq read(new(memory, id), idC(id, ls), pSel) = 0 .
 
     eq read(clear(memory), idC(id, ls) , idS) = idC(id, idS ls) .
 
     eq read(clear(memory), idC(id, nil) , pSel) = read(memory, idC(id, nil) , pSel) .
 
-    eq read(clear(memory), idC(id, sel ls), pSel) = read(memory, read(memory, idC(id, ls), sel), pSel) .
+    eq read(clear(memory), idC(id, ls sel), pSel) = read(memory, read(memory, idC(id, ls), sel), pSel) .
 
     eq read(emptyMemory, id1, pSel) = 0 .
     eq read(emptyMemory, id1, idS) = id1 : idS .
+
+    eq read(delete(memory, idC(id, ls)), idC(id, ls ls2), pSel) = 0 .
+    eq read(delete(memory, idC(id, ls)), idC(id, ls ls2), idS) = idC(id, ls ls2 idS) .
+
+    eq ls1 isPrefixOf ls1 ls2 = true .
 endfm
 
 fmod TEST-STATIC-ARRAY{Field :: TRIV} is
@@ -77,3 +80,6 @@ red read(cMemory, bAcc, $balance) .
 red read(cMemory, idC(bobC, $account), $balance) .
 
 red read(emptyMemory, bob, $account)  .
+
+red read(delete(memory, bob), bob : $account, $balance) .
+red read(delete(memory, bob), bob : $account, $account) .
