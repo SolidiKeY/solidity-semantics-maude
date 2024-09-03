@@ -1,6 +1,6 @@
 fmod FUNCS{X :: TRIV} is
     pr NAT .
-    pr LIST{X} * (sort List{X} to Path) .
+    pr LIST{X} * (sort List{X} to Path, sort NeList{X} to NPath) .
     sorts Storage Value Field ConcreteField IdField .
     subsort Nat < Value .
     subsort ConcreteField IdField < Field < X$Elt .
@@ -9,6 +9,7 @@ fmod FUNCS{X :: TRIV} is
     op _|>_ : Value Path -> Value .
 
     vars path path1 path2 : Path .
+    vars pathN1 pathN2 : NPath .
 
     var st stV : Value .
     var v : Value .
@@ -18,7 +19,7 @@ fmod FUNCS{X :: TRIV} is
     eq st | path1 path2 := v |> path1 = st |> path1 | path2 := v .
     eq st | path1 := v |> path2 = st |> path2 [owise] .
 
-    eq st |> path1 |> path2 = st |> path1 path2 .
+    eq st |> pathN1 pathN2 = st |> pathN1 |> pathN2 .
 endfm
 
 fmod TEST{X :: TRIV} is
