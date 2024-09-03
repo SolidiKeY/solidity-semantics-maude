@@ -16,15 +16,29 @@ fmod FUNCS{X :: TRIV} is
     eq st | path  := v   |> path = v .
     eq st | path1 := stV |> path1 path2 = stV |> path2 .
     eq st | path1 path2 := v |> path1 = st |> path1 | path2 := v .
+    eq st | path1 := v |> path2 = st |> path2 [owise] .
+
+    eq st |> path1 |> path2 = st |> path1 path2 .
 endfm
 
 fmod TEST{X :: TRIV} is
     pr FUNCS{X} .
 
+    subsort Nat < ConcreteField .
+
+    ops a b : -> IdField .
     op $account : -> IdField .
     op $balance : -> ConcreteField .
 
     op st : -> Value .
+
+    op stC : -> Value .
+    eq stC = st | b := (st |> a) .
 endfm
 
 red st | $account $balance := 20 |> $account |> $balance .
+
+red stC |> a 20 .
+red stC |> b 20 .
+
+red stC |> a 20 == stC |> b 20 .
