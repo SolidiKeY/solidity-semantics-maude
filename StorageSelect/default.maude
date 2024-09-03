@@ -10,13 +10,6 @@ fmod FUNCS{X :: TRIV} is
 
     vars path path1 path2 : Path .
 
-    op _isPrefixOf_ : Path Path -> Bool .
-    eq path1 isPrefixOf path1 path2 = true .
-    eq path1 isPrefixOf path2 = false [owise] .
-
-    op _-_ : Path Path -> Path .
-    eq path1 path2 - path2 = path1 .
-
     var st stV : Value .
     var v : Value .
 
@@ -33,11 +26,5 @@ fmod TEST{X :: TRIV} is
 
     op st : -> Value .
 endfm
-
-
-red $account isPrefixOf $account $balance .
-red $balance isPrefixOf $account $balance .
-
-red $account $balance - $balance .
 
 red st | $account $balance := 20 |> $account |> $balance .
