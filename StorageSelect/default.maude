@@ -82,13 +82,17 @@ fmod StSave {X :: TRIV} is
     eq st |>f k path = st |> k |>f path .
 
     eq st | k := v <| k path := v' = st | k := v <| path := v' .
-    ceq st | k := v <| k' path := v' = (st <| k' path := v') | k := v
+    ceq st | k := v <| k' path := v' = st <| k' path := v' | k := v
         if k =/= k' .
-    eq mtst <| k path := v = mtst | k := (mtst <| path := v) .
+    eq mtst <| k path := v = mtst | k := mtst <| path := v .
     eq st <| nil := v = v .
 
-    eq st <| k := v |> k = v .
+    eq st  <| k := v |> k = v .
     ceq st <| k := v |> k' = st |> k'
+        if k =/= k' .
+
+    eq st <| k := v |>f k path2 = v |>f k .
+    ceq st <| k := v |>f k' path = st |>f path
         if k =/= k' .
 endfm
 
@@ -109,4 +113,4 @@ fmod StSaveSTEST{X :: TRIV} is
     eq st3 = st2 <| b := (st2 |> a) .
 endfm
 
-red st <| $balance := 20 |> $balance .
+red st <| $account := (st <| $balance := 20) |>f $account |>f $balance .
