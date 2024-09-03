@@ -17,7 +17,6 @@ fmod STATIC-ARRAY{Field :: TRIV} is
 
     op clear : Memory -> Memory .
     op _:_ : Identity Field$Elt -> Identity .
-    op _isPrefixOf_ : List{Field} List{Field} -> Bool .
 
     op emptyMemory : -> Memory .
 
@@ -50,8 +49,6 @@ fmod STATIC-ARRAY{Field :: TRIV} is
 
     eq read(delete(memory, idC(id, ls)), idC(id, ls ls2), pSel) = 0 .
     eq read(delete(memory, idC(id, ls)), idC(id, ls ls2), idS) = idC(id, ls ls2 idS) .
-
-    eq ls1 isPrefixOf ls1 ls2 = true .
 endfm
 
 fmod TEST-STATIC-ARRAY{Field :: TRIV} is
