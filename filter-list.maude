@@ -1,0 +1,56 @@
+fmod FILTER{P :: TRIV} is
+    pr LIST{P} .
+
+    sorts X Y .
+
+    op _,,_ : X Y -> P$Elt .
+    op fst : P$Elt -> X .
+    op snd : P$Elt -> Y .
+    op yDef : -> Y .
+
+    op filterNot : List{P} X -> List{P} .
+    op iff_then_else_ : Bool List{P} List{P} -> List{P} .
+    op iff_then_else_ : Bool P$Elt P$Elt -> P$Elt .
+
+    var x x1 x2 : X .
+    var y : Y .
+    var p : P$Elt .
+    var ps ps2 : List{P} .
+    var psL : NeList{P} .
+
+
+    eq fst(x,, y) = x .
+    eq snd(x,, y) = y .
+
+    op eqq : X X -> Bool .
+
+    eq eqq(x1, x2) = x1 == x2 .
+
+    eq filterNot(nil, x) = nil .
+    eq filterNot(psL, x) = iff eqq(fst(head(psL)), x) then tail(psL) else psL .
+
+    op findFirst : List{P} X -> P$Elt .
+
+    eq findFirst(psL, x) = iff eqq(fst(head(psL)), x) then head(psL) else findFirst(tail(psL), x) .
+    eq findFirst(nil, x) = (x,, yDef) .
+
+    op add : List{P} X Y -> List{P} .
+    op changeSnd : P$Elt Y -> P$Elt .
+
+    eq changeSnd(p, y) = fst(p),, y .
+
+    eq add(ps, x, y) = changeSnd(findFirst(ps, x), y) filterNot(ps, x) .
+
+endfm
+
+
+fmod TEST{P :: TRIV} is
+    pr FILTER{P} .
+
+    ops x1 x2 x3 : -> X .
+    ops y1 y2 y3 : -> Y .
+
+    op lss : -> List{P} .
+endfm
+
+red add(lss, x1, y1) .
