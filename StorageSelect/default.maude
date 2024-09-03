@@ -33,8 +33,11 @@ fmod TEST{X :: TRIV} is
 
     op st : -> Value .
 
-    op stC : -> Value .
+    ops stC st2 st3 : -> Value .
     eq stC = st | b := (st |> a) .
+
+    eq st2 = st | a 5 := 7 | b 10 := 2 | a 9 := 11 .
+    eq st3 = st2 | b := (st2 |> a) .
 endfm
 
 red st | $account $balance := 20 |> $account |> $balance .
@@ -43,3 +46,6 @@ red stC |> a 20 .
 red stC |> b 20 .
 
 red stC |> a 20 == stC |> b 20 .
+
+red st3 |> b 5 .
+red st3 |> a 20 == st3 |> a 20 .
