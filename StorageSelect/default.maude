@@ -6,7 +6,7 @@ fmod FUNCS{X :: TRIV} is
     subsort ConcreteField IdField < Field < X$Elt .
     subsort Nat < ConcreteField .
 
-    op _|_:=_ : Value Path Value -> Value [gather (E e e)] .
+    op _|_=_ : Value Path Value -> Value [gather (E e e)] .
     op _|>_ : Value Path -> Value .
 
     ops default mtst : -> Value .
@@ -22,10 +22,10 @@ fmod EXAMPLES{X :: TRIV} is
     op st : -> Value .
 
     ops stC st2 st3 : -> Value .
-    eq stC = st | b := (st |> a) .
+    eq stC = st | b = (st |> a) .
 
-    eq st2 = st | a 5 := 7 | b 10 := 2 | a 9 := 11 .
-    eq st3 = st2 | b := (st2 |> a) .
+    eq st2 = st | a 5 = 7 | b 10 = 2 | a 9 = 11 .
+    eq st3 = st2 | b = (st2 |> a) .
 endfm
 
 fmod StEq {X :: TRIV} is
@@ -37,10 +37,10 @@ fmod StEq {X :: TRIV} is
     var st stV : Value .
     var v : Value .
 
-    eq st | path  := v   |> path = v .
-    eq st | path1 := stV |> path1 path2 = stV |> path2 .
-    eq st | path1 path2 := v |> path1 = st |> path1 | path2 := v .
-    eq st | path1 := v |> path2 = st |> path2 [owise] .
+    eq st | path  = v   |> path = v .
+    eq st | path1 = stV |> path1 path2 = stV |> path2 .
+    eq st | path1 path2 = v |> path1 = st |> path1 | path2 = v .
+    eq st | path1 = v |> path2 = st |> path2 [owise] .
 
     eq st |> pathN1 pathN2 = st |> pathN1 |> pathN2 .
 endfm
@@ -51,7 +51,7 @@ fmod StEtTEST{X :: TRIV} is
     pr EXAMPLES{X} .
 endfm
 
-red st | $account $balance := 20 |> $account |> $balance .
+red st | $account $balance = 20 |> $account |> $balance .
 
 red stC |> a 20 .
 red stC |> b 20 .
@@ -72,27 +72,27 @@ fmod StSave {X :: TRIV} is
     var v v' : Value .
 
     op _|>f_ : Value Path -> Value .
-    op _<|_:=_ : Value Path Value -> Value [gather (E e e)] .
+    op _<|_=_ : Value Path Value -> Value [gather (E e e)] .
 
     eq mtst |> path = default .
-    eq st | path := v |> path = v .
-    eq st | path := v |> path2 = st |> path2 [owise] .
+    eq st | path = v |> path = v .
+    eq st | path = v |> path2 = st |> path2 [owise] .
 
     eq st |>f nil = st .
     eq st |>f k path = st |> k |>f path .
 
-    eq st | k := v <| k path := v' = st | k := v <| path := v' .
-    ceq st | k := v <| k' path := v' = st <| k' path := v' | k := v
+    eq st | k = v <| k path = v' = st | k = v <| path = v' .
+    ceq st | k = v <| k' path = v' = st <| k' path = v' | k = v
         if k =/= k' .
-    eq mtst <| k path := v = mtst | k := mtst <| path := v .
-    eq st <| nil := v = v .
+    eq mtst <| k path = v = mtst | k = mtst <| path = v .
+    eq st <| nil = v = v .
 
-    eq st  <| k := v |> k = v .
-    ceq st <| k := v |> k' = st |> k'
+    eq st  <| k = v |> k = v .
+    ceq st <| k = v |> k' = st |> k'
         if k =/= k' .
 
-    eq st <| k := v |>f k path2 = v |>f k .
-    ceq st <| k := v |>f k' path = st |>f path
+    eq st <| k = v |>f k path2 = v |>f k .
+    ceq st <| k = v |>f k' path = st |>f path
         if k =/= k' .
 endfm
 
@@ -107,10 +107,10 @@ fmod StSaveSTEST{X :: TRIV} is
     op st : -> Value .
 
     ops stC st2 st3 : -> Value .
-    eq stC = st <| b := (st |> a) .
+    eq stC = st <| b = (st |> a) .
 
-    eq st2 = st <| a 5 := 7 <| b 10 := 2 <| a 9 := 11 .
-    eq st3 = st2 <| b := (st2 |> a) .
+    eq st2 = st <| a 5 = 7 <| b 10 = 2 <| a 9 = 11 .
+    eq st3 = st2 <| b = (st2 |> a) .
 endfm
 
-red st <| $account := (st <| $balance := 20) |>f $account |>f $balance .
+red st <| $account = (st <| $balance = 20) |>f $account |>f $balance .
