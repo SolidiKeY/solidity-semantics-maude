@@ -23,7 +23,7 @@ save : Storage A → List ℕ → Storage A → Storage A
 save mtst [] v = v
 save mtst (k ∷ xs) v = store mtst k (save mtst xs v)
 save (var _) _ v = v
-save (store st x v) [] v' = store st x v
+save (store st x v) [] v' = store st x v'
 save (store st k v) xs@(k' ∷ ys) v' = if k ≡ᵇ k' then store st k (save v ys v') else store (save st xs v') k v
 
 select : Storage A → ℕ → Storage A
@@ -57,15 +57,15 @@ select-save : ∀ (st : Storage A) k path v k' (wf : WellFormed st) → select (
   (if k ≡ᵇ k' then save (select st k') path v else select st k')
 select-save mtst k path v k' _ = refl
 select-save (var _) k path v k' ()
-select-save (store st k v) k' path v' k'' wf with k ≟ k' | k' ≟ k'' | k ≟ k''
-... | yes refl | yes refl | _ rewrite same-bool k | same-bool k = refl
-... | yes refl | no np | _ rewrite same-bool k | diff-bool np = refl
-... | no np | yes refl | _ rewrite diff-bool np | diff-bool np | same-bool k' = trans (select-save st _ _ _ _ (wellformed-below k v wf)) help
+select-save (store st k''' v) k path v' k' wf with k''' ≟ k | k ≟ k' | k''' ≟ k'
+... | yes refl | yes refl | _ rewrite same-bool k''' | same-bool k''' = refl
+... | yes refl | no np | _ rewrite same-bool k''' | diff-bool np  = refl
+... | no np | yes refl | _ rewrite diff-bool np | diff-bool np | same-bool k = trans (select-save st _ _ _ _ (wellformed-below k''' v wf)) help
   where
-  help : (if k' ≡ᵇ k' then save (select st k') path v' else select st k') ≡ save (select st k') path v'
-  help  rewrite same-bool k' = refl
-... | no np | no npp | yes refl rewrite diff-bool np | diff-bool npp | same-bool k = refl
-... | no np | no npp | no eqn rewrite diff-bool np | diff-bool npp | diff-bool eqn = trans (select-save st _ _ _ _ (wellformed-below k v wf)) help
+  help : (if k ≡ᵇ k then save (select st k) path v' else select st k) ≡ save (select st k) path v'
+  help  rewrite same-bool k = refl
+... | no np | no npp | yes refl rewrite diff-bool np | diff-bool npp | same-bool k''' = refl
+... | no np | no npp | no eqn rewrite diff-bool np | diff-bool npp | diff-bool eqn = trans (select-save st _ _ _ _ (wellformed-below k''' v wf)) help
   where
-  help : (if k' ≡ᵇ k'' then save (select st k'') path v' else select st k'') ≡ select st k''
+  help : (if k ≡ᵇ k' then save (select st k') path v' else select st k') ≡ select st k'
   help rewrite diff-bool npp = refl
