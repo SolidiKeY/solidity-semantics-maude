@@ -17,7 +17,7 @@ private variable
 data Storage (A : Set ℓ) : Set ℓ where
   mtst : Storage A
   var : A → Storage A
-  store : Storage A → ℕ → Storage A → Storage A
+  store : (st : Storage A) (fld : ℕ) (value : Storage A) → Storage A
 
 save : Storage A → List ℕ → Storage A → Storage A
 save mtst [] v = v
