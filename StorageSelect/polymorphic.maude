@@ -1,14 +1,20 @@
 fmod FUNCS{X :: TRIV} is
     pr NAT .
     pr LIST{X} * (sort List{X} to Path, sort NeList{X} to NPath) .
-    sorts Struct PrimValue Value Field ConcreteField IdField .
-    subsort PrimValue Struct < Value .
-    subsort Nat < PrimValue .
+    sorts Struct ConcreteValue Value Field ConcreteField IdField .
+    sorts CType SType Type .
+    subsort ConcreteValue Struct < Value .
+    subsort Nat < ConcreteValue .
     subsort ConcreteField IdField < Field < X$Elt .
     subsort Nat < ConcreteField .
+    subsort CType SType < Type .
 
     op _|_≔_ : Struct Field Value -> Struct [gather (E e e)] .
     op _|>_ : Value Path -> Value .
+
+    *** C is Concrete and S is Struct
+    op C : -> CType .
+    op S : -> SType .
 
     op mtst : -> Struct .
     op default : -> Value .
@@ -80,17 +86,21 @@ fmod StSave {X :: TRIV} is
     vars rest path path1 path2 : Path .
     vars pathN1 pathN2 : NPath .
 
-    var st stV : Struct .
-    var v v' : Value .
+    vars st sv : Struct .
+    vars v v' : Value .
+    var cv : ConcreteValue .
+    var t : Type .
 
-    op _<|_≔_ : Struct Path Value -> Struct [gather (E e e)] .
+    op _<[_]_≔_ : Struct SType Path  Value -> Struct [gather (E e e e)] .
+    op _<[_]_≔_ : Struct CType Path ConcreteValue -> ConcreteValue [gather (E e e e)] .
 
-    eq st <| nil ≔ v = v .
-    eq mtst <| k rest ≔ v = mtst | k ≔ (mtst <| rest ≔ v) .
+    eq st <[ t ] nil ≔ v = v .
+    eq mtst <[ t ] k rest ≔ v = mtst | k ≔ (mtst <[ t ] rest ≔ v) .
+    eq mtst <[ t ] k rest ≔ v = mtst | k ≔ (mtst <[ t ] rest ≔ v) .
 
-    eq (st | k ≔ v) <| k rest ≔ v' = st | k ≔ (v | rest ≔ v') .
+    eq (st | k ≔ v) <[ t ] k rest ≔ v' = st | k ≔ (v | rest ≔ v') .
 
-    ceq (st | k ≔ v) <| k' rest ≔ v' = (st <| k' rest ≔ v') | k ≔ v
+    ceq (st | k ≔ v) <[ t ] k' rest ≔ v' = (st <[ t ] k' rest ≔ v') | k ≔ v
         if k =/= k' .
 
     *** eq st | path ≔ v |> path = v .
@@ -114,16 +124,21 @@ fmod StSaveSTEST{X :: TRIV} is
     ops a b : -> IdField .
     op $account : -> IdField .
     op $balance : -> ConcreteField .
+    op t : -> Type .
 
     op st : -> Struct .
 
     ops stC st2 st3 : -> Value .
-    eq stC = st <| b ≔ (st |> a) .
+    eq stC = st <[ t ] b ≔ (st |> a) .
 
-    eq st2 = st <| a 5 ≔ 7 <| b 10 ≔ 2 <| a 9 ≔ 11 .
-    eq st3 = st2 <| b ≔ (st2 |> a) .
+    eq st2 = st <[ t ] a 5 ≔ 7 <[ t ] b 10 ≔ 2 <[ t ] a 9 ≔ 11 .
+    eq st3 = st2 <[ t ] b ≔ (st2 |> a) .
 endfm
 
-red st <| $balance ≔ 20 .
-red st <| $account ≔ (st <| $balance ≔ 20) .
-red st <| $account ≔ (st <| $balance ≔ 20) |> $account |> $balance .
+*** red st <[ S ] $balance ≔ 20 .
+
+*** red st <[ S ] $account ≔ (st <[ S ] $balance ≔ 20) .
+*** red (st <[ S ] $account ≔ (st <[ S ] $balance ≔ 20)) |> $account |> $balance .
+
+*** red mtst <[ C ] nil ≔ 20 .
+*** red mtst <[ S ] nil ≔ 20 .
