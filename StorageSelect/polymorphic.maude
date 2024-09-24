@@ -1,0 +1,129 @@
+fmod FUNCS{X :: TRIV} is
+    pr NAT .
+    pr LIST{X} * (sort List{X} to Path, sort NeList{X} to NPath) .
+    sorts Struct PrimValue Value Field ConcreteField IdField .
+    subsort PrimValue Struct < Value .
+    subsort Nat < PrimValue .
+    subsort ConcreteField IdField < Field < X$Elt .
+    subsort Nat < ConcreteField .
+
+    op _|_≔_ : Struct Field Value -> Struct [gather (E e e)] .
+    op _|>_ : Value Path -> Value .
+
+    op mtst : -> Struct .
+    op default : -> Value .
+endfm
+
+fmod EXAMPLES{X :: TRIV} is
+    pr FUNCS{X} .
+
+    ops a b : -> IdField .
+    op $account : -> IdField .
+    op $balance : -> ConcreteField .
+
+    op st : -> Struct .
+
+    ops stC st2 st3 : -> Value .
+    eq stC = st | b ≔ (st |> a) .
+
+    eq st2 = st | b ≔ (st | 10 ≔ 2) | a ≔ (st | 9 ≔ 11 | 5 ≔ 7) .
+    eq st3 = st2 | b ≔ (st2 |> a) .
+endfm
+
+fmod StEq {X :: TRIV} is
+    pr FUNCS{X} .
+
+    vars rest path path1 path2 : Path .
+    vars pathN1 pathN2 : NPath .
+
+    var k k' : Field .
+    var st stV : Value .
+    var v : Value .
+
+    eq st |> nil = st .
+
+    eq st | k ≔ v |> k rest = v |> rest .
+    ceq st | k ≔ v |> k' rest = st |> k' rest
+        if k =/= k' .
+
+    *** eq st | path  ≔ v   |> path = v .
+    *** eq st | path1 ≔ stV |> path1 path2 = stV |> path2 .
+    *** eq st | path1 path2 ≔ v |> path1 = st |> path1 | path2 ≔ v .
+    *** eq st | path1 ≔ v |> path2 = st |> path2 [owise] .
+
+    *** Axiom
+    eq st |> pathN1 pathN2 = st |> pathN1 |> pathN2 .
+endfm
+
+
+fmod StEtTEST{X :: TRIV} is
+    pr StEq{X} .
+    pr EXAMPLES{X} .
+endfm
+
+red st | $account ≔ (st | $balance ≔ 20) |> $account |> $balance .
+
+red stC |> a 20 .
+red stC |> b 20 .
+red stC |> a .
+red stC |> b .
+
+red stC |> a 20 == stC |> b 20 .
+
+red st3 |> b 5 .
+red st3 |> a 20 == st3 |> a 20 .
+
+fmod StSave {X :: TRIV} is
+    pr FUNCS{X} .
+
+    var k k' : Field .
+    vars rest path path1 path2 : Path .
+    vars pathN1 pathN2 : NPath .
+
+    var st stV : Struct .
+    var v v' : Value .
+
+    op _<|_≔_ : Struct Path Value -> Struct [gather (E e e)] .
+
+    eq st <| nil ≔ v = v .
+    eq mtst <| k rest ≔ v = mtst | k ≔ (mtst <| rest ≔ v) .
+
+    eq (st | k ≔ v) <| k rest ≔ v' = st | k ≔ (v | rest ≔ v') .
+
+    ceq (st | k ≔ v) <| k' rest ≔ v' = (st <| k' rest ≔ v') | k ≔ v
+        if k =/= k' .
+
+    *** eq st | path ≔ v |> path = v .
+    *** eq st | path ≔ v |> path2 = st |> path2 [owise] .
+
+    *** eq st | k ≔ v <| k path ≔ v' = st | k ≔ v <| path ≔ v' .
+    *** ceq st | k ≔ v <| k' path ≔ v' = st <| k' path ≔ v' | k ≔ v
+    ***     if k =/= k' .
+    *** *** eq mtst <| k path = v ≔ mtst | k = mtst <| path = v .
+    *** eq st <| nil ≔ v = v .
+
+    *** eq st  <| k ≔ v |> k = v .
+    *** ceq st <| k ≔ v |> k' = st |> k'
+    ***     if k =/= k' .
+endfm
+
+
+fmod StSaveSTEST{X :: TRIV} is
+    pr StSave{X} .
+
+    ops a b : -> IdField .
+    op $account : -> IdField .
+    op $balance : -> ConcreteField .
+
+    op st : -> Struct .
+
+    ops stC st2 st3 : -> Value .
+    eq stC = st <| b ≔ (st |> a) .
+
+    eq st2 = st <| a 5 ≔ 7 <| b 10 ≔ 2 <| a 9 ≔ 11 .
+    eq st3 = st2 <| b ≔ (st2 |> a) .
+endfm
+
+red st <| $balance ≔ 20 .
+red st <| $account ≔ (st <| $balance ≔ 20) .
+red st <| $account ≔ (st <| $balance ≔ 20) |> $account |> $balance .
