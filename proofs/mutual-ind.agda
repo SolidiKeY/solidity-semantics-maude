@@ -3,68 +3,86 @@ open import Data.Unit hiding (_≟_)
 open import Data.Empty
 open import Data.Product
 open import Data.Sum
+open import Data.Sum.Properties
 open import Data.List
 open import Data.Refinement
-open import Data.Nat
-open import Data.Nat.Properties
 open import Data.Bool hiding (_≟_)
 
 open import Relation.Nullary
 open import Relation.Binary.PropositionalEquality
+open import Relation.Binary
 
-private variable
+variable
+  ℓ₁ : Level
+  D : Set ℓ₁
+
+postulate
   ℓ : Level
   A B C : Set ℓ
+  _≟a_ : DecidableEquality A
+  _≟b_ : DecidableEquality B
 
-data Value (A : Set ℓ) : Set ℓ
-data Struct (A : Set ℓ) : Set ℓ
 
-data Value A where
-  prim : A → Value A
-  stv : Struct A → Value A
+data Value : Set ℓ
+data Struct : Set ℓ
 
-N2 = ℕ ⊎ ℕ
+data Value where
+  prim : C → Value
+  stv : Struct → Value
 
-data Struct A where
-  mtst : Struct A
-  store : (st : Struct A) (k : N2) (value : Value A) → Struct A
+AB = A ⊎ B
 
-IsNotEmpty : List A → Set _
+_≟_ : DecidableEquality AB
+_≟_ = ≡-dec _≟a_ _≟b_
+
+data Struct where
+  mtst : Struct
+  store : (st : Struct) (k : AB) (value : Value) → Struct
+
+IsNotEmpty : List D → Set _
 IsNotEmpty [] = ⊥
 IsNotEmpty (_ ∷ _) = ⊤
 
 List⁺ : (A : Set ℓ) → Set _
 List⁺ A = Refinement (List A) IsNotEmpty
 
-WellformSt : Struct A → Set _
-WellformSt mtst = ⊤
-WellformSt (store st (inj₁ _) (prim _)) = WellformSt st
-WellformSt (store st (inj₂ _) (prim _)) = ⊥
-WellformSt (store st (inj₁ _) (stv _))  = ⊥
-WellformSt (store st (inj₂ _) (stv _))  = WellformSt st
+-- WellformSt : Struct A → Set _
+-- WellformSt mtst = ⊤
+-- WellformSt (store st (inj₁ _) (prim _)) = WellformSt st
+-- WellformSt (store st (inj₂ _) (prim _)) = ⊥
+-- WellformSt (store st (inj₁ _) (stv _))  = ⊥
+-- WellformSt (store st (inj₂ _) (stv _))  = WellformSt st
 
-AreStructs : List⁺ N2 → Set _
-AreStructs (_ ∷ [] , p) = ⊤
-AreStructs (inj₁ _ ∷ _ ∷ v , p) = ⊥
-AreStructs (inj₂ _ ∷ rest@(_ ∷ _) , p) = AreStructs (rest , _)
+-- AreStructs : List⁺ N2 → Set _
+-- AreStructs (_ ∷ [] , p) = ⊤
+-- AreStructs (inj₁ _ ∷ _ ∷ v , p) = ⊥
+-- AreStructs (inj₂ _ ∷ rest@(_ ∷ _) , p) = AreStructs (rest , _)
 
-last⁺ : List⁺ A → A
-last⁺ (x ∷ [] , _) = x
-last⁺ (x ∷ rest@(_ ∷ _) , proof) = last⁺ (rest , _)
+-- last⁺ : List⁺ A → A
+-- last⁺ (x ∷ [] , _) = x
+-- last⁺ (x ∷ rest@(_ ∷ _) , proof) = last⁺ (rest , _)
 
+v→s : Value → Struct
+v→s (prim _) = mtst
+v→s (stv st) = st
 
-save : (st : Struct A) (wf : WellformSt st) (fields : List⁺ N2) {_ : AreStructs fields} (v : Value A) → Struct A
-save mtst wf (k ∷ rest , _) v = store mtst k (sv rest)
+save : (st : Struct) (fields : List⁺ AB) (v : Value) → Struct
+save mtst (k ∷ rest , _) v = store mtst k (restV rest)
   where
-  sv : List N2 → Value _
-  sv [] = v
-  sv rest@(_ ∷ _) = stv (save mtst _ (rest , _) v)
-save (store st k (prim x)) wf (k' ∷ rest , _) v' = if {!!} then {!!} else {!!}
-save (store st k (stv x)) wf (k' ∷ rest , _) v' = if {!!} then {!!} else {!!}
+  restV : List AB → Value
+  restV [] = v
+  restV rest'@(rest ∷ _) = stv (save mtst (rest' , _) v)
+save (store st k v) r@(k' ∷ rest , _) v' =
+  if
+    isYes (k ≟ k')
+  then
+    store st k (restV rest)
+  else
+    store (save st r v') k v
   where
-  sv : List N2 → Value _
-  sv [] = v'
-  sv rest@(_ ∷ _) = stv (save {!!} {!!} (rest , _) v')
+  restV : List AB → Value
+  restV [] = v'
+  restV rest@(_ ∷ _) = stv (save (v→s v) (rest , _) v')
 
 
 -- save : Value A → List ℕ → Value A → Value A
