@@ -9,6 +9,7 @@ open import Data.Refinement
 open import Data.Bool hiding (_≟_)
 
 open import Relation.Nullary
+open import Relation.Nullary.Decidable
 open import Relation.Binary.PropositionalEquality
 open import Relation.Binary
 
@@ -35,6 +36,9 @@ AB = A ⊎ B
 _≟_ : DecidableEquality AB
 _≟_ = ≡-dec _≟a_ _≟b_
 
+_≟ᵇ_ : AB → AB → Bool
+x ≟ᵇ y = does (x ≟ y)
+
 data Struct where
   mtst : Struct
   store : (st : Struct) (k : AB) (value : Value) → Struct
@@ -46,21 +50,18 @@ IsNotEmpty (_ ∷ _) = ⊤
 List⁺ : (A : Set ℓ) → Set _
 List⁺ A = Refinement (List A) IsNotEmpty
 
--- WellformSt : Struct A → Set _
--- WellformSt mtst = ⊤
--- WellformSt (store st (inj₁ _) (prim _)) = WellformSt st
--- WellformSt (store st (inj₂ _) (prim _)) = ⊥
--- WellformSt (store st (inj₁ _) (stv _))  = ⊥
--- WellformSt (store st (inj₂ _) (stv _))  = WellformSt st
+AB-Value-correct : AB → Value → Set
+AB-Value-correct (inj₁ _) (prim _) = ⊤
+AB-Value-correct (inj₁ _) (stv _)  = ⊥
+AB-Value-correct (inj₂ _) (prim _) = ⊥
+AB-Value-correct (inj₂ _) (stv _)  = ⊤
 
--- AreStructs : List⁺ N2 → Set _
--- AreStructs (_ ∷ [] , p) = ⊤
--- AreStructs (inj₁ _ ∷ _ ∷ v , p) = ⊥
--- AreStructs (inj₂ _ ∷ rest@(_ ∷ _) , p) = AreStructs (rest , _)
-
--- last⁺ : List⁺ A → A
--- last⁺ (x ∷ [] , _) = x
--- last⁺ (x ∷ rest@(_ ∷ _) , proof) = last⁺ (rest , _)
+WellformSt : Struct → Set _
+WellformSt mtst = ⊤
+WellformSt (store st (inj₁ _) (prim _)) = WellformSt st
+WellformSt (store st (inj₂ _) (prim _)) = ⊥
+WellformSt (store st (inj₁ _) (stv _))  = ⊥
+WellformSt (store st (inj₂ _) (stv v))  = WellformSt st × WellformSt v
 
 v→s : Value → Struct
 v→s (prim _) = mtst
@@ -74,7 +75,7 @@ save mtst (k ∷ rest , _) v = store mtst k (restV rest)
   restV rest'@(rest ∷ _) = stv (save mtst (rest' , _) v)
 save (store st k v) r@(k' ∷ rest , _) v' =
   if
-    isYes (k ≟ k')
+    k ≟ᵇ k'
   then
     store st k (restV rest)
   else
@@ -84,54 +85,35 @@ save (store st k v) r@(k' ∷ rest , _) v' =
   restV [] = v'
   restV rest@(_ ∷ _) = stv (save (v→s v) (rest , _) v')
 
+select : (st : Struct) (k : AB) → Value
+select mtst k = stv mtst
+select (store st k v) k' = if (k ≟ᵇ k') then v else select st k'
 
--- save : Value A → List ℕ → Value A → Value A
--- save mtst [] v = v
--- save mtst (k ∷ xs) v = store mtst k (save mtst xs v)
--- save (var _) _ v = v
--- save (store st x v) [] v' = store st x v'
--- save (store st k v) xs@(k' ∷ ys) v' = if k ≡ᵇ k' then store st k (save v ys v') else store (save st xs v') k v
+if-true : ∀ {b} {a d : D} → b ≡ true → (if b then a else d) ≡ a
+if-true refl = refl
 
--- select : Value A → ℕ → Value A
--- select mtst n = mtst
--- select (var st) n = mtst
--- select (store xs k v) n = if k ≡ᵇ n then v else select xs n
+wellformed-down : ∀ {st k v} → WellformSt (store st k v) → WellformSt st
+wellformed-down {k = inj₁ _} {prim _} x = x
+wellformed-down {k = inj₂ _} {stv _} (x , _) = x
 
--- same-bool : ∀ m → (m ≡ᵇ m) ≡ true
--- same-bool m with m ≡ᵇ m | ≡⇒≡ᵇ m m refl
--- ... | true | _ = refl
-
--- diff-bool : ∀ {m n} → m ≢ n → (m ≡ᵇ n) ≡ false
--- diff-bool {ℕ.zero} {ℕ.zero} m≢n with () ← m≢n refl
--- diff-bool {ℕ.zero} {ℕ.suc n} m≢n = refl
--- diff-bool {ℕ.suc m} {ℕ.zero} m≢n = refl
--- diff-bool {ℕ.suc m} {ℕ.suc n} m≢n = diff-bool (λ eq → m≢n (cong ℕ.suc eq))
-
--- IsStruct : (st : Value A) → Set
--- IsStruct mtst = ⊤
--- IsStruct (var _) = ⊥
--- IsStruct (store st _ mtst) = IsStruct st
--- IsStruct (store st _ (var x)) = IsStruct st
--- IsStruct (store st _ st2@(store v x v₁)) = IsStruct st × IsStruct st2
-
--- isStructInside : ∀ {st : Value A} k v → IsStruct (store st k v) → IsStruct st
--- isStructInside {st = st} k mtst x = x
--- isStructInside {st = st} k (var x₁) x = x
--- isStructInside {st = st} k (store v x₁ v₁) (fst , snd) = fst
-
--- select-save : ∀ (st : Value A) k path v k' (wf : IsStruct st) → select (save st (k ∷ path) v) k' ≡
---   (if k ≡ᵇ k' then save (select st k') path v else select st k')
--- select-save mtst k path v k' _ = refl
--- select-save (var _) k path v k' ()
--- select-save (store st k''' v) k path v' k' wf with k''' ≟ k | k ≟ k' | k''' ≟ k'
--- ... | yes refl | yes refl | _ rewrite same-bool k''' | same-bool k''' = refl
--- ... | yes refl | no np | _ rewrite same-bool k''' | diff-bool np  = refl
--- ... | no np | yes refl | _ rewrite diff-bool np | diff-bool np | same-bool k = trans (select-save st _ _ _ _ (isStructInside k''' v wf)) help
---   where
---   help : (if k ≡ᵇ k then save (select st k) path v' else select st k) ≡ save (select st k) path v'
---   help  rewrite same-bool k = refl
--- ... | no np | no npp | yes refl rewrite diff-bool np | diff-bool npp | same-bool k''' = refl
--- ... | no np | no npp | no eqn rewrite diff-bool np | diff-bool npp | diff-bool eqn = trans (select-save st _ _ _ _ (isStructInside k''' v wf)) help
---   where
---   help : (if k ≡ᵇ k' then save (select st k') path v' else select st k') ≡ select st k'
---   help rewrite diff-bool npp = refl
+select-save : ∀ (st : Struct) k (path'@(path , _) : List⁺ AB) v k' (wf : WellformSt st) →
+  select (save st (k ∷ path , _) v) k' ≡
+  (if k ≟ᵇ k' then stv (save (v→s (select st k')) path' v) else select st k')
+select-save mtst _ (_ ∷ _ , _) _ _ _ = refl
+select-save (store st k''' v) k path'@(p ∷ path , _) v' k' wf with k''' ≟ k | k ≟ k' | k''' ≟ k'
+... | yes refl | yes refl | yes refl rewrite dec-true (k''' ≟ k''') refl = refl
+... | yes refl | yes refl | no k≢k with () ← k≢k refl
+... | yes refl | no ¬p | yes refl with () ← ¬p refl
+... | yes refl | no ¬p | no _ rewrite dec-false (k''' ≟ k') ¬p = refl
+... | no k≢k | yes refl | yes refl with () ← k≢k refl
+... | no ¬a | yes refl | no ¬c rewrite dec-false (k''' ≟ k) ¬a =
+  trans (select-save st _ _ _ _ (wellformed-down {k = k'''} wf)) help
+  where
+  help : (if k ≟ᵇ k then _ else _) ≡ _
+  help rewrite dec-true (k ≟ k) refl = refl
+... | no ¬a | no ¬p | yes refl rewrite dec-true (k''' ≟ k''') refl = refl
+... | no ¬a | no ¬b | no ¬c rewrite dec-false (k''' ≟ k') ¬c =
+  trans (select-save st _ _ _ _ (wellformed-down {k = k'''} wf)) help
+  where
+  help : (if k ≟ᵇ k' then _ else _) ≡ _
+  help rewrite dec-false (k ≟ k') ¬b = refl
