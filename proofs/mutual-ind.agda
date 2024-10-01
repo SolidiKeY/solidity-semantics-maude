@@ -47,15 +47,6 @@ IsNotEmpty (_ ∷ _) = ⊤
 List⁺ : (A : Set ℓ) → Set _
 List⁺ A = Refinement (List A) IsNotEmpty
 
-WellformValue : Value → Set _
-WellformSt : Struct → Set _
-
-WellformSt mtst = ⊤
-WellformSt (store st _ v)  = WellformSt st × WellformValue v
-
-WellformValue (prim _) = ⊤
-WellformValue (stv st) = WellformSt st
-
 postulate
   v→s : Value → Struct
   v→st≡st : ∀ {st} → v→s (stv st) ≡ st
@@ -84,24 +75,24 @@ select : (st : Struct) (k : A) → Value
 select mtst k = stv mtst
 select (store st k v) k' = if (k ≟ᵇ k') then v else select st k'
 
-select-save : ∀ (st : Struct) k (path'@(path , _) : List⁺ A) v k' (wf : WellformSt st) →
+select-save : ∀ (st : Struct) k (path'@(path , _) : List⁺ A) v k' →
   select (save st (k ∷ path , _) v) k' ≡
   (if k ≟ᵇ k' then stv (save (v→s (select st k')) path' v) else select st k')
-select-save mtst _ (_ ∷ _ , _) _ _ _ = refl
-select-save (store st k''' v) k path'@(p ∷ path , _) v' k' (wf , _) with k''' ≟ k | k ≟ k' | k''' ≟ k'
+select-save mtst _ (_ ∷ _ , _) _ _ = refl
+select-save (store st k''' v) k path'@(p ∷ path , _) v' k' with k''' ≟ k | k ≟ k' | k''' ≟ k'
 ... | yes refl | yes refl | yes refl rewrite dec-true (k''' ≟ k''') refl = refl
 ... | yes refl | yes refl | no k≢k with () ← k≢k refl
 ... | yes refl | no ¬p | yes refl with () ← ¬p refl
 ... | yes refl | no ¬p | no _ rewrite dec-false (k''' ≟ k') ¬p = refl
 ... | no k≢k | yes refl | yes refl with () ← k≢k refl
 ... | no ¬a | yes refl | no ¬c rewrite dec-false (k''' ≟ k) ¬a =
-  trans (select-save st _ _ _ _ wf) help
+  trans (select-save st _ _ _ _) help
   where
   help : (if k ≟ᵇ k then _ else _) ≡ _
   help rewrite dec-true (k ≟ k) refl = refl
 ... | no ¬a | no ¬p | yes refl rewrite dec-true (k''' ≟ k''') refl = refl
 ... | no ¬a | no ¬b | no ¬c rewrite dec-false (k''' ≟ k') ¬c =
-  trans (select-save st _ _ _ _ wf) help
+  trans (select-save st _ _ _ _) help
   where
   help : (if k ≟ᵇ k' then _ else _) ≡ _
   help rewrite dec-false (k ≟ k') ¬b = refl
