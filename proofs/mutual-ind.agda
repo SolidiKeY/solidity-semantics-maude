@@ -47,40 +47,91 @@ IsNotEmpty (_ ∷ _) = ⊤
 List⁺ : (A : Set ℓ) → Set _
 List⁺ A = Refinement (List A) IsNotEmpty
 
+variable
+  st : Struct
+  path : List A
+  f : A
+  v : Value
+
 postulate
   v→s : Value → Struct
   v→st≡st : ∀ {st} → v→s (stv st) ≡ st
 
 {-# REWRITE v→st≡st #-}
 
-save : (st : Struct) (fields : List⁺ A) (v : Value) → Struct
-save mtst (k ∷ rest , _) v = store mtst k (restV rest)
+save⁺ : (st : Struct) (fields : List⁺ A) (v : Value) → Struct
+save⁺ mtst (k ∷ rest , _) v = store mtst k (restV rest)
   where
   restV : List A → Value
   restV [] = v
-  restV rest'@(rest ∷ _) = stv (save mtst (rest' , _) v)
-save (store st k v) r@(k' ∷ rest , _) v' =
+  restV rest'@(rest ∷ _) = stv (save⁺ mtst (rest' , _) v)
+save⁺ (store st k v) r@(k' ∷ rest , _) v' =
   if
     k ≟ᵇ k'
   then
     store st k (restV rest)
   else
-    store (save st r v') k v
+    store (save⁺ st r v') k v
   where
   restV : List A → Value
   restV [] = v'
-  restV rest@(_ ∷ _) = stv (save (v→s v) (rest , _) v')
+  restV rest@(_ ∷ _) = stv (save⁺ (v→s v) (rest , _) v')
+
+postulate
+  save : (st : Struct) (path : List A) (v : Value) → Struct
+
+  save≡save⁺ : save st (f ∷ path) v ≡ save⁺ st (f ∷ path , _) v
+
+{-# REWRITE save≡save⁺ #-}
 
 select : (st : Struct) (k : A) → Value
 select mtst k = stv mtst
 select (store st k v) k' = if (k ≟ᵇ k') then v else select st k'
 
-select-save : ∀ (st : Struct) k (path'@(path , _) : List⁺ A) v k' →
-  select (save st (k ∷ path , _) v) k' ≡
-  (if k ≟ᵇ k' then stv (save (v→s (select st k')) path' v) else select st k')
-select-save mtst _ (_ ∷ _ , _) _ _ = refl
-select-save (store st k''' v) k path'@(p ∷ path , _) v' k' with k''' ≟ k | k ≟ k' | k''' ≟ k'
+{-
+select-save⁺ : ∀ (st : Struct) k (path'@(path , _) : List⁺ A) v k' →
+  select (save⁺ st (k ∷ path , _) v) k' ≡
+  (if k ≟ᵇ k' then stv (save⁺ (v→s (select st k')) path' v) else select st k')
+select-save⁺ mtst _ (_ ∷ _ , _) _ _ = refl
+select-save⁺ (store st k''' v) k path'@(p ∷ path , _) v' k' with k''' ≟ k | k ≟ k' | k''' ≟ k'
 ... | yes refl | yes refl | yes refl rewrite dec-true (k''' ≟ k''') refl = refl
+... | yes refl | yes refl | no k≢k with () ← k≢k refl
+... | yes refl | no ¬p | yes refl with () ← ¬p refl
+... | yes refl | no ¬p | no _ rewrite dec-false (k''' ≟ k') ¬p = refl
+... | no k≢k | yes refl | yes refl with () ← k≢k refl
+... | no ¬a | yes refl | no ¬c rewrite dec-false (k''' ≟ k) ¬a =
+  trans (select-save⁺ st _ _ _ _) help
+  where
+  help : (if k ≟ᵇ k then _ else _) ≡ _
+  help rewrite dec-true (k ≟ k) refl = refl
+... | no ¬a | no ¬p | yes refl rewrite dec-true (k''' ≟ k''') refl = refl
+... | no ¬a | no ¬b | no ¬c rewrite dec-false (k''' ≟ k') ¬c =
+  trans (select-save⁺ st _ _ _ _) help
+  where
+  help : (if k ≟ᵇ k' then _ else _) ≡ _
+  help rewrite dec-false (k ≟ k') ¬b = refl
+-}
+
+save-path : (st : Struct) (k : A) (path : List A) (v : Value) → Value
+save-path st k [] v = v
+save-path st k path@(_ ∷ _) v = stv (save (v→s (select st k)) path v)
+
+save-path≡ : ∀ (st : Struct) k k' (path : List A) v v' (k'≢k : k' ≢ k)
+  → save-path st k path v' ≡ save-path (store st k' v) k path v'
+save-path≡ st k k' [] v v' k≢k' = refl
+save-path≡ st k k' (x ∷ path) v v' k'≢k rewrite dec-false (k' ≟ k) k'≢k = refl
+
+select-save : ∀ (st : Struct) k (path : List A) v k' →
+  select (save st (k ∷ path) v) k' ≡
+  (if k ≟ᵇ k' then save-path st k path v else select st k')
+select-save mtst _ [] _ _ = refl
+select-save mtst _ (_ ∷ _) _ _ = refl
+select-save (store st k''' v) k path v' k'  with k''' ≟ k | k ≟ k' | k''' ≟ k'
+select-save (store st k''' v) k [] v' k' | yes refl | yes refl | yes refl
+  rewrite dec-true (k''' ≟ k''') refl = refl
+select-save (store st k''' value₁) k (x ∷ path) v k' | yes refl | yes refl | yes refl
+  rewrite dec-true (k''' ≟ k''') refl = refl
+-- rewrite dec-true (k''' ≟ k''') refl = {!path!}
 ... | yes refl | yes refl | no k≢k with () ← k≢k refl
 ... | yes refl | no ¬p | yes refl with () ← ¬p refl
 ... | yes refl | no ¬p | no _ rewrite dec-false (k''' ≟ k') ¬p = refl
@@ -89,7 +140,7 @@ select-save (store st k''' v) k path'@(p ∷ path , _) v' k' with k''' ≟ k | k
   trans (select-save st _ _ _ _) help
   where
   help : (if k ≟ᵇ k then _ else _) ≡ _
-  help rewrite dec-true (k ≟ k) refl = refl
+  help rewrite dec-true (k ≟ k) refl = save-path≡ st _ _ path _ _ ¬a
 ... | no ¬a | no ¬p | yes refl rewrite dec-true (k''' ≟ k''') refl = refl
 ... | no ¬a | no ¬b | no ¬c rewrite dec-false (k''' ≟ k') ¬c =
   trans (select-save st _ _ _ _) help
