@@ -18,29 +18,29 @@ open import Relation.Binary
 
 variable
   ℓ′ : Level
-  C : Set ℓ′
+  A : Set ℓ′
 
 postulate
   ℓ : Level
-  A B : Set ℓ
-  _≟_ : DecidableEquality A
+  Field PrimValue : Set ℓ
+  _≟_ : DecidableEquality Field
 
 
-data Value : Set ℓ
+data Value  : Set ℓ
 data Struct : Set ℓ
 
 data Value where
-  prim : B → Value
-  stv : Struct → Value
+  prim : PrimValue → Value
+  stv  : Struct → Value
 
-_≟ᵇ_ : A → A → Bool
+_≟ᵇ_ : Field → Field → Bool
 x ≟ᵇ y = does (x ≟ y)
 
 data Struct where
   mtst : Struct
-  store : (st : Struct) (k : A) (value : Value) → Struct
+  store : (st : Struct) (k : Field) (value : Value) → Struct
 
-IsNotEmpty : List C → Set _
+IsNotEmpty : List A → Set _
 IsNotEmpty [] = ⊥
 IsNotEmpty (_ ∷ _) = ⊤
 
@@ -49,20 +49,20 @@ List⁺ A = Refinement (List A) IsNotEmpty
 
 variable
   st : Struct
-  path : List A
-  f : A
+  path : List Field
+  f : Field
   v : Value
 
 postulate
   v→s : Value → Struct
-  v→st≡st : ∀ {st} → v→s (stv st) ≡ st
+  v→st≡st : v→s (stv st) ≡ st
 
 {-# REWRITE v→st≡st #-}
 
-save⁺ : (st : Struct) (fields : List⁺ A) (v : Value) → Struct
+save⁺ : (st : Struct) (fields : List⁺ Field) (v : Value) → Struct
 save⁺ mtst (k ∷ rest , _) v = store mtst k (restV rest)
   where
-  restV : List A → Value
+  restV : List Field → Value
   restV [] = v
   restV rest'@(rest ∷ _) = stv (save⁺ mtst (rest' , _) v)
 save⁺ (store st k v) r@(k' ∷ rest , _) v' =
@@ -73,31 +73,30 @@ save⁺ (store st k v) r@(k' ∷ rest , _) v' =
   else
     store (save⁺ st r v') k v
   where
-  restV : List A → Value
+  restV : List Field → Value
   restV [] = v'
   restV rest@(_ ∷ _) = stv (save⁺ (v→s v) (rest , _) v')
 
 postulate
-  save : (st : Struct) (path : List A) (v : Value) → Struct
-
+  save : (st : Struct) (path : List Field) (v : Value) → Struct
   save≡save⁺ : save st (f ∷ path) v ≡ save⁺ st (f ∷ path , _) v
 
 {-# REWRITE save≡save⁺ #-}
 
-select : (st : Struct) (k : A) → Value
+select : (st : Struct) (k : Field) → Value
 select mtst k = stv mtst
 select (store st k v) k' = if (k ≟ᵇ k') then v else select st k'
 
-save-path : (st : Struct) (k : A) (path : List A) (v : Value) → Value
+save-path : (st : Struct) (k : Field) (path : List Field) (v : Value) → Value
 save-path st k [] v = v
 save-path st k path@(_ ∷ _) v = stv (save (v→s (select st k)) path v)
 
-save-path≡ : ∀ (st : Struct) k k' (path : List A) v v' (k'≢k : k' ≢ k)
+save-path≡ : ∀ (st : Struct) k k' (path : List Field) v v' (k'≢k : k' ≢ k)
   → save-path st k path v' ≡ save-path (store st k' v) k path v'
 save-path≡ st k k' [] v v' k≢k' = refl
 save-path≡ st k k' (x ∷ path) v v' k'≢k rewrite dec-false (k' ≟ k) k'≢k = refl
 
-select-save : ∀ (st : Struct) k (path : List A) v k' →
+select-save : ∀ (st : Struct) k (path : List Field) v k' →
   select (save st (k ∷ path) v) k' ≡
   (if k ≟ᵇ k' then save-path st k path v else select st k')
 select-save mtst _ [] _ _ = refl
