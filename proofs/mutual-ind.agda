@@ -12,7 +12,7 @@ open import Data.Bool hiding (_≟_)
 
 open import Relation.Nullary
 open import Relation.Nullary.Decidable
-open import Relation.Binary.PropositionalEquality
+open import Relation.Binary.PropositionalEquality hiding ([_])
 open import Agda.Builtin.Equality.Rewrite
 open import Relation.Binary
 
@@ -102,9 +102,26 @@ select (store st k v) pAll@(k' ∷ path) =
   fromCases [] = v
   fromCases path@(_ ∷ _) = select (v→s v) path
 
-select≡select⁺ : (st : Struct) (k : Field) → select st (k ∷ []) ≡ select⁺ st k
+select≡select⁺ : (st : Struct) (k : Field) → select st [ k ] ≡ select⁺ st k
 select≡select⁺ mtst k = refl
 select≡select⁺ (store st k v) k' rewrite select≡select⁺ st k' = refl
+
+selectOfSelects : (st : Struct) (k k' : Field) (path : List Field) → select st (k ∷ k' ∷ path) ≡
+  select (v→s (select st [ k ])) (k' ∷ path)
+selectOfSelects mtst k k' [] = refl
+selectOfSelects (store st k'' v) k k' [] with k'' ≟ k
+... | yes refl = refl
+... | no _ rewrite selectOfSelects st k k' []  = refl
+selectOfSelects mtst k k' (k'' ∷ path) = refl
+selectOfSelects (store st k''' v) k k' (k'' ∷ path) with k''' ≟ k
+... | yes refl = refl
+... | no np rewrite selectOfSelects st k k' (k'' ∷ path) = refl
+
+selectOfSelect⁺ : (st : Struct) (k k' : Field) (path : List Field)
+  → select st (k ∷ k' ∷ path) ≡ select (v→s (select⁺ st k)) (k' ∷ path)
+selectOfSelect⁺ st k k' path rewrite selectOfSelects st k k' path | select≡select⁺ st k = refl
+
+{-# REWRITE selectOfSelects selectOfSelect⁺ #-}
 
 save-path : (st : Struct) (k : Field) (path : List Field) (v : Value) → Value
 save-path st k [] v = v
