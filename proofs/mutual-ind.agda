@@ -132,26 +132,27 @@ save-path≡ : ∀ (st : Struct) k k' (path : List Field) v v' (k'≢k : k' ≢ 
 save-path≡ st k k' [] v v' k≢k' = refl
 save-path≡ st k k' (x ∷ path) v v' k'≢k rewrite dec-false (k' ≟ k) k'≢k = refl
 
+dec-eq : ∀ {k} → does (k ≟ k) ≡ true
+dec-eq {k} = dec-true (k ≟ k) refl
+
+{-# REWRITE dec-eq #-}
+
 select⁺-save : ∀ (st : Struct) k (path : List Field) v k' →
   select⁺ (save st (k ∷ path) v) k' ≡
   (if k ≟ᵇ k' then save-path st k path v else select⁺ st k')
 select⁺-save mtst _ [] _ _ = refl
 select⁺-save mtst _ (_ ∷ _) _ _ = refl
 select⁺-save (store st k''' v) k path v' k'  with k''' ≟ k | k ≟ k' | k''' ≟ k'
-select⁺-save (store st k''' v) k [] v' k' | yes refl | yes refl | yes refl
-  rewrite dec-true (k''' ≟ k''') refl = refl
+select⁺-save (store st k''' v) k [] v' k' | yes refl | yes refl | yes refl = refl
 select⁺-save (store st k''' value₁) k (x ∷ path) v k' | yes refl | yes refl | yes refl
-  rewrite dec-true (k''' ≟ k''') refl = refl
+   = refl
 ... | yes refl | yes refl | no k≢k with () ← k≢k refl
 ... | yes refl | no ¬p | yes refl with () ← ¬p refl
 ... | yes refl | no ¬p | no _ rewrite dec-false (k''' ≟ k') ¬p = refl
 ... | no k≢k | yes refl | yes refl with () ← k≢k refl
 ... | no ¬a | yes refl | no ¬c rewrite dec-false (k''' ≟ k) ¬a =
-  trans (select⁺-save st _ _ _ _) help
-  where
-  help : (if k ≟ᵇ k then _ else _) ≡ _
-  help rewrite dec-true (k ≟ k) refl = save-path≡ st _ _ path _ _ ¬a
-... | no ¬a | no ¬p | yes refl rewrite dec-true (k''' ≟ k''') refl = refl
+  trans (select⁺-save st _ _ _ _) (save-path≡ st _ _ path _ _ ¬a)
+... | no ¬a | no ¬p | yes refl = refl
 ... | no ¬a | no ¬b | no ¬c rewrite dec-false (k''' ≟ k') ¬c =
   trans (select⁺-save st _ _ _ _) help
   where
