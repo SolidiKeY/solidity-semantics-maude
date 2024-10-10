@@ -1,9 +1,11 @@
 {-# OPTIONS --rewriting #-}
 
 open import Level
+open import Function
 open import Data.Unit hiding (_≟_)
 open import Data.Empty
 open import Data.Product
+open import Data.Nat
 open import Data.Sum
 open import Data.Sum.Properties
 open import Data.List
@@ -20,10 +22,11 @@ variable
   ℓ′ : Level
   A : Set ℓ′
 
+Field = ℕ
+
 postulate
   ℓ : Level
-  Field PrimValue : Set ℓ
-  _≟_ : DecidableEquality Field
+  PrimValue : Set ℓ
 
 
 data Value  : Set ℓ
@@ -44,7 +47,7 @@ IsNotEmpty : List A → Set _
 IsNotEmpty [] = ⊥
 IsNotEmpty (_ ∷ _) = ⊤
 
-List⁺ : (A : Set ℓ) → Set _
+List⁺ : (A : Set ℓ′) → Set _
 List⁺ A = Refinement (List A) IsNotEmpty
 
 variable
@@ -106,16 +109,9 @@ select≡select⁺ : (st : Struct) (k : Field) → select st [ k ] ≡ select⁺
 select≡select⁺ mtst k = refl
 select≡select⁺ (store st k v) k' rewrite select≡select⁺ st k' = refl
 
-selectOfSelects : (st : Struct) (k k' : Field) (path : List Field) → select st (k ∷ k' ∷ path) ≡
-  select (v→s (select st [ k ])) (k' ∷ path)
-selectOfSelects mtst k k' [] = refl
-selectOfSelects (store st k'' v) k k' [] with k'' ≟ k
-... | yes refl = refl
-... | no _ rewrite selectOfSelects st k k' []  = refl
-selectOfSelects mtst k k' (k'' ∷ path) = refl
-selectOfSelects (store st k''' v) k k' (k'' ∷ path) with k''' ≟ k
-... | yes refl = refl
-... | no np rewrite selectOfSelects st k k' (k'' ∷ path) = refl
+postulate
+  selectOfSelects : (st : Struct) (k k' : Field) (path : List Field) → select st (k ∷ k' ∷ path) ≡
+    select (v→s (select st [ k ])) (k' ∷ path)
 
 selectOfSelect⁺ : (st : Struct) (k k' : Field) (path : List Field)
   → select st (k ∷ k' ∷ path) ≡ select (v→s (select⁺ st k)) (k' ∷ path)
@@ -132,29 +128,27 @@ save-path≡ : ∀ (st : Struct) k k' (path : List Field) v v' (k'≢k : k' ≢ 
 save-path≡ st k k' [] v v' k≢k' = refl
 save-path≡ st k k' (x ∷ path) v v' k'≢k rewrite dec-false (k' ≟ k) k'≢k = refl
 
-dec-eq : ∀ {k} → does (k ≟ k) ≡ true
-dec-eq {k} = dec-true (k ≟ k) refl
+postulate
+  select⁺-save : ∀ (st : Struct) k (path : List Field) v k' →
+    select⁺ (save st (k ∷ path) v) k' ≡
+    (if k ≟ᵇ k' then save-path st k path v else select⁺ st k')
 
-{-# REWRITE dec-eq #-}
+{-# REWRITE select⁺-save #-}
 
-select⁺-save : ∀ (st : Struct) k (path : List Field) v k' →
-  select⁺ (save st (k ∷ path) v) k' ≡
-  (if k ≟ᵇ k' then save-path st k path v else select⁺ st k')
-select⁺-save mtst _ [] _ _ = refl
-select⁺-save mtst _ (_ ∷ _) _ _ = refl
-select⁺-save (store st k''' v) k path v' k'  with k''' ≟ k | k ≟ k' | k''' ≟ k'
-select⁺-save (store st k''' v) k [] v' k' | yes refl | yes refl | yes refl = refl
-select⁺-save (store st k''' value₁) k (x ∷ path) v k' | yes refl | yes refl | yes refl
-   = refl
-... | yes refl | yes refl | no k≢k with () ← k≢k refl
-... | yes refl | no ¬p | yes refl with () ← ¬p refl
-... | yes refl | no ¬p | no _ rewrite dec-false (k''' ≟ k') ¬p = refl
-... | no k≢k | yes refl | yes refl with () ← k≢k refl
-... | no ¬a | yes refl | no ¬c rewrite dec-false (k''' ≟ k) ¬a =
-  trans (select⁺-save st _ _ _ _) (save-path≡ st _ _ path _ _ ¬a)
-... | no ¬a | no ¬p | yes refl = refl
-... | no ¬a | no ¬b | no ¬c rewrite dec-false (k''' ≟ k') ¬c =
-  trans (select⁺-save st _ _ _ _) help
-  where
-  help : (if k ≟ᵇ k' then _ else _) ≡ _
-  help rewrite dec-false (k ≟ k') ¬b = refl
+bob = 0
+$account = 1
+$balance = 2
+$date = 3
+
+postulate
+  vA vB : Value
+  symbSt : Struct
+
+stEx : Struct
+stEx = save (save symbSt (bob ∷ [ $account ]) (stv (store mtst $date vB))) (bob ∷ $account ∷ [ $balance ]) vA
+
+vEx : Struct
+vEx = v→s $ select stEx (bob ∷ [ $account ])
+
+_ : vEx ≡ store (store mtst 2 vA) 3 vB
+_ = refl
