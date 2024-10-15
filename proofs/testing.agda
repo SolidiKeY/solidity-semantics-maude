@@ -150,5 +150,5 @@ stEx = save (save symbSt (bob ∷ [ $account ]) (stv (store mtst $date vB))) (bo
 vEx : Struct
 vEx = v→s $ select stEx (bob ∷ [ $account ])
 
-_ : vEx ≡ store (store mtst 2 vA) 3 vB
+_ : vEx ≡ store (store mtst $balance vA) $date vB
 _ = refl
