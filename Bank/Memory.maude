@@ -1,4 +1,4 @@
-fmod STATIC-ARRAY{Field :: TRIV} is
+fmod BANK{Field :: TRIV} is
     pr INT .
     pr LIST{Field} .
 
@@ -9,13 +9,14 @@ fmod STATIC-ARRAY{Field :: TRIV} is
 
     pr LIST{Field} .
 
+    op mtMem : -> Memory .
     op new : Memory PrimIdentity -> Memory .
     op read : Memory Identity Field$Elt -> Value .
     op write : Memory Identity Field$Elt Value -> Memory .
     op delete : Memory Identity -> Memory .
     op idC : PrimIdentity List{Field} -> Identity .
 
-    op clear : Memory -> Memory .
+    op erase : Memory -> Memory .
     op _:_ : Identity Field$Elt -> Identity .
 
     op emptyMemory : -> Memory .
@@ -38,33 +39,57 @@ fmod STATIC-ARRAY{Field :: TRIV} is
 
     eq read(new(memory, id), idC(id, ls), pSel) = 0 .
 
-    eq read(clear(memory), idC(id, ls) , idS) = idC(id, idS ls) .
-
-    eq read(clear(memory), idC(id, nil) , pSel) = read(memory, idC(id, nil) , pSel) .
-
-    eq read(clear(memory), idC(id, ls sel), pSel) = read(memory, read(memory, idC(id, ls), sel), pSel) .
 
     eq read(emptyMemory, id1, pSel) = 0 .
     eq read(emptyMemory, id1, idS) = id1 : idS .
 
     eq read(delete(memory, idC(id, ls)), idC(id, ls ls2), pSel) = 0 .
     eq read(delete(memory, idC(id, ls)), idC(id, ls ls2), idS) = idC(id, ls ls2 idS) .
+
 endfm
 
-fmod TEST-STATIC-ARRAY{Field :: TRIV} is
-    pr STATIC-ARRAY{Field} .
+fmod BANK-ERASE-LAZY{Field :: TRIV} is
+    pr INT .
+    pr LIST{Field} .
+    pr BANK{Field} .
 
-    ops memory wMemory cMemory : -> Memory .
-    ops bobC bAccC : -> PrimIdentity .
-    ops bob bAcc : -> Identity .
+    vars i j size : Int .
+    var memory : Memory .
+    vars id : PrimIdentity .
+    var idComplex id1 id2 : Identity .
+    var val : Value .
+    var sel sel1 sel2 : Field$Elt .
+    var pSel : PrimField .
+    var idS : IdField .
+    var ls ls1 ls2 : List{Field} .
+
+    eq read(erase(memory), idC(id, ls) , idS) = idC(id, idS ls) .
+    eq read(erase(memory), idC(id, nil) , pSel) = read(memory, idC(id, nil) , pSel) .
+    eq read(erase(memory), idC(id, ls sel), pSel) = read(memory, read(memory, idC(id, ls), sel), pSel) .
+endfm
+
+fmod TEST-BANK-FIELDS{Field :: TRIV} is
+    pr BANK{Field} .
+
+    ops abMemory memory wMemory cMemory : -> Memory .
+    ops aliceC bobC bAccC : -> PrimIdentity .
+    ops alice bob bAcc : -> Identity .
     op $balance : -> PrimField .
     op $account : -> IdField .
 
+    eq alice = idC(aliceC, nil) .
     eq bob = idC(bobC, nil) .
     eq bAcc = idC(bAccC, nil) .
 
     eq wMemory = write(write(emptyMemory, bob , $account , bAcc), bAcc, $balance, 1) .
-    eq cMemory = clear(wMemory) .
+    eq cMemory = erase(wMemory) .
+
+    eq abMemory = write(write(mtMem, alice : $account, $balance, 10), bob, $account, alice : $account) .
+endfm
+
+fmod TEST-BANK{Field :: TRIV} is
+    pr BANK-ERASE-LAZY{Field} .
+    pr TEST-BANK-FIELDS{Field} .
 endfm
 
 red read(emptyMemory, bAcc, $balance) .
@@ -80,3 +105,42 @@ red read(emptyMemory, bob, $account)  .
 
 red read(delete(memory, bob), bob : $account, $balance) .
 red read(delete(memory, bob), bob : $account, $account) .
+
+fmod BANK-ERASE{Field :: TRIV} is
+    pr INT .
+    pr LIST{Field} .
+    pr BANK{Field} .
+
+    vars i j size : Int .
+    var memory : Memory .
+    vars id id3 : PrimIdentity .
+    var idComplex id1 id2 : Identity .
+    var val : Value .
+    var sel sel1 sel2 : Field$Elt .
+    var pSel : PrimField .
+    var idS : IdField .
+    var ls ls1 ls2 ls3 : List{Field} .
+
+
+    eq erase(mtMem) = mtMem .
+    eq erase(new(memory, id)) = new(erase(memory), id) .
+    eq erase(write(memory, id1, pSel, val)) = write(erase(memory), id1, pSel, val) .
+
+    op copy : Memory Identity Identity -> Memory .
+
+    eq erase(write(memory, id1, idS, id2)) = copy(erase(memory), id1 : idS, id2) .
+
+    eq copy(mtMem, id1, id2) = mtMem .
+    *** New does not change anything, it can just skip
+    eq copy(new(memory, id), id1, id2) = memory .
+    eq copy(write(memory, idC(id, ls1 ls2), sel, val), idC(id3, ls3), idC(id, ls1)) =
+        write(write(copy(memory, idC(id3, ls3), idC(id, ls1)), idC(id, ls1 ls2), sel, val), idC(id3, ls3 ls2), sel, val) .
+endfm
+
+
+fmod TEST-BANK{Field :: TRIV} is
+    pr BANK-ERASE{Field} .
+    pr TEST-BANK-FIELDS{Field} .
+endfm
+
+red erase(abMemory) .
