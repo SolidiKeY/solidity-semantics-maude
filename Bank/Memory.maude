@@ -17,7 +17,7 @@ fmod BANK{Field :: TRIV} is
     op idC : PrimIdentity List{Field} -> Identity .
 
     op erase : Memory -> Memory .
-    op _:_ : Identity Field$Elt -> Identity .
+    op _:_ : Identity List{Field} -> Identity .
 
     op emptyMemory : -> Memory .
 
@@ -31,7 +31,7 @@ fmod BANK{Field :: TRIV} is
     var idS : IdField .
     var ls ls1 ls2 : List{Field} .
 
-    eq idC(id, ls) : sel = idC(id, sel ls) .
+    eq idC(id, ls1) : ls2 = idC(id, ls1 ls2) .
 
     eq read(write(memory, id1, sel, val), id1, sel) = val .
     ceq read(write(memory, id1, sel1, val), id2, sel2) = read(memory, id2, sel2)
@@ -134,7 +134,8 @@ fmod BANK-ERASE{Field :: TRIV} is
     *** New does not change anything, it can just skip
     eq copy(new(memory, id), id1, id2) = memory .
     eq copy(write(memory, idC(id, ls1 ls2), sel, val), idC(id3, ls3), idC(id, ls1)) =
-        write(write(copy(memory, idC(id3, ls3), idC(id, ls1)), idC(id, ls1 ls2), sel, val), idC(id3, ls3 ls2), sel, val) .
+        write(write(copy(memory, idC(id3, ls3), idC(id, ls1)),
+            idC(id, ls1 ls2), sel, val), idC(id3, ls3 ls2), sel, val) .
 endfm
 
 
