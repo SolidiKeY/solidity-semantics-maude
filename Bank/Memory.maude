@@ -84,7 +84,8 @@ fmod TEST-BANK-FIELDS{Field :: TRIV} is
     eq wMemory = write(write(emptyMemory, bob , $account , bAcc), bAcc, $balance, 1) .
     eq cMemory = erase(wMemory) .
 
-    eq abMemory = write(write(mtMem, alice : $account, $balance, 10), bob, $account, alice : $account) .
+    eq abMemory = write(write(mtMem, alice : $account, $balance, 10),
+          bob, $account, alice : $account) .
 endfm
 
 fmod TEST-BANK{Field :: TRIV} is
@@ -113,8 +114,8 @@ fmod BANK-ERASE{Field :: TRIV} is
 
     vars i j size : Int .
     var memory : Memory .
-    vars id id3 : PrimIdentity .
-    var idComplex id1 id2 : Identity .
+    vars id : PrimIdentity .
+    var idComplex id1 id2 id3 : Identity .
     var val : Value .
     var sel sel1 sel2 : Field$Elt .
     var pSel : PrimField .
@@ -133,9 +134,9 @@ fmod BANK-ERASE{Field :: TRIV} is
     eq copy(mtMem, id1, id2) = mtMem .
     *** New does not change anything, it can just skip
     eq copy(new(memory, id), id1, id2) = memory .
-    eq copy(write(memory, idC(id, ls1 ls2), sel, val), idC(id3, ls3), idC(id, ls1)) =
-        write(write(copy(memory, idC(id3, ls3), idC(id, ls1)),
-            idC(id, ls1 ls2), sel, val), idC(id3, ls3 ls2), sel, val) .
+    eq copy(write(memory, idC(id, ls1 ls2), sel, val), id3, idC(id, ls1)) =
+        write(write(copy(memory, id3, idC(id, ls1)),
+            idC(id, ls1 ls2), sel, val), id3 : ls2, sel, val) .
 endfm
 
 
