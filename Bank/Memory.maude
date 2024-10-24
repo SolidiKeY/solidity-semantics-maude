@@ -1,11 +1,10 @@
+load Fields .
+
 fmod BANK{Field :: TRIV} is
     pr INT .
-    pr LIST{Field} .
+    pr FIELDS{Field} .
 
-    sorts Memory PrimIdentity Identity Value .
-    sorts PrimField IdField .
-    subsort PrimField IdField < Field$Elt .
-    subsort Int Identity < Value .
+    sorts Memory .
 
     pr LIST{Field} .
 
