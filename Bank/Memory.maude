@@ -1,12 +1,9 @@
 load Fields .
 
 fmod BANK{Field :: TRIV} is
-    pr INT .
     pr FIELDS{Field} .
 
-    sorts Memory .
-
-    pr LIST{Field} .
+    sort Memory .
 
     op mtMem : -> Memory .
     op new : Memory PrimIdentity -> Memory .

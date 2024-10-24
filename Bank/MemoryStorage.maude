@@ -1,0 +1,17 @@
+load Memory .
+load Storage .
+
+fmod MemoryStorage{Field :: TRIV} is
+    pr BANK-ERASE{Field} .
+    pr STORAGE{Field} .
+
+    op copy-struct-mem : Struct Identity -> Memory .
+
+    var st : Struct .
+    var pF : PrimField .
+    var idF : IdField .
+    var v : Value .
+    var id : Identity .
+
+    eq copy-struct-mem(store(st, pF, v), id) = write(copy-struct-mem(st, id), id, pF, v) .
+endfm

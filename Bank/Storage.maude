@@ -1,0 +1,12 @@
+load Fields .
+
+fmod STORAGE{Field :: TRIV} is
+    pr FIELDS{Field} .
+
+    sort Struct .
+
+    subsort Struct < Value .
+
+    op store : Struct Field$Elt Value -> Struct .
+    op select : Struct Field$Elt -> Struct .
+endfm
