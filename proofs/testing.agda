@@ -141,14 +141,14 @@ $balance = 2
 $date = 3
 
 postulate
-  vA vB : Value
+  vBal vDate : Value
   symbSt : Struct
 
 stEx : Struct
-stEx = save (save symbSt (bob ∷ [ $account ]) (stv (store mtst $date vB))) (bob ∷ $account ∷ [ $balance ]) vA
+stEx = save (save symbSt (bob ∷ [ $account ]) (stv (store mtst $date vDate))) (bob ∷ $account ∷ [ $balance ]) vBal
 
 vEx : Struct
 vEx = v→s $ select stEx (bob ∷ [ $account ])
 
-_ : vEx ≡ store (store mtst $balance vA) $date vB
+_ : vEx ≡ store (store mtst $balance vBal) $date vDate
 _ = refl
