@@ -1,7 +1,7 @@
 load Memory .
 load Storage .
 
-fmod MemoryStorage{Field :: TRIV} is
+fmod StorageToMemory{Field :: TRIV} is
     pr BANK-ERASE{Field} .
     pr STORAGE{Field} .
 
@@ -22,7 +22,7 @@ fmod MemoryStorage{Field :: TRIV} is
 endfm
 
 fmod Example{Field :: TRIV} is
-    pr MemoryStorage{Field} .
+    pr StorageToMemory{Field} .
 
     ops $alice $bob $account $balance : -> PrimField .
     ops st1 stAlice stBal : -> Struct .
