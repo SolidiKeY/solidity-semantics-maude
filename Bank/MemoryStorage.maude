@@ -10,26 +10,32 @@ fmod MemoryStorage{Field :: TRIV} is
     var st : Struct .
     var pF : PrimField .
     var idF : IdField .
-    var v : Value .
+    var vSt : Struct .
+    var vInt : Int .
     var id : Identity .
     var mem : Memory .
 
-    eq copy-struct-mem(store(st, pF, v), id, mem) = write(copy-struct-mem(st, id, mem), id, pF, v) .
     eq copy-struct-mem(mtSt, id, mem) = mem .
+    eq copy-struct-mem(store(st, pF, vInt), id, mem) = write(copy-struct-mem(st, id, mem), id, pF, vInt) .
+    eq copy-struct-mem(store(st, pF, vSt), id, mem) = copy-struct-mem(st, id,
+          copy-struct-mem(vSt, id : pF, write(mem, id, pF, id : pF))) .
 endfm
 
 fmod Example{Field :: TRIV} is
     pr MemoryStorage{Field} .
 
     ops $alice $bob $account $balance : -> PrimField .
-    ops st1 stAlice : -> Struct .
+    ops st1 stAlice stBal : -> Struct .
 
-    eq stAlice = store(mtSt, $account, store(mtSt, $balance, 10)) .
+    eq stBal = store(mtSt, $balance, 10) .
+    eq stAlice = store(mtSt, $account, stBal) .
     eq st1 = store(store(mtSt, $alice, stAlice),
                                $bob  , store(mtSt, $account, store(mtSt, $balance, 20))) .
 
-    op idA : -> Identity .
+    ops idA idF : -> Identity .
     op mem : -> Memory .
 endfm
 
+red copy-struct-mem(stBal, idA, mem) .
 red copy-struct-mem(stAlice, idA, mem) .
+red copy-struct-mem(st1, idF, mem) .
