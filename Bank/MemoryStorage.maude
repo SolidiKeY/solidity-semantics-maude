@@ -5,13 +5,31 @@ fmod MemoryStorage{Field :: TRIV} is
     pr BANK-ERASE{Field} .
     pr STORAGE{Field} .
 
-    op copy-struct-mem : Struct Identity -> Memory .
+    op copy-struct-mem : Struct Identity Memory -> Memory .
 
     var st : Struct .
     var pF : PrimField .
     var idF : IdField .
     var v : Value .
     var id : Identity .
+    var mem : Memory .
 
-    eq copy-struct-mem(store(st, pF, v), id) = write(copy-struct-mem(st, id), id, pF, v) .
+    eq copy-struct-mem(store(st, pF, v), id, mem) = write(copy-struct-mem(st, id, mem), id, pF, v) .
+    eq copy-struct-mem(mtSt, id, mem) = mem .
 endfm
+
+fmod Example{Field :: TRIV} is
+    pr MemoryStorage{Field} .
+
+    ops $alice $bob $account $balance : -> PrimField .
+    ops st1 stAlice : -> Struct .
+
+    eq stAlice = store(mtSt, $account, store(mtSt, $balance, 10)) .
+    eq st1 = store(store(mtSt, $alice, stAlice),
+                               $bob  , store(mtSt, $account, store(mtSt, $balance, 20))) .
+
+    op idA : -> Identity .
+    op mem : -> Memory .
+endfm
+
+red copy-struct-mem(stAlice, idA, mem) .
