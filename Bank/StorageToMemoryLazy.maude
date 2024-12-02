@@ -1,0 +1,43 @@
+load Memory .
+load Storage .
+
+fmod StorageToMemory{Field :: TRIV} is
+    pr BANK-ERASE{Field} .
+    pr STORAGE{Field} .
+
+    var st : Struct .
+    var pF : PrimField .
+    var idF : IdField .
+    var vSt : Struct .
+    var vInt : Int .
+    var id id2 : PrimIdentity .
+    var mem : Memory .
+    var fxs : List{Field} .
+
+    op copySt : Memory PrimIdentity Struct -> Memory .
+
+    ceq read(copySt(mem, id, st), idC(id2, fxs), pF) =
+        read(mem, idC(id2, fxs), pF)
+        if id =/= id2 .
+
+    eq read(copySt(mem, id, st), idC(id, fxs), pF) =
+        find(st, fxs pF) .
+endfm
+
+fmod Examples{Field :: TRIV} is
+    pr StorageToMemory{Field} .
+
+    ops $alice $bob $account $balance : -> PrimField .
+    ops st1 stAlice stBal : -> Struct .
+    ops idA idF : -> PrimIdentity .
+    ops mem nMem memAlice : -> Memory .
+
+    eq stBal = store(mtSt, $balance, 10) .
+    eq stAlice = store(mtSt, $account, stBal) .
+
+    eq nMem = copySt(mem, idA, stBal) .
+    eq memAlice = copySt(mem, idA, stAlice) .
+endfm
+
+red read(nMem, idC(idA, nil), $balance) .
+red read(memAlice, idC(idA, $account), $balance) .

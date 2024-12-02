@@ -10,4 +10,13 @@ fmod STORAGE{Field :: TRIV} is
     op mtSt : -> Struct .
     op store : Struct Field$Elt Value -> Struct .
     op select : Struct Field$Elt -> Struct .
+    op find : Struct List{Field} -> Struct .
+
+    var st : Struct .
+    var fld : Field$Elt .
+    var val : Value .
+    var flds : List{Field} .
+
+    eq find(val, nil) = val .
+    eq find(store(st, fld, val), fld flds) = find(val, flds) .
 endfm
