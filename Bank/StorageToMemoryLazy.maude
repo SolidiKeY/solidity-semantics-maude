@@ -5,8 +5,9 @@ fmod StorageToMemory{Field :: TRIV} is
     pr BANK-ERASE{Field} .
     pr STORAGE{Field} .
 
-    var st : Struct .
+    var st : Value .
     var pF : PrimField .
+    var fld : Field$Elt .
     var idF : IdField .
     var vSt : Struct .
     var vInt : Int .
@@ -14,10 +15,10 @@ fmod StorageToMemory{Field :: TRIV} is
     var mem : Memory .
     var fxs : List{Field} .
 
-    op copySt : Memory PrimIdentity Struct -> Memory .
+    op copySt : Memory PrimIdentity Value -> Memory .
 
-    ceq read(copySt(mem, id, st), idC(id2, fxs), pF) =
-        read(mem, idC(id2, fxs), pF)
+    ceq read(copySt(mem, id, st), idC(id2, fxs), fld) =
+        read(mem, idC(id2, fxs), fld)
         if id =/= id2 .
 
     eq read(copySt(mem, id, st), idC(id, fxs), pF) =
@@ -41,3 +42,55 @@ endfm
 
 red read(nMem, idC(idA, nil), $balance) .
 red read(memAlice, idC(idA, $account), $balance) .
+
+fmod ShallowExample{Field :: TRIV} is
+    pr StorageToMemory{Field} .
+
+    op add1 : Value -> Value .
+    op toId : Value -> Identity .
+    ops $pn $balance : -> PrimField .
+    ops $alice $bob $carol $account : -> IdField .
+    ops st stC : -> Struct .
+    ops mem memAlice memBob alice++ shallow shallowMod : -> Memory .
+    ops idB idA : -> PrimIdentity .
+    ops idAA idBB : -> Identity .
+    ops vA vB vA2 vB2 : -> Int .
+
+    eq stC = find(st, $carol) .
+    eq idAA = idC(idA, nil) .
+    eq idBB = idC(idB, nil) .
+
+    eq memAlice = copySt(new(mem, idA), idA, stC) .
+    eq memBob   = copySt(new(memAlice, idB), idB, stC) .
+    eq alice++ = write(memBob, idAA, $pn, add1(read(memBob, idAA, $pn))) .
+
+    eq vA = read(alice++, idAA, $pn) .
+    eq vB = read(alice++, idBB, $pn) .
+
+    eq shallow = write(alice++, idBB, $account, read(alice++, idAA, $account)) .
+
+    eq shallowMod = write(shallow, toId(read(shallow, idBB, $account)), $balance, 10) .
+    eq vA2 = read(shallowMod, toId(read(shallowMod, idAA, $account)), $balance) .
+    eq vB2 = read(shallowMod, toId(read(shallowMod, idBB, $account)), $balance) .
+
+endfm
+
+red memAlice .
+red memBob .
+
+red read(memBob, idC(idA, nil) , $pn) .
+red read(memBob, idC(idB, nil) , $pn) .
+
+red alice++ .
+
+red vA == add1(vB) .
+red vA =/= vB .
+
+red shallow .
+red shallowMod .
+
+red read(shallowMod, idAA, $account) .
+
+red vA2 .
+red vB2 .
+red vA2 == vB2 .
