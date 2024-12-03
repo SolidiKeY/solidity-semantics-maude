@@ -16,8 +16,10 @@ fmod StorageToMemory{Field :: TRIV} is
     var mem : Memory .
 
     eq copy-struct-mem(mtSt, id, mem) = mem .
-    eq copy-struct-mem(store(st, pF, vInt), id, mem) = write(copy-struct-mem(st, id, mem), id, pF, vInt) .
-    eq copy-struct-mem(store(st, pF, vSt), id, mem) = copy-struct-mem(st, id,
+    eq copy-struct-mem(store(st, pF, vInt), id, mem) =
+        write(copy-struct-mem(st, id, mem), id, pF, vInt) .
+    eq copy-struct-mem(store(st, pF, vSt), id, mem) =
+        copy-struct-mem(st, id,
           copy-struct-mem(vSt, id : pF, write(mem, id, pF, id : pF))) .
 endfm
 
