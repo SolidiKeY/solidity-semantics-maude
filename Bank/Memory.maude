@@ -19,7 +19,7 @@ fmod BANK{Field :: TRIV} is
 
     vars i j size : Int .
     var memory : Memory .
-    vars id : PrimIdentity .
+    vars id idn : PrimIdentity .
     var idComplex id1 id2 : Identity .
     var val : Value .
     var sel sel1 sel2 : Field$Elt .
@@ -34,7 +34,8 @@ fmod BANK{Field :: TRIV} is
         if id1 =/= id2 or sel1 =/= sel2 .
 
     eq read(new(memory, id), idC(id, ls), pSel) = 0 .
-
+    ceq read(new(memory, id), idC(idn, ls), sel) = read(memory, idC(idn, ls), sel)
+        if id =/= idn .
 
     eq read(emptyMemory, id1, pSel) = 0 .
     eq read(emptyMemory, id1, idS) = id1 : idS .
