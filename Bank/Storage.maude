@@ -15,8 +15,10 @@ fmod STORAGE{Field :: TRIV} is
     var st : Struct .
     var fld : Field$Elt .
     var val : Value .
-    var flds : List{Field} .
+    var flds flds2 : List{Field} .
 
     eq find(val, nil) = val .
     eq find(store(st, fld, val), fld flds) = find(val, flds) .
+
+    eq find(find(st, flds), flds2) = find(st, flds flds2) .
 endfm

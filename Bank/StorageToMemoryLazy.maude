@@ -60,15 +60,17 @@ fmod ShallowExample{Field :: TRIV} is
     ops vA vB vA2 vB2 : -> Int .
 
     eq stC = find(st, $carol) .
-    eq idAA = idC(idA, nil) .
-    eq idBB = idC(idB, nil) .
 
     eq memAlice = copySt(mem, idA, stC) .
     eq memBob   = copySt(memAlice, idB, stC) .
-    eq alice++ = write(memBob, idAA, $pn, add1(read(memBob, idAA, $pn))) .
 
-    eq vA = read(alice++, idAA, $pn) .
-    eq vB = read(alice++, idBB, $pn) .
+    eq idAA = read(memBob, idC(idA, nil), $account) .
+    eq idBB = read(memBob, idC(idB, nil), $account) .
+
+    eq alice++ = write(memBob, idAA, $balance, add1(read(memBob, idAA, $balance))) .
+
+    eq vA = read(alice++, idAA, $balance) .
+    eq vB = read(alice++, idBB, $balance) .
 
     eq shallow = write(alice++, idBB, $account, read(alice++, idAA, $account)) .
 
@@ -78,11 +80,14 @@ fmod ShallowExample{Field :: TRIV} is
 
 endfm
 
+red idAA .
+red idBB .
+
 red memAlice .
 red memBob .
 
-red read(memBob, idC(idA, nil) , $pn) .
-red read(memBob, idC(idB, nil) , $pn) .
+red read(memBob, idAA, $balance) .
+red read(memBob, idBB , $balance) .
 
 red alice++ .
 
