@@ -21,6 +21,9 @@ fmod StorageToMemory{Field :: TRIV} is
         read(mem, idC(id2, fxs), fld)
         if id =/= id2 .
 
+    eq read(copySt(mem, id, st), idC(id, fxs), idF) =
+        idC(id, fxs idF) .
+
     eq read(copySt(mem, id, st), idC(id, fxs), pF) =
         find(st, fxs pF) .
 endfm
@@ -60,8 +63,8 @@ fmod ShallowExample{Field :: TRIV} is
     eq idAA = idC(idA, nil) .
     eq idBB = idC(idB, nil) .
 
-    eq memAlice = copySt(new(mem, idA), idA, stC) .
-    eq memBob   = copySt(new(memAlice, idB), idB, stC) .
+    eq memAlice = copySt(mem, idA, stC) .
+    eq memBob   = copySt(memAlice, idB, stC) .
     eq alice++ = write(memBob, idAA, $pn, add1(read(memBob, idAA, $pn))) .
 
     eq vA = read(alice++, idAA, $pn) .
