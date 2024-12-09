@@ -1,0 +1,38 @@
+load Memory .
+load Storage .
+
+fmod MemoryToStorage{Field :: TRIV} is
+    pr BANK-ERASE{Field} .
+    pr STORAGE{Field} .
+
+    var st : Value .
+    var pF : PrimField .
+    var fld : Field$Elt .
+    var idF : IdField .
+    var vSt : Struct .
+    var vInt : Int .
+    var id id2 : Identity .
+    var mem : Memory .
+    var fxs : List{Field} .
+
+    op copyMem : Struct Memory Identity -> Value .
+
+    eq find(copyMem(st, mem, id), fxs fld) = read(mem, id, fxs fld) .
+endfm
+
+
+fmod Examples{Field :: TRIV} is
+    pr MemoryToStorage{Field} .
+
+    ops $alice $bob $carol $account : -> IdField .
+    ops $balance : -> PrimField .
+    ops st1 stAlice stBal : -> Struct .
+    ops idA idF : -> PrimIdentity .
+    ops mem nMem memAlice : -> Memory .
+
+    eq nMem = write(new(mem, idA), idC(idA, $account), $balance, 10) .
+    eq stAlice = copyMem(st1, nMem, idC(idA, nil)) .
+endfm
+
+
+red find(stAlice, $account $balance) .
