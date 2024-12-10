@@ -17,7 +17,7 @@ fmod MemoryToStorage{Field :: TRIV} is
 
     op copyMem : Struct Memory Identity -> Value .
 
-    eq find(copyMem(st, mem, id), fxs fld) = read(mem, id, fxs fld) .
+    eq find(copyMem(st, mem, id), fxs pF) = read(mem, id, fxs pF) .
 endfm
 
 
@@ -34,5 +34,5 @@ fmod Examples{Field :: TRIV} is
     eq stAlice = copyMem(st1, nMem, idC(idA, nil)) .
 endfm
 
-
+red find(find(stAlice, $account), $balance) .
 red find(stAlice, $account $balance) .

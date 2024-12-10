@@ -12,7 +12,7 @@ fmod STORAGE{Field :: TRIV} is
     op select : Value Field$Elt -> Value .
     op find : Value List{Field} -> Value .
 
-    var st : Struct .
+    var st : Value .
     var fld : Field$Elt .
     var val : Value .
     var flds flds2 : List{Field} .
