@@ -20,6 +20,5 @@ fmod STORAGE{Field :: TRIV} is
     eq find(val, nil) = val .
     eq find(store(st, fld, val), fld flds) = find(val, flds) .
 
-    *** eq find(find(st, flds), flds2) = find(st, flds flds2) .
     eq find(st, flds flds2) = find(find(st, flds), flds2) .
 endfm
