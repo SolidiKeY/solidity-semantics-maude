@@ -13,16 +13,14 @@ fmod MemoryToStorage{Field :: TRIV} is
     var vInt : Int .
     var id id2 : Identity .
     var mem : Memory .
-    var fxs : List{Field} .
+    var fxs fys : List{Field} .
 
     op copyMem : Struct Memory Identity -> Value .
-
-    eq find(copyMem(st, mem, id), pF) = read(mem, id, pF) .
-
     op copyMemAcc : Struct Memory Identity List{Field} -> Value .
 
-    eq find(copyMemAcc(st, mem, id, fxs), pF) = readR(mem, id, fxs pF) .
-    eq find(copyMem(st, mem, id), fxs) = copyMemAcc(st, mem, id, fxs) [owise] .
+    eq find(copyMem(st, mem, id), fxs) = copyMemAcc(st, mem, id, fxs) .
+    eq find(copyMemAcc(st, mem, id, fxs), fys) = copyMemAcc(st, mem, id, fxs fys) .
+    eq copyMemAcc(st, mem, id, fxs pF) = readR(mem, id, fxs pF) .
 endfm
 
 
