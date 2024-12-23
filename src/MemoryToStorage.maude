@@ -17,7 +17,7 @@ fmod MemoryToStorage{Field :: TRIV} is
 
     op copyMem : Struct Memory Identity -> Value .
 
-    eq find(copyMem(st, mem, id), fxs pF) = read(mem, id, fxs pF) .
+    eq find(copyMem(st, mem, id), fxs pF) = readR(mem, id, fxs pF) .
 endfm
 
 

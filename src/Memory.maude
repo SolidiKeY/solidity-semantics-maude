@@ -7,7 +7,8 @@ fmod BANK{Field :: TRIV} is
 
     op mtMem : -> Memory .
     op new : Memory PrimIdentity -> Memory .
-    op read : Memory Identity NeList{Field} -> Value .
+    op read : Memory Identity Field$Elt -> Value .
+    op readR : Memory Identity NeList{Field} -> Value .
     op write : Memory Identity Field$Elt Value -> Memory .
     op delete : Memory Identity -> Memory .
     op idC : PrimIdentity List{Field} -> Identity .
@@ -45,7 +46,7 @@ fmod BANK{Field :: TRIV} is
     eq read(delete(memory, idC(id, ls)), idC(id, ls ls2), pSel) = 0 .
     eq read(delete(memory, idC(id, ls)), idC(id, ls ls2), idS) = idC(id, ls ls2 idS) .
 
-    eq read(memory, id1, sel ls3) = read(memory, read(memory, id1, sel), ls3) .
+    eq readR(memory, id1, ls3 sel) = read(memory, read(memory, id1, ls3), sel) .
 
 endfm
 
