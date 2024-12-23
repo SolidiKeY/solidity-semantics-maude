@@ -1,6 +1,0 @@
-load MapDict .
-load TreeList .
-load Account/full-maude .
-load AccountInt/full-maude .
-load maps/full-maude .
-quit().

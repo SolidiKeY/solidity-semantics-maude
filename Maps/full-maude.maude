@@ -1,5 +1,0 @@
-load WriteSubstituteTests .
-load WriteTests .
-load WriteReadBool .
-load WRLists .
-quit() .

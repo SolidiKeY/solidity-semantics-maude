@@ -1,5 +1,0 @@
-load AccountExample .
-load AccountFunctional .
-load AccountFunctionalView .
-load AccountFunctionalViewParameter .
-quit().

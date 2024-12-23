@@ -1,7 +1,0 @@
-load Account .
-
-fmod ACC-FUNCTIONAL-EXAMPLE is
-  pr Read-After-Write-Richard-Solution .
-endfm
-
-load Examples .

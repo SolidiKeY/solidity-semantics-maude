@@ -1,8 +1,0 @@
-load WriteRead .
-
-fmod Testing is
-  pr WRITE-READ-WITH-EXAMPLES .
-  pr WRITE-SUBSTITUTE .
-endfm
-
-load TestExamples .

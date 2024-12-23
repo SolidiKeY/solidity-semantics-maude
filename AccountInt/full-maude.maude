@@ -1,4 +1,0 @@
-load AccWithExamples .
-load AccConstructWithExamples .
-load RichardSolutionExample .
-quit().

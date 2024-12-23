@@ -1,7 +1,0 @@
-load Account .
-
-fmod ACC-FUNCTIONAL-EXAMPLE is
-  inc Read-After-Write .
-endfm
-
-load Examples .
