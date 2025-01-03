@@ -13,9 +13,7 @@ open import Relation.Nullary
 open import Field
 
 postulate
-  ℓ : Level
-  A PrimIdentity : Set ℓ
-  v0 : A
+  PrimIdentity : Set ℓ
   _≟ₚ_ : DecidableEquality PrimIdentity
 
 record Identity : Set ℓ where

@@ -16,13 +16,13 @@ open import Relation.Binary.PropositionalEquality hiding ([_])
 open import Agda.Builtin.Equality.Rewrite
 open import Relation.Binary
 
-variable
+open import Field renaming (A to PrimValue)
+
+private variable
   ℓ′ : Level
   A : Set ℓ′
 
-postulate
-  ℓ : Level
-  Field PrimValue : Set ℓ
+private postulate
   _≟_ : DecidableEquality Field
 
 
@@ -44,7 +44,7 @@ IsNotEmpty : List A → Set _
 IsNotEmpty [] = ⊥
 IsNotEmpty (_ ∷ _) = ⊤
 
-List⁺ : (A : Set ℓ) → Set _
+List⁺ : (A : Set ℓ′) → Set _
 List⁺ A = Refinement (List A) IsNotEmpty
 
 variable

@@ -1,11 +1,14 @@
+{-# OPTIONS --rewriting #-}
+
 open import Data.List
 
+open import Field
 open import memory
-open import proof-select-save renaming (Value to ValueSS)
+open import mutual-ind renaming (Value to ValueS)
 
-ValueS = ValueSS A
 
-copySt : (mem : Memory) (pId : PrimIdentity) (val : ValueS) → Memory
-copySt mem pId mtst = mem
-copySt mem pId (var x) = write mem ⟨ pId , [] ⟩ {!!} {!!}
-copySt mem pId (store val fld val₁) = {!!}
+copySt : (mem : Memory) (id : Identity) (st : Struct) → Memory
+copySt mem id mtst = mem
+copySt mem id (store st pf@(pSel _) (prim x)) = write (copySt mem id st) id pf {!!}
+copySt mem id (store st pf@(pSel _) (stv x)) = write (copySt mem id st) id pf {!!}
+copySt mem id (store st (idSel x) value) = {!!}
