@@ -22,6 +22,9 @@ record Identity : Set ℓ where
     prim : PrimIdentity
     flds : List Field
 
+_·_  : Identity → Field → Identity
+⟨ prim , flds ⟩ · fld = ⟨ prim , flds ∷ᵣ fld ⟩
+
 _≟ˡ_ : DecidableEquality Identity
 ⟨ prim1 , flds1 ⟩ ≟ˡ ⟨ prim2 , flds2 ⟩ with prim1 ≟ₚ prim2 | flds1 ≟ˡᶠ flds2
 ... | yes refl | yes refl = yes refl
