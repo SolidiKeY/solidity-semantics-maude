@@ -22,6 +22,8 @@ record Identity : Set ℓ where
     prim : PrimIdentity
     flds : List Field
 
+pattern ⟪_⟫ pId = ⟨ pId , [] ⟩
+
 _·_  : Identity → Field → Identity
 ⟨ prim , flds ⟩ · fld = ⟨ prim , flds ∷ᵣ fld ⟩
 
