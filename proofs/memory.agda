@@ -53,7 +53,7 @@ read mtm id fld = inj₂ v0
 read (write mem idM fldM value) id fld with ⌊ idM ≟ᵢ id ⌋ ∧ ⌊ fldM ≟ᶠ fld ⌋
 ... | true = value
 ... | false = read mem id fld
-read (add mem pId) idd@(⟨ id , _ ⟩) fld with ⌊ pId ≟ˡ idd ⌋
+read (add mem ⟨ pId , _ ⟩ ) idd@(⟨ id , _ ⟩) fld with ⌊ pId ≟ₚ id ⌋
 ... | false = read mem idd fld
 read (add mem pId) ⟨ id , ids ⟩ f@(idSel _) | true = idSel ⟨ id , ids ∷ᵣ f ⟩
 read (add mem pId) ⟨ id , _ ⟩ (pSel y) | true = pSel v0
