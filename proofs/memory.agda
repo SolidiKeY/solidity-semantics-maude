@@ -45,7 +45,7 @@ Value = Identity ⊎ A
 data Memory : Set ℓ where
   mtm : Memory
   write : (mem : Memory) (id : Identity) (fld : Field) (value : Value) → Memory
-  add : (mem : Memory) (pId : Identity) → Memory
+  add : (mem : Memory) (pId : PrimIdentity) → Memory
 
 
 read : (mem : Memory) (id : Identity) (fld : Field) → Value
@@ -53,7 +53,7 @@ read mtm id fld = inj₂ v0
 read (write mem idM fldM value) id fld with ⌊ idM ≟ᵢ id ⌋ ∧ ⌊ fldM ≟ᶠ fld ⌋
 ... | true = value
 ... | false = read mem id fld
-read (add mem ⟨ pId , _ ⟩ ) idd@(⟨ id , _ ⟩) fld with ⌊ pId ≟ₚ id ⌋
+read (add mem pId ) idd@(⟨ id , _ ⟩) fld with ⌊ pId ≟ₚ id ⌋
 ... | false = read mem idd fld
 read (add mem pId) ⟨ id , ids ⟩ f@(idSel _) | true = idSel ⟨ id , ids ∷ᵣ f ⟩
 read (add mem pId) ⟨ id , _ ⟩ (pSel y) | true = pSel v0
