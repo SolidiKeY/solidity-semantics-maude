@@ -1,0 +1,87 @@
+load Memory .
+load Storage .
+
+fmod StorageToMemory{Field :: TRIV} is
+    pr BANK-ERASE{Field} .
+    pr STORAGE{Field} .
+
+    op copy-struct-mem : Memory PrimIdentity Struct -> Memory .
+    op copy-struct-mem-aux : Memory Identity Struct -> Memory .
+
+    var st : Struct .
+    var pF : PrimField .
+    var idF : IdField .
+    var vSt : Struct .
+    var vInt : Int .
+    var id : Identity .
+    var idPrim : PrimIdentity .
+
+    var mem : Memory .
+    var v : Value .
+
+    eq copy-struct-mem(mem, idPrim, st) = copy-struct-mem-aux(add(mem, idPrim), idC(idPrim, nil), st) .
+
+    eq copy-struct-mem-aux(mem, id, mtSt) = mem .
+    eq copy-struct-mem-aux(mem, id, store(st, pF, vInt)) =
+        write(copy-struct-mem-aux(mem, id, st), id, pF, vInt) .
+
+    eq copy-struct-mem-aux(mem, id, store(st, idF, vSt)) =
+        *** copy-struct-mem(copy-struct-mem(write(mem, id, pF, id : pF), id : pF, vSt), id, st) .
+        copy-struct-mem-aux(copy-struct-mem-aux(mem, id, st), id : idF, vSt) .
+
+
+
+*** copySt mem id (store st x@(idSel _) (stv st2)) = let
+
+***   restMemSt : Memory → Memory
+***   restMemSt mem = copySt mem id st
+
+***   addId : Memory → Memory
+***   addId mem = add mem id
+
+***   copiedSt2 : Memory → Memory
+***   copiedSt2 mem = copySt mem (id · x) st2
+
+***   in copiedSt2 $ addId $ restMemSt mem
+endfm
+
+fmod Example{Field :: TRIV} is
+    pr StorageToMemory{Field} .
+
+    ops $alice $bob $account $balance : -> PrimField .
+    ops st1 stAlice stBal : -> Struct .
+
+    eq stBal = store(mtSt, $balance, 10) .
+    eq stAlice = store(mtSt, $account, stBal) .
+    eq st1 = store(store(mtSt, $alice, stAlice),
+                               $bob  , store(mtSt, $account, store(mtSt, $balance, 20))) .
+
+    ops idA idF : -> Identity .
+    op mem : -> Memory .
+endfm
+
+red copy-struct-mem(mem, idA, stBal) .
+red copy-struct-mem(mem, idA, stAlice) .
+red copy-struct-mem(mem, idF, st1) .
+
+fmod ShallowExample{Field :: TRIV} is
+    pr StorageToMemory{Field} .
+
+    ops $alice $bob $carol $account $pn $balance : -> PrimField .
+    ops st stC : -> Struct .
+    ops mem memAlice memBob : -> Memory .
+    ops idB idA : -> PrimIdentity .
+    ops IDa IDb : -> Identity .
+
+    eq stC = find(st, $carol) .
+    eq IDa = idC(idA, nil) .
+    eq IDb = idC(idB, nil) .
+
+    eq memAlice = copy-struct-mem(new(mem, idA), IDa, stC) .
+    eq memBob   = copy-struct-mem(new(memAlice, idB), IDb, stC) .
+endfm
+
+red memAlice .
+red memBob .
+
+red read(memBob, IDa, $pn) .
