@@ -1,5 +1,8 @@
+{-# OPTIONS --rewriting #-}
+
 open import Level
 open import Data.Bool
+open import Data.Product
 open import Data.Nat as ℕ
 open import Data.Sum
 open import Data.Sum.Properties as ⊎
@@ -8,7 +11,9 @@ open import Data.List.Properties as L
 
 open import Relation.Binary
 open import Relation.Binary.PropositionalEquality
+open import Agda.Builtin.Equality.Rewrite
 open import Relation.Nullary
+open import Relation.Nullary.Decidable
 
 open import Field
 
