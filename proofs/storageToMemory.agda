@@ -2,8 +2,10 @@
 
 open import Function hiding (id)
 open import Data.Empty
-open import Data.Nat
+open import Data.Bool hiding (_≟_)
+open import Data.Nat hiding (_≟_)
 open import Data.List
+import Data.List.Relation.Binary.Pointwise as P
 open import Data.List.Relation.Binary.Suffix.Heterogeneous as S
 open import Data.List.Relation.Binary.Suffix.Heterogeneous.Properties
 open import Data.List.Relation.Binary.Pointwise.Properties renaming (refl to refll)
@@ -41,7 +43,7 @@ copySt : (mem : Memory) (id : PrimIdentity) (st : Struct) → Memory
 copySt mem id = copyStAux (add mem id) ⟨ id , [] ⟩
 
 readSkip : (mem : Memory) (pId pIdR : PrimIdentity) (st : Struct) (fxsL fxsR : List Field) (fld : Field)
- (pIds≠⊎sufix : pId ≢ pIdR ⊎ pId ≡ pIdR × ¬ (Suffix _≡_ fxsL fxsR))
+ (pIds≠⊎sufix : pId ≢ pIdR ⊎ pId ≡ pIdR × ¬ (Suffix _≡_ fxsL (fxsR ∷ᵣ fld)))
   → read (copyStAux mem ⟨ pId , fxsL ⟩ st) ⟨ pIdR , fxsR ⟩ fld ≡ read mem ⟨ pIdR , fxsR ⟩ fld
 readSkip mem pId pIdR mtst fxsL fxsR fld (inj₁ pIds≠)
   rewrite dec-no (pId ≟ₚ pIdR) pIds≠ = refl
@@ -50,7 +52,7 @@ readSkip mem pId pIdR (store st (pSel y) (prim x)) fxsL fxsR fld pIds≠≠@(inj
   rewrite dec-no (pId ≟ₚ pIdR) pIds≠ | dec-no (pId ≟ₚ pIdR) pIds≠ =
     readSkip mem pId pIdR st fxsL fxsR fld pIds≠≠
 readSkip mem pId pIdR (store st (pSel y) (prim x)) fxsL fxsR fld (pSel (refl ,, nSuf))
-  rewrite dec-no (⟨ pId , fxsL ⟩ ≟ᵢ ⟨ pId , fxsR ⟩) λ where refl → nSuf (fromPointwise (refll refl))
+  rewrite dec-no (⟨ pId , fxsL ⟩ ≟ᵢ ⟨ pId , fxsR ⟩) λ where refl → nSuf (S.tail (fromPointwise (refll refl)))
   = readSkip mem pId pIdR st fxsL fxsR fld (inj₂ (refl ,, nSuf))
 readSkip mem pId pIdR (store st (pSel y) (stv x)) fxsL fxsR fld pIds≠ = impossible
 readSkip mem pId pIdR (store st (idSel x) (prim _)) fxsL fxsR fld pIds≠ = impossible
@@ -62,6 +64,26 @@ readSkip mem pId pIdR (store st f@(idSel x) (stv st2)) fxsL fxsR fld pIds≠≠@
       | dec-no (pId ≟ₚ pIdR) pIds≠
       | readSkip mem pId pIdR st fxsL fxsR fld (inj₁ pIds≠)
   = refl
+
+readFind : (mem : Memory) (id : PrimIdentity) (st : Struct) (fxs : List Field) (f : ℕ)
+  → read (copySt mem id st) ⟪ id ⟫ (pSel f) ≡ pSel (v→p (select⁺ st (pSel f)))
+readFind mem id mtst fxs f rewrite dec-yes (id ≟ₚ id) refl .proj₂ = refl
+readFind mem id (store st (idSel idS) (prim p)) fxs f = impossible
+readFind mem id (store st (idSel idS) (stv sv)) fxs f = res
+
+  where
+  help : ¬ Suffix _≡_ [ idSel idS ] ([] ∷ᵣ pSel f)
+  help (here (() P.∷ _))
+  help (there (here ()))
+
+  res : read (copySt mem id (store st (idSel idS) (stv sv))) ⟪ id ⟫ (pSel f) ≡
+    pSel (v→p (if idSel idS ≟ᵇ pSel f then stv sv else select⁺ st (pSel f)))
+  res rewrite readSkip (copyStAux (add mem id) ⟪ id ⟫ st) id id sv [ idSel idS ] [] (pSel f) (inj₂ (refl ,, help))
+      | readFind mem id st [] f
+      | dec-no (idSel idS ≟ pSel f) λ ()
+    = cong pSel refl
+readFind mem id (store st (pSel y) value) fxs f = {!!}
+
 
 -- readGetId : (mem : Memory) (pId : PrimIdentity) (st : Struct) (fxs : List Field)
 --   (fld : ℕ)

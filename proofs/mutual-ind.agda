@@ -22,7 +22,7 @@ private variable
   ℓ′ : Level
   A : Set ℓ′
 
-private postulate
+postulate
   _≟_ : DecidableEquality Field
 
 
@@ -52,12 +52,17 @@ variable
   path : List Field
   f : Field
   v : Value
+  vp : PrimValue
 
 postulate
   v→s : Value → Struct
   v→st≡st : v→s (stv st) ≡ st
 
-{-# REWRITE v→st≡st #-}
+  v→p : Value → PrimValue
+  v→pv≡pv : v→p (prim vp) ≡ vp
+  v→pv≡v0 : v→p (stv mtst) ≡ v0
+
+{-# REWRITE v→st≡st v→pv≡pv v→pv≡v0 #-}
 
 save⁺ : (st : Struct) (fields : List⁺ Field) (v : Value) → Struct
 save⁺ mtst (k ∷ rest , _) v = store mtst k (restV rest)
