@@ -2,7 +2,8 @@
 
 open import Function hiding (id)
 open import Data.Empty
-open import Data.Bool hiding (_≟_)
+open import Data.Bool.Base
+open import Data.Bool.Properties hiding (_≟_)
 open import Data.List
 import Data.List.Relation.Binary.Pointwise as P
 open import Data.List.Relation.Binary.Suffix.Heterogeneous as S
@@ -88,8 +89,25 @@ readFind mem id (store st (pSel p) (prim v)) fxs f with p ≟ᶠᵇ f
     dec-yes (⟪ id ⟫ ≟ᵢ ⟪ id ⟫) refl .proj₂
   | dec-no (pSel p ≟ pSel f) λ where refl → p≢f refl = readFind mem id st fxs f
 
-readGetId : (mem : Memory) (pId : PrimIdentity) (st : Struct) (fxs : List Field)
-  (fld : FA)
+private
+  false-right : ∀ {b} → b ∧ false ≡ false
+  false-right = ∧-zeroʳ _
+
+{-# REWRITE false-right #-}
+
+skipIdRead : (mem : Memory) (idC idR : Identity) (st : Struct)  (fld : FA)
+  → read (copyStAux mem idC st) idR (idSel fld)
+    ≡ read mem idR (idSel fld)
+skipIdRead mem idC idR mtst fld = refl
+skipIdRead mem idC idR (store st (idSel _) (prim _)) fld = impossible
+skipIdRead mem idC idR (store st (pSel y) (stv x)) fld = impossible
+skipIdRead mem ⟨ idC , fldsC ⟩ ⟨ idR , fldsR ⟩ (store st (pSel y) (prim x)) fld
+  rewrite dec-no (pSel y ≟ᶠ idSel fld) (λ where ()) = skipIdRead mem ⟨ idC , fldsC ⟩ ⟨ idR , fldsR ⟩ st fld
+skipIdRead mem idC idR (store st (idSel id) (stv v)) fld =
+  skipIdRead (copyStAux mem idC st) (idC · idSel id) idR v fld ∙
+  skipIdRead mem idC idR st fld
+
+readGetId : (mem : Memory) (pId : PrimIdentity) (st : Struct) (fxs : List Field) (fld : FA)
   → read (copySt mem pId st) ⟨  pId , fxs ⟩ (idSel fld)
     ≡ idSel (⟨ pId , fxs ∷ᵣ idSel fld ⟩)
 readGetId mem pId mtst fxs fld = refl
