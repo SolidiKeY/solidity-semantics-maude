@@ -28,7 +28,6 @@ record Identity : Set ℓ where
     flds : List Field
 
 pattern ⟪_⟫ pId = ⟨ pId , [] ⟩
-
 _·_  : Identity → Field → Identity
 ⟨ prim , flds ⟩ · fld = ⟨ prim , flds ∷ᵣ fld ⟩
 
@@ -38,12 +37,16 @@ _≟ˡ_ : DecidableEquality Identity
 ... | no na | _ = no (λ where refl → na refl)
 ... | _ | no nb = no (λ where refl → nb refl)
 
-
 _≟ᵢ_ : DecidableEquality Identity
 ⟨ prim1 , flds1 ⟩ ≟ᵢ ⟨ prim2 , flds2 ⟩ with prim1 ≟ₚ prim2 | flds1 ≟ˡᶠ flds2
 ... | no ¬a | _ = no λ where refl → ¬a refl
 ... | yes refl | no ¬b = no λ where refl → ¬b refl
 ... | yes refl | yes refl = yes refl
+
+dec-eq-pi : ∀ {k} → does (k ≟ₚ k) ≡ true
+dec-eq-pi {k} = dec-true (k ≟ₚ k) refl
+
+{-# REWRITE dec-eq-pi #-}
 
 Value = Identity ⊎ A
 
