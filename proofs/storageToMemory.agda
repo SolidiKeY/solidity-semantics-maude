@@ -110,13 +110,4 @@ skipIdRead mem idC idR (store st (idSel id) (stv v)) fld =
 readGetId : (mem : Memory) (pId : PrimIdentity) (st : Struct) (fxs : List Field) (fld : FA)
   → read (copySt mem pId st) ⟨  pId , fxs ⟩ (idSel fld)
     ≡ idSel (⟨ pId , fxs ∷ᵣ idSel fld ⟩)
-readGetId mem pId mtst fxs fld = refl
-readGetId mem pId (store st (idSel id) (prim v)) fxs fld = impossible
-readGetId mem pId (store st (idSel id) (stv v)) fxs fld =
-    readSkip (copyStAux (add mem pId) ⟪ pId ⟫ st) pId pId v ([ idSel id ]) fxs (idSel fld) (inj₂ (refl ,, ns))
-  ∙ readGetId mem pId st fxs fld
-  where
-  ns : ¬ Suffix _≡_ [ idSel id ] (fxs ∷ᵣ idSel fld)
-  ns (here (p P.∷ P.[])) = {!!}
-  ns (there x) = {!!}
-readGetId mem pId (store st (pSel y) value) fxs fld = {!!}
+readGetId mem pId st fxs fld = skipIdRead (add mem pId) ⟪ pId ⟫ ⟨ pId , fxs ⟩ st fld
