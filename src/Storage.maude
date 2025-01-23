@@ -9,7 +9,6 @@ fmod STORAGE{Field :: TRIV} is
 
     op mtSt : -> Struct .
     op store : Struct Field$Elt Value -> Struct .
-    op add : Struct Field$Elt -> Struct .
     op select : Struct Field$Elt -> Value .
     op find : Struct List{Field} -> Value .
 

@@ -61,8 +61,8 @@ fmod ShallowExample{Field :: TRIV} is
     eq IDa = idC(idA, nil) .
     eq IDb = idC(idB, nil) .
 
-    eq memAlice = copy-struct-mem(new(mem, idA), IDa, stC) .
-    eq memBob   = copy-struct-mem(new(memAlice, idB), IDb, stC) .
+    eq memAlice = copy-struct-mem(add(mem, idA), IDa, stC) .
+    eq memBob   = copy-struct-mem(add(memAlice, idB), IDb, stC) .
 endfm
 
 red memAlice .

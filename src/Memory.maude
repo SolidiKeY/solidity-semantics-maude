@@ -6,7 +6,7 @@ fmod BANK{Field :: TRIV} is
     sort Memory .
 
     op mtMem : -> Memory .
-    op new : Memory PrimIdentity -> Memory .
+    op add : Memory PrimIdentity -> Memory .
     op read : Memory Identity Field$Elt -> Value .
     op readR : Memory Identity NeList{Field} -> Value .
     op write : Memory Identity Field$Elt Value -> Memory .
@@ -35,9 +35,9 @@ fmod BANK{Field :: TRIV} is
     ceq read(write(memory, id1, sel1, val), id2, sel2) = read(memory, id2, sel2)
         if id1 =/= id2 or sel1 =/= sel2 .
 
-    eq read(new(memory, id), idC(id, ls), pSel) = 0 .
-    eq read(new(memory, id), idC(id, ls), idS) = idC(id, ls idS) .
-    ceq read(new(memory, id), idC(idn, ls), sel) = read(memory, idC(idn, ls), sel)
+    eq read(add(memory, id), idC(id, ls), pSel) = 0 .
+    eq read(add(memory, id), idC(id, ls), idS) = idC(id, ls idS) .
+    ceq read(add(memory, id), idC(idn, ls), sel) = read(memory, idC(idn, ls), sel)
         if id =/= idn .
 
     eq read(emptyMemory, id1, pSel) = 0 .
@@ -126,7 +126,7 @@ fmod BANK-ERASE{Field :: TRIV} is
 
 
     eq erase(mtMem) = mtMem .
-    eq erase(new(memory, id)) = new(erase(memory), id) .
+    eq erase(add(memory, id)) = add(erase(memory), id) .
     eq erase(write(memory, id1, pSel, val)) = write(erase(memory), id1, pSel, val) .
 
     op copy : Memory Identity Identity -> Memory .
@@ -134,8 +134,8 @@ fmod BANK-ERASE{Field :: TRIV} is
     eq erase(write(memory, id1, idS, id2)) = copy(erase(memory), id1 : idS, id2) .
 
     eq copy(mtMem, id1, id2) = mtMem .
-    *** New does not change anything, it can just skip
-    eq copy(new(memory, id), id1, id2) = memory .
+    *** Add does not change anything, it can just skip
+    eq copy(add(memory, id), id1, id2) = memory .
     eq copy(write(memory, idC(id, ls1 ls2), sel, val), id3, idC(id, ls1)) =
         write(write(copy(memory, id3, idC(id, ls1)),
             idC(id, ls1 ls2), sel, val), id3 : ls2, sel, val) .
