@@ -34,6 +34,5 @@ fmod Examples{Field :: TRIV} is
     eq stAlice = copyMem(st1, nMem, idC(idA, nil)) .
 endfm
 
-red find(v→st(find(stAlice, $account)), $balance) .
-red find(stAlice, $account $balance) .
+red find(find(stAlice, $account), $balance) .
 red find(stAlice, $account $balance) .
