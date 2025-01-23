@@ -52,7 +52,7 @@ fmod ShallowExample{Field :: TRIV} is
     ops idB idA : -> PrimIdentity .
     ops IDa IDb : -> Identity .
 
-    eq stC = find(st, $carol) .
+    eq stC = v→st(find(st, $carol)) .
     eq IDa = idC(idA, nil) .
     eq IDb = idC(idB, nil) .
 

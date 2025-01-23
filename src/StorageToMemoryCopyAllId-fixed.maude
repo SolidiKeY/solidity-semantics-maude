@@ -26,23 +26,7 @@ fmod StorageToMemory{Field :: TRIV} is
         write(copy-struct-mem-aux(mem, id, st), id, pF, vInt) .
 
     eq copy-struct-mem-aux(mem, id, store(st, idF, vSt)) =
-        *** copy-struct-mem(copy-struct-mem(write(mem, id, pF, id : pF), id : pF, vSt), id, st) .
         copy-struct-mem-aux(copy-struct-mem-aux(mem, id, st), id : idF, vSt) .
-
-
-
-*** copySt mem id (store st x@(idSel _) (stv st2)) = let
-
-***   restMemSt : Memory → Memory
-***   restMemSt mem = copySt mem id st
-
-***   addId : Memory → Memory
-***   addId mem = add mem id
-
-***   copiedSt2 : Memory → Memory
-***   copiedSt2 mem = copySt mem (id · x) st2
-
-***   in copiedSt2 $ addId $ restMemSt mem
 endfm
 
 fmod Example{Field :: TRIV} is

@@ -8,9 +8,9 @@ fmod STORAGE{Field :: TRIV} is
     subsort Struct < Value .
 
     op mtSt : -> Struct .
-    op store : Value Field$Elt Value -> Value .
-    op select : Value Field$Elt -> Value .
-    op find : Value List{Field} -> Value .
+    op store : Struct Field$Elt Value -> Struct .
+    op select : Struct Field$Elt -> Value .
+    op find : Struct List{Field} -> Value .
 
     var st : Value .
     var fld : Field$Elt .

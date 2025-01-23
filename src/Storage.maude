@@ -8,11 +8,12 @@ fmod STORAGE{Field :: TRIV} is
     subsort Struct < Value .
 
     op mtSt : -> Struct .
-    op store : Value Field$Elt Value -> Value .
-    op select : Value Field$Elt -> Value .
-    op find : Value List{Field} -> Value .
+    op store : Struct Field$Elt Value -> Struct .
+    op add : Struct Field$Elt -> Struct .
+    op select : Struct Field$Elt -> Value .
+    op find : Struct List{Field} -> Value .
 
-    var st : Value .
+    var st : Struct .
     var fld : Field$Elt .
     var val : Value .
     var flds flds2 : List{Field} .
@@ -20,5 +21,6 @@ fmod STORAGE{Field :: TRIV} is
     eq find(val, nil) = val .
     eq find(store(st, fld, val), fld flds) = find(val, flds) .
 
-    eq find(find(st, flds), flds2) = find(st, flds flds2) .
+    op v→st : Value -> Struct .
+    eq v→st(st) = st .
 endfm
