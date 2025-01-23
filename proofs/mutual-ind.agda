@@ -1,6 +1,7 @@
 {-# OPTIONS --rewriting #-}
 
 open import Level
+open import Function
 open import Data.Unit hiding (_≟_)
 open import Data.Empty
 open import Data.Product
@@ -39,6 +40,23 @@ x ≟ᵇ y = does (x ≟ y)
 data Struct where
   mtst : Struct
   store : (st : Struct) (k : Field) (value : Value) → Struct
+
+WellFormed? : Struct → Bool
+WellFormed? mtst = true
+WellFormed? (store s (idSel _) (prim _)) = false
+WellFormed? (store s (idSel _) (stv v)) = WellFormed? s ∧ WellFormed? v
+WellFormed? (store s (pSel _) (prim _)) = WellFormed? s
+WellFormed? (store s (pSel _) (stv _)) = false
+
+WellFormedT : Struct → Set
+WellFormedT = T ∘ WellFormed?
+
+WellFormed : Struct → Set
+WellFormed mtst = ⊥
+WellFormed (store s (idSel _) (prim _)) = ⊥
+WellFormed (store s (idSel _) (stv v)) = WellFormed s × WellFormed v
+WellFormed (store s (pSel _) (prim _)) = WellFormed s
+WellFormed (store s (pSel _) (stv _)) = ⊥
 
 IsNotEmpty : List A → Set _
 IsNotEmpty [] = ⊥
