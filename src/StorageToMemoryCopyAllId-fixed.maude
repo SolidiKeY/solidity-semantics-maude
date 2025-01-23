@@ -32,7 +32,8 @@ endfm
 fmod Example{Field :: TRIV} is
     pr StorageToMemory{Field} .
 
-    ops $alice $bob $account $balance : -> PrimField .
+    ops $alice $bob $carol $account : -> IdField .
+    ops $balance : -> PrimField .
     ops st1 stAlice stBal : -> Struct .
 
     eq stBal = store(mtSt, $balance, 10) .
@@ -51,7 +52,8 @@ red copy-struct-mem(mem, idF, st1) .
 fmod ShallowExample{Field :: TRIV} is
     pr StorageToMemory{Field} .
 
-    ops $alice $bob $carol $account $pn $balance : -> PrimField .
+    ops $alice $bob $carol $account : -> IdField .
+    ops $pn $balance : -> PrimField .
     ops st stC : -> Struct .
     ops mem memAlice memBob : -> Memory .
     ops idB idA : -> PrimIdentity .
