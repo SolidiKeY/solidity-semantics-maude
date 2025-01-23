@@ -40,7 +40,7 @@ fmod Example{Field :: TRIV} is
     eq st1 = store(store(mtSt, $alice, stAlice),
                                $bob  , store(mtSt, $account, store(mtSt, $balance, 20))) .
 
-    ops idA idF : -> Identity .
+    ops idA idF : -> PrimIdentity .
     op mem : -> Memory .
 endfm
 
@@ -61,8 +61,8 @@ fmod ShallowExample{Field :: TRIV} is
     eq IDa = idC(idA, nil) .
     eq IDb = idC(idB, nil) .
 
-    eq memAlice = copy-struct-mem(add(mem, idA), IDa, stC) .
-    eq memBob   = copy-struct-mem(add(memAlice, idB), IDb, stC) .
+    eq memAlice = copy-struct-mem(add(mem, idA), idA, stC) .
+    eq memBob   = copy-struct-mem(add(memAlice, idB), idB, stC) .
 endfm
 
 red memAlice .
