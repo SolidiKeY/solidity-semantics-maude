@@ -17,6 +17,7 @@ fmod STORAGE{Field :: TRIV} is
     var idF : IdField .
     var val : Value .
     var flds flds2 : List{Field} .
+    var fldsN fldsN2 : NeList{Field} .
 
     mb find(st, idF) : Struct .
 
@@ -25,4 +26,6 @@ fmod STORAGE{Field :: TRIV} is
 
     op v→st : Value -> Struct .
     eq v→st(st) = st .
+
+    eq find(find(st, fldsN), fldsN2) =  find(st, fldsN fldsN2) .
 endfm

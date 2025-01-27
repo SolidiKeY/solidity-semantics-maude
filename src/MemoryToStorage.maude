@@ -30,7 +30,7 @@ fmod Examples{Field :: TRIV} is
     ops idA idF : -> PrimIdentity .
     ops mem nMem memAlice : -> Memory .
 
-    eq nMem = write(new(mem, idA), idC(idA, $account), $balance, 10) .
+    eq nMem = write(add(mem, idA), idC(idA, $account), $balance, 10) .
     eq stAlice = copyMem(st1, nMem, idC(idA, nil)) .
 endfm
 
