@@ -37,13 +37,14 @@ let rec select_save #a (#b : eqtype) (st : struct a b) (k : b) (path : list b) (
     | Var _ -> _
     | Store st' k''' v' -> select_save st' k path v k'
 
-let isStructB #a #v #i (st : value a (either v i)) : bool
+
+let rec isStructB #a #v #i (st : value a (either v i)) : bool
   = match st with
   | Mtst -> true
   | Var _ -> true
-  | Store _ (Inl _) (Var _) -> true
-  | Store _ (Inr _) Mtst -> true
-  | Store _ (Inr _) (Store _ _ _) -> true
+  | Store _  (Inl _) (Var _) -> true
+  | Store _  (Inr _) (Var _) -> false
+  | Store st (Inr _) v -> isStructB st && isStructB v
   | _ -> false
 
 type structB a v i = v:struct a (either v i) { isStructB v }
