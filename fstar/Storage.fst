@@ -42,9 +42,10 @@ let rec isStructB #a #v #i (st : value a (either v i)) : bool
   = match st with
   | Mtst -> true
   | Var _ -> true
-  | Store _  (Inl _) (Var _) -> true
+  | Store _  (Inl _) Mtst -> false
+  | Store st (Inl _) (Var _) -> isStructB st
+  | Store _  (Inl _) (Store _ _ _) -> false
   | Store _  (Inr _) (Var _) -> false
   | Store st (Inr _) v -> isStructB st && isStructB v
-  | _ -> false
 
 type structB a v i = v:struct a (either v i) { isStructB v }
