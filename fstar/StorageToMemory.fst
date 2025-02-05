@@ -53,6 +53,12 @@ let rec inc_suffix (#a : eqtype) (l1 l2 : list a) (x : a) :
     | [] -> _
     | _ :: ys -> inc_suffix l1 ys x
 
+let rec cond_lemma  (#a : eqtype) (l1 l2 : list a) (x : a) :
+  Lemma (not (l1 `is_suffix_of` l2) ==> not ((x :: l1) `is_suffix_of` l2))
+  = match l2 with
+  | [] -> _
+  | _ :: ys -> cond_lemma l1 ys x
+
 let rec readSkip (#v : eqtype) (#i :eqtype) (#a : eqtype) (mem : memoryI a v i nat) (pId : a)
   (pIdR : a) (st : structB nat v i) (fxsL : list (either v i)) (fxsR : list (either v i)) (fld : either v i) :
   Lemma (requires pId <> pIdR || pId = pIdR && not (fxsL `is_suffix_of` (fld :: fxsR)))
@@ -65,11 +71,7 @@ let rec readSkip (#v : eqtype) (#i :eqtype) (#a : eqtype) (mem : memoryI a v i n
       readSkip mem pId pIdR st fxsL fxsR fld;
       suffix_equal fld fxsL
     | Store st (Inr f) st2 ->
-      assume pId = pIdR;
       readSkip mem pId pIdR st fxsL fxsR fld;
-      suffix_equal fld fxsL;
-      suffix_equal (Inr f) fxsL;
-      inc_suffix fxsL (fld :: fxsR) (Inr f);
+      cond_lemma fxsL (fld :: fxsR) (Inr f);
       readSkip (copyStAux mem (pId , fxsL) st) pId pIdR st2 (Inr f :: fxsL) fxsR fld;
       _
-      // admit()
