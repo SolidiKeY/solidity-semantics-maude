@@ -46,13 +46,30 @@ let suffix_equal (#a : eqtype) (x : a) (l : list a) :
   | [] -> _
   | _ :: xs -> is_same_rev xs
 
+let rec inc_suffix (#a : eqtype) (l1 l2 : list a) (x : a) :
+  Lemma (requires not (l1 `is_suffix_of` l2))
+    (ensures not ((x :: l1) `is_suffix_of` l2))
+  = match l2 with
+    | [] -> _
+    | _ :: ys -> inc_suffix l1 ys x
+
 let rec readSkip (#v : eqtype) (#i :eqtype) (#a : eqtype) (mem : memoryI a v i nat) (pId : a)
   (pIdR : a) (st : structB nat v i) (fxsL : list (either v i)) (fxsR : list (either v i)) (fld : either v i) :
   Lemma (requires pId <> pIdR || pId = pIdR && not (fxsL `is_suffix_of` (fld :: fxsR)))
-    (ensures read (copyStAux mem (pId, fxsL) st) (pIdR , fxsR) fld == read mem (pIdR , fxsR) fld) =
+    (ensures read (copyStAux mem (pId, fxsL) st) (pIdR , fxsR) fld == read mem (pIdR , fxsR) fld)
+    (decreases st)
+    =
     match st with
     | Mtst -> _
-    | Store st' (Inl f) (Var _) ->
-      readSkip mem pId pIdR st' fxsL fxsR fld;
+    | Store st (Inl f) (Var _) ->
+      readSkip mem pId pIdR st fxsL fxsR fld;
       suffix_equal fld fxsL
-    | Store _ (Inr _) _ -> admit()
+    | Store st (Inr f) st2 ->
+      assume pId = pIdR;
+      readSkip mem pId pIdR st fxsL fxsR fld;
+      suffix_equal fld fxsL;
+      suffix_equal (Inr f) fxsL;
+      inc_suffix fxsL (fld :: fxsR) (Inr f);
+      readSkip (copyStAux mem (pId , fxsL) st) pId pIdR st2 (Inr f :: fxsL) fxsR fld;
+      _
+      // admit()
