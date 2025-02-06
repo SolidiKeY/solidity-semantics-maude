@@ -53,11 +53,10 @@ let rec inc_suffix (#a : eqtype) (l1 l2 : list a) (x : a) :
     | [] -> _
     | _ :: ys -> inc_suffix l1 ys x
 
-let rec cond_lemma  (#a : eqtype) (l1 l2 : list a) (x : a) :
+let cond_lemma  (#a : eqtype) (l1 l2 : list a) (x : a) :
   Lemma (not (l1 `is_suffix_of` l2) ==> not ((x :: l1) `is_suffix_of` l2))
-  = match l2 with
-  | [] -> _
-  | _ :: ys -> cond_lemma l1 ys x
+  =  introduce not (l1 `is_suffix_of` l2) ==> not ((x :: l1) `is_suffix_of` l2) with _.
+     inc_suffix l1 l2 x
 
 let rec readSkip (#v : eqtype) (#i :eqtype) (#a : eqtype) (mem : memoryI a v i nat) (pId : a)
   (pIdR : a) (st : structB nat v i) (fxsL : list (either v i)) (fxsR : list (either v i)) (fld : either v i) :
