@@ -84,3 +84,19 @@ let rec readFind (#v : eqtype) (#i :eqtype) (#a : eqtype) (mem : memoryI a v i n
     readFind mem id st [] f;
     readSkip (copyStAux (Add mem id) (id, []) st) id id sv (Inr idS :: []) [] (Inl f)
   | Store st (Inl p) (Var sv) -> readFind mem id st fxs f
+
+let rec skipIdRead (#v : eqtype) (#i : eqtype) (#a : eqtype) (mem : memoryI a v i nat) (idC : idIB a v i) (idR : idIB a v i)
+    (st : structB nat v i) (fld : i) :
+    Lemma (ensures read (copyStAux mem idC st) idR (Inr fld) == read mem idR (Inr fld)) (decreases st)
+    = match st, idC, idR with
+    | Mtst, _, _ -> _
+    | Store st (Inl f) (Var _), (idC, fldsC), (idR, fldsR) ->
+      skipIdRead mem (idC , fldsC) (idR, fldsR) st fld
+    | Store st (Inr id) v, (idC', fldsC), _ ->
+      skipIdRead (copyStAux mem idC st) (idC', (Inr id) :: fldsC) idR v fld;
+      skipIdRead mem idC idR st fld
+
+let readGetId (#v : eqtype) (#i : eqtype) (#a : eqtype) (mem : memoryI a v i nat) (pId : a) (st : structB nat v i)
+    (fxs : list (either v i)) (fld : i) :
+    Lemma (read (copySt mem pId st) (pId, fxs) (Inr fld) == 0)
+    = skipIdRead (Add mem pId) (pId, []) (pId, fxs) st fld
