@@ -81,5 +81,6 @@ let rec readFind (#v : eqtype) (#i :eqtype) (#a : eqtype) (mem : memoryI a v i n
   = match st with
   | Mtst -> _
   | Store st (Inr idS) sv ->
-    admit()
+    readFind mem id st [] f;
+    readSkip (copyStAux (Add mem id) (id, []) st) id id sv (Inr idS :: []) [] (Inl f)
   | Store st (Inl p) (Var sv) -> readFind mem id st fxs f
