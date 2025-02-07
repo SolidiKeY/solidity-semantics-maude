@@ -8,7 +8,7 @@ let rec copyStAux #v #i #a #c (mem : memoryI a v i c)
   (id : idIB a v i) (st : structB c v i) : Tot (memoryI a v i c) (decreases %[st; id])
   = match st, id with
   | Mtst, _ -> mem
-  | Store st' (Inl pf) (Var v), _ -> Write mem id (Inl pf) v
+  | Store st' (Inl pf) (Var v), _ -> Write (copyStAux mem id st') id (Inl pf) v
   | Store st' (Inr x) v, (idd, xs) ->
   let copyInt = copyStAux mem id st' in
   copyStAux copyInt (idd, (Inr x) :: xs) v
@@ -74,3 +74,12 @@ let rec readSkip (#v : eqtype) (#i :eqtype) (#a : eqtype) (mem : memoryI a v i n
       cond_lemma fxsL (fld :: fxsR) (Inr f);
       readSkip (copyStAux mem (pId , fxsL) st) pId pIdR st2 (Inr f :: fxsL) fxsR fld;
       _
+
+let rec readFind (#v : eqtype) (#i :eqtype) (#a : eqtype) (mem : memoryI a v i nat) (id : a) (st : structB nat v i)
+  (fxs : list (either v i)) (f : v) :
+  Lemma (Some (read (copySt mem id st) (id , []) (Inl f)) == vToNat (select st (Inl f)))
+  = match st with
+  | Mtst -> _
+  | Store st (Inr idS) sv ->
+    admit()
+  | Store st (Inl p) (Var sv) -> readFind mem id st fxs f

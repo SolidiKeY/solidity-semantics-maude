@@ -49,3 +49,9 @@ let rec isStructB #a #v #i (st : value a (either v i)) : bool
   | Store st (Inr _) v -> isStructB st && isStructB v
 
 type structB a v i = v:struct a (either v i) { isStructB v }
+
+let vToNat #b (v : value nat b) : option nat
+  = match v with
+  | Mtst -> Some 0
+  | Var x -> Some x
+  | Store _ _ _ -> None
