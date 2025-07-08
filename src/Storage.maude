@@ -2,15 +2,17 @@ load Fields .
 
 fmod STORAGE{Field :: TRIV} is
     pr FIELDS{Field} .
+    pr LIST{Field} .
 
     sort Struct .
 
-    subsort Struct < Value .
+    subsort Struct Int < Value .
 
     op mtSt : -> Struct .
     op store : Struct Field$Elt Value -> Struct .
     op select : Struct Field$Elt -> Value .
     op find : Struct List{Field} -> Value .
+    op save : Struct NeList{Field} Value -> Struct .
 
     var st : Struct .
     var fld : Field$Elt .
@@ -28,4 +30,20 @@ fmod STORAGE{Field :: TRIV} is
     eq v→st(st) = st .
 
     eq find(find(st, fldsN), fldsN2) =  find(st, fldsN fldsN2) .
+    eq find(save(st, fldsN, val), fldsN) = val .
+    ceq find(save(st, fldsN, val), fldsN2) = find(st, fldsN2)
+        if fldsN =/= fldsN2 .
 endfm
+
+*** fmod Example{Field :: TRIV} is
+***     pr STORAGE{Field} .
+
+***     ops $alice $bob $carol $account : -> IdField .
+***     ops $balance : -> PrimField .
+***     ops st stEx : -> Struct .
+
+***     eq stEx = save(save(st, $alice $account length, 10), $alice $account 5, 20) .
+*** endfm
+
+*** red find(stEx, $alice $account length) .
+*** red find(stEx, $alice $account 5) .

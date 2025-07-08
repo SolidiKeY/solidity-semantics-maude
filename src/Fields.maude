@@ -5,5 +5,8 @@ fmod FIELDS{Field :: TRIV} is
     sorts PrimIdentity Identity Value .
     sorts PrimField IdField .
     subsort PrimField IdField < Field$Elt .
+    subsort Int < Field$Elt .
     subsort Int Identity < Value .
+
+    op length : -> PrimField .
 endfm
