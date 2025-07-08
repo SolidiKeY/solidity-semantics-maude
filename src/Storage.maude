@@ -13,13 +13,15 @@ fmod STORAGE{Field :: TRIV} is
     op select : Struct Field$Elt -> Value .
     op find : Struct List{Field} -> Value .
     op save : Struct NeList{Field} Value -> Struct .
+    op push : Struct NeList{Field} Value -> Struct .
 
-    var st : Struct .
+    vars st nSt : Struct .
     var fld : Field$Elt .
     var idF : IdField .
     var val : Value .
     var flds flds2 : List{Field} .
     var fldsN fldsN2 : NeList{Field} .
+    var old_length : Int .
 
     mb find(st, idF) : Struct .
 
@@ -31,19 +33,28 @@ fmod STORAGE{Field :: TRIV} is
 
     eq find(find(st, fldsN), fldsN2) =  find(st, fldsN fldsN2) .
     eq find(save(st, fldsN, val), fldsN) = val .
+    eq find(save(st, fldsN fldsN2, val), fldsN) = save(find(st, fldsN), fldsN2, val) .
     ceq find(save(st, fldsN, val), fldsN2) = find(st, fldsN2)
-        if fldsN =/= fldsN2 .
+        if fldsN =/= fldsN2 [owise] .
+
+    ceq push(st, fldsN, val) = save(nSt, fldsN length, old_length + 1)
+        if old_length := find(st, fldsN length) /\ nSt := save(st, fldsN old_length, val) .
 endfm
 
-*** fmod Example{Field :: TRIV} is
-***     pr STORAGE{Field} .
+fmod Example{Field :: TRIV} is
+    pr STORAGE{Field} .
 
-***     ops $alice $bob $carol $account : -> IdField .
-***     ops $balance : -> PrimField .
-***     ops st stEx : -> Struct .
+    ops $alice $bob $carol $account : -> IdField .
+    ops $balance : -> PrimField .
+    ops st stEx stEx2 : -> Struct .
 
-***     eq stEx = save(save(st, $alice $account length, 10), $alice $account 5, 20) .
-*** endfm
+    eq stEx = save(save(st, $alice $account length, 10), $alice $account 5, 20) .
 
-*** red find(stEx, $alice $account length) .
-*** red find(stEx, $alice $account 5) .
+    eq stEx2 = save(st, $account length, 10) .
+endfm
+
+red find(stEx, $alice $account length) .
+red find(stEx, $alice $account 5) .
+red find(stEx, $alice) .
+
+red push(stEx2, $account, 20) .
