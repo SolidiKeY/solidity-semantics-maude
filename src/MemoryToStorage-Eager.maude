@@ -1,0 +1,53 @@
+load Storage .
+load Memory .
+
+fmod MemoryToStorage{Field :: TRIV} is
+    pr BANK-ERASE{Field} .
+    pr STORAGE{Field} .
+
+    var st : Struct .
+    var v : Value .
+    var pF : PrimField .
+    var fld : Field$Elt .
+    var idF : IdField .
+    var pId : PrimIdentity .
+    vars id id2 : Identity .
+    vars allMem mem : Memory .
+    vars fxs fxs2 fxs3 : List{Field} .
+    vars nfxs : NeList{Field} .
+
+    op copyMem : Struct Memory Identity -> Struct .
+    op copyMemAux : Struct Identity Memory Memory -> Struct .
+
+    eq copyMem(st, mem, id) = copyMemAux(st, id, mem, mem) .
+
+    eq copyMemAux(st, id, mtMem, allMem) = st .
+    eq copyMemAux(st, idC(pId, fxs) , add(mem, pId) , allMem) = st .
+
+    ceq copyMemAux(st, id, write(mem, id2, fld, v), allMem) =
+        copyMemAux(st, id, mem, allMem)
+    if not(id <: id2) .
+
+    eq copyMemAux(st, idC(pId, fxs), write(mem, idC(pId, fxs fxs2), pF, v), allMem) =
+        save(copyMemAux(st, idC(pId, fxs), mem, allMem), fxs2 pF, v) .
+
+    eq copyMemAux(st, idC(pId, fxs), write(mem, idC(pId, fxs fxs2), idF, v), allMem) =
+        save(
+            copyMemAux(st, idC(pId, fxs), mem, allMem), fxs2 idF,
+            copyMemAux(mtSt, idC(pId, fxs fxs2 idF), allMem, allMem)) .
+endfm
+
+fmod Examples{Field :: TRIV} is
+    pr MemoryToStorage{Field} .
+
+    ops $alice $bob $carol $account : -> IdField .
+    ops $balance : -> PrimField .
+    ops st1 stAlice stBal : -> Struct .
+    ops idA idF : -> PrimIdentity .
+    ops mem nMem memAlice : -> Memory .
+
+    eq nMem = write(add(mem, idA), idC(idA, $account), $balance, 10) .
+    eq stAlice = copyMem(st1, nMem, idC(idA, nil)) .
+endfm
+
+red find(stAlice, $account $balance) .

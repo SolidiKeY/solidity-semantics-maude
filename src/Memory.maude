@@ -48,6 +48,9 @@ fmod BANK{Field :: TRIV} is
 
     eq readR(memory, id1, ls3 sel) = read(memory, read(memory, id1, ls3), sel) .
 
+    op _<:_ : Identity Identity -> Bool .
+    eq idC(id, ls) <: idC(id, ls ls1) = true .
+    eq id1 <: id2 = false [owise] .
 endfm
 
 fmod BANK-ERASE-LAZY{Field :: TRIV} is
@@ -108,6 +111,13 @@ red read(emptyMemory, bob, $account)  .
 
 red read(delete(memory, bob), bob : $account, $balance) .
 red read(delete(memory, bob), bob : $account, $account) .
+
+red idC(aliceC, nil) <: idC(aliceC, nil) .
+red idC(aliceC, nil) <: idC(aliceC, $account) .
+red idC(aliceC, $account) <: idC(aliceC, $account) .
+red idC(aliceC, $account) <: idC(aliceC, $account $balance) .
+red idC(aliceC, $account) <: idC(aliceC, nil) .
+red idC(aliceC, $account) <: idC(bobC, $account) .
 
 fmod BANK-ERASE{Field :: TRIV} is
     pr INT .
