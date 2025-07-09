@@ -9,4 +9,5 @@ fmod FIELDS{Field :: TRIV} is
     subsort Int Identity < Value .
 
     op length : -> PrimField .
+    op default : Field$Elt -> Value .
 endfm
