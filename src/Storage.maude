@@ -22,7 +22,7 @@ fmod STORAGE{Field :: TRIV} is
     var val : Value .
     var flds flds2 : List{Field} .
     var fldsN fldsN2 : NeList{Field} .
-    var old_length : Int .
+    vars nl old_length : Int .
 
     mb find(st, idF) : Struct .
 
@@ -38,15 +38,12 @@ fmod STORAGE{Field :: TRIV} is
     ceq find(save(st, fldsN, val), fldsN2) = find(st, fldsN2)
         if fldsN =/= fldsN2 [owise] .
 
-    ceq push(st, fldsN, val) = save(nSt, fldsN length, old_length + 1)
-        if old_length := find(st, fldsN length) /\ nSt := save(st, fldsN old_length, val) .
+    ceq push(st, fldsN, val) = save(nSt, fldsN length, s old_length)
+        if old_length := find(st, fldsN length) /\ s nl := old_length /\ nSt := save(st, fldsN nl, val) .
 
-    op sub1 : NzNat -> Nat .
-    var xnz : NzNat .
-    eq sub1(s xnz) = xnz .
-
-    ceq pop(st, fldsN) = save(nSt, fldsN length, sub1(old_length))
-        if old_length := find(st, fldsN length) /\ nSt := save(st, fldsN old_length, default(last(fldsN))) .
+    ceq pop(st, fldsN) = save(nSt, fldsN length, nl)
+        if old_length := find(st, fldsN length) /\ s nl := old_length
+        /\ nSt := save(st, fldsN nl, default(last(fldsN))) .
 endfm
 
 fmod Example{Field :: TRIV} is
