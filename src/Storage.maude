@@ -14,6 +14,7 @@ fmod STORAGE{Field :: TRIV} is
     op find : Struct List{Field} -> Value .
     op save : Struct NeList{Field} Value -> Struct .
     op push : Struct NeList{Field} Value -> Struct .
+    op push : Struct NeList{Field} -> Struct .
     op pop : Struct NeList{Field} -> Struct .
 
     vars st nSt : Struct .
@@ -40,6 +41,7 @@ fmod STORAGE{Field :: TRIV} is
 
     ceq push(st, fldsN, val) = save(nSt, fldsN length, s old_length)
         if old_length := find(st, fldsN length) /\ s nl := old_length /\ nSt := save(st, fldsN nl, val) .
+    eq push(st, fldsN) = save(st, fldsN length, s find(st, fldsN length)) .
 
     ceq pop(st, fldsN) = save(nSt, fldsN length, nl)
         if old_length := find(st, fldsN length) /\ s nl := old_length
@@ -66,3 +68,5 @@ red find(stEx, $alice) .
 
 red push(stEx2, $account, 20) .
 red pop(stEx, $alice $account) .
+
+red push(stEx2, $account) .
