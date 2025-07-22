@@ -1,37 +1,18 @@
 load Fields .
 
-fmod PAIR{X :: TRIV, Y :: TRIV} is
-    sort Pair{X, Y} .
-    op <_;_> : X$Elt Y$Elt -> Pair{X, Y} .
-    op 1st : Pair{X, Y} -> X$Elt .
-    op 2nd : Pair{X, Y} -> Y$Elt .
-
-    var A : X$Elt .
-    var B : Y$Elt .
-    eq 1st(< A ; B >) = A .
-    eq 2nd(< A ; B >) = B .
-endfm
-
-view PAIR{X :: TRIV, Y :: TRIV} from TRIV to PAIR{X, Y} is
-    sort Elt to Pair{X, Y} .
-endv
-
-view LIST{X :: TRIV} from TRIV to LIST{X} is
-    sort Elt to List{X} .
-endv
-
 fmod STORAGE{Field :: TRIV, ValueConc :: TRIV} is
-    *** pr PAIR{Field, ValueConc} .
     pr LIST{Field} .
-    pr LIST*{PAIR{LIST{Field}, ValueConc}} * (sort List{PAIR{LIST{Field}, ValueConc}} to Value) .
+    sorts Struct Value .
+    subsort Struct ValueConc$Elt < Value .
 
-    sort Struct .
-    subsort Struct < Value .
+    vars st1 st2 : Struct .
 
-    mb [] : Struct .
+    op nil : -> Struct [ctor] .
+    op __ : Struct Struct -> Struct [ctor assoc id: nil prec 27] .
+    op [_:=_] : NeList{Field} Value -> Struct [ctor prec 26] .
+    op _|>_ : Struct List{Field} -> Value [prec 28] .
 
-    op [_:=_] : NeList{Field} Value -> Struct .
-    op _|>_ : Struct List{Field} -> Value .
+    mb nil : Struct .
 
     var xs : Struct .
     var flds : List{Field} .
@@ -39,7 +20,10 @@ fmod STORAGE{Field :: TRIV, ValueConc :: TRIV} is
     var v : Value .
 
     eq xs |> nil = xs .
-    eq xs [ fldsN := v ] |> fldsN flds = v |> flds .
+    eq xs [ fldsN := v ] |> fldsN  = v .
+    eq xs [ fldsN := v ] |> fldsN fldsN2 = v |> fldsN2 .
     eq xs [ fldsN fldsN2 := v ] |> fldsN = (xs |> fldsN) [ fldsN2 := v ] .
+    eq xs [ fldsN := v ] |> fldsN2 = xs |> fldsN2 [owise] .
 endfm
 
+red  [ fldsN := v ] |> fldsN .
