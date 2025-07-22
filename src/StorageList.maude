@@ -9,8 +9,8 @@ fmod STORAGE{Field :: TRIV, ValueConc :: TRIV} is
 
     op nil : -> Struct [ctor] .
     op __ : Struct Struct -> Struct [ctor assoc id: nil prec 27] .
-    op [_:=_] : NeList{Field} Value -> Struct [ctor prec 26] .
-    op _|>_ : Struct List{Field} -> Value [prec 28] .
+    op [_=_] : NeList{Field} Value -> Struct [ctor prec 26] .
+    op _>_ : Struct List{Field} -> Value [prec 28] .
 
     mb nil : Struct .
 
@@ -19,11 +19,11 @@ fmod STORAGE{Field :: TRIV, ValueConc :: TRIV} is
     var fldsN fldsN2 : NeList{Field} .
     var v : Value .
 
-    eq xs |> nil = xs .
-    eq xs [ fldsN := v ] |> fldsN  = v .
-    eq xs [ fldsN := v ] |> fldsN fldsN2 = v |> fldsN2 .
-    eq xs [ fldsN fldsN2 := v ] |> fldsN = (xs |> fldsN) [ fldsN2 := v ] .
-    eq xs [ fldsN := v ] |> fldsN2 = xs |> fldsN2 [owise] .
+    eq xs > nil = xs .
+    eq xs [ fldsN = v ] > fldsN  = v .
+    eq xs [ fldsN = v ] > fldsN fldsN2 = v > fldsN2 .
+    eq xs [ fldsN fldsN2 = v ] > fldsN = (xs > fldsN) [ fldsN2 = v ] .
+    eq xs [ fldsN = v ] > fldsN2 = xs > fldsN2 [owise] .
 endfm
 
-red  [ fldsN := v ] |> fldsN .
+red  [ fldsN = v ] > fldsN .
