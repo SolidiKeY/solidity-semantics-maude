@@ -1,0 +1,45 @@
+load Fields .
+
+fmod PAIR{X :: TRIV, Y :: TRIV} is
+    sort Pair{X, Y} .
+    op <_;_> : X$Elt Y$Elt -> Pair{X, Y} .
+    op 1st : Pair{X, Y} -> X$Elt .
+    op 2nd : Pair{X, Y} -> Y$Elt .
+
+    var A : X$Elt .
+    var B : Y$Elt .
+    eq 1st(< A ; B >) = A .
+    eq 2nd(< A ; B >) = B .
+endfm
+
+view PAIR{X :: TRIV, Y :: TRIV} from TRIV to PAIR{X, Y} is
+    sort Elt to Pair{X, Y} .
+endv
+
+view LIST{X :: TRIV} from TRIV to LIST{X} is
+    sort Elt to List{X} .
+endv
+
+fmod STORAGE{Field :: TRIV, ValueConc :: TRIV} is
+    *** pr PAIR{Field, ValueConc} .
+    pr LIST{Field} .
+    pr LIST*{PAIR{LIST{Field}, ValueConc}} * (sort List{PAIR{LIST{Field}, ValueConc}} to Value) .
+
+    sort Struct .
+    subsort Struct < Value .
+
+    mb [] : Struct .
+
+    op [_:=_] : NeList{Field} Value -> Struct .
+    op _|>_ : Struct List{Field} -> Value .
+
+    var xs : Struct .
+    var flds : List{Field} .
+    var fldsN fldsN2 : NeList{Field} .
+    var v : Value .
+
+    eq xs |> nil = xs .
+    eq xs [ fldsN := v ] |> fldsN flds = v |> flds .
+    eq xs [ fldsN fldsN2 := v ] |> fldsN = (xs |> fldsN) [ fldsN2 := v ] .
+endfm
+
