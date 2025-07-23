@@ -1,20 +1,21 @@
-fmod FIELDS{Field :: TRIV} is
+fmod FIELDS{Field :: TRIV, ValueConc :: TRIV} is
     pr INT .
     pr LIST{Field} .
 
-    sorts PrimIdentity Identity .
+    sorts PrimIdentity Identity Value .
     sorts PrimField IdField .
     subsort PrimField IdField < Field$Elt .
+    subsort ValueConc$Elt < Value .
     subsort Int < Field$Elt .
 
     op length : -> PrimField .
 endfm
 
 fmod STORAGE{Field :: TRIV, ValueConc :: TRIV} is
-    pr FIELDS{Field} .
+    pr FIELDS{Field, ValueConc} .
     pr LIST{Field} .
-    sorts Struct Value .
-    subsort Struct ValueConc$Elt < Value .
+    sorts Struct .
+    subsort Struct < Value .
 
     vars st1 st2 : Struct .
 
@@ -32,14 +33,14 @@ fmod STORAGE{Field :: TRIV, ValueConc :: TRIV} is
     var v : Value .
 
     eq xs |> nil = xs .
-    eq xs · [ fldsN = v ] |> fldsN fldsN2 = v |> fldsN2 .
+    eq xs · [ fldsN = v ] |> fldsN flds = v |> flds .
     eq xs · [ fldsN fldsN2 = v ] |> fldsN = (xs |> fldsN) · [ fldsN2 = v ] .
     eq xs · [ fldsN = v ] |> fldsN2 = xs |> fldsN2 [owise] .
 
     mb xs |> flds idf : Struct .
 endfm
 
-red  [ fldsN = v ] |> fldsN .
+red  [ fldsN = xs ] |> fldsN .
 
 fmod Example{Field :: TRIV} is
     pr STORAGE{Field, Int} .
