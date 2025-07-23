@@ -1,29 +1,57 @@
-load Fields .
+fmod FIELDS{Field :: TRIV} is
+    pr INT .
+    pr LIST{Field} .
+
+    sorts PrimIdentity Identity .
+    sorts PrimField IdField .
+    subsort PrimField IdField < Field$Elt .
+    subsort Int < Field$Elt .
+
+    op length : -> PrimField .
+endfm
 
 fmod STORAGE{Field :: TRIV, ValueConc :: TRIV} is
+    pr FIELDS{Field} .
     pr LIST{Field} .
     sorts Struct Value .
     subsort Struct ValueConc$Elt < Value .
 
     vars st1 st2 : Struct .
 
-    op nil : -> Struct [ctor] .
-    op __ : Struct Struct -> Struct [ctor assoc id: nil prec 27] .
+    op none : -> Struct [ctor] .
+    op _·_ : Struct Struct -> Struct [ctor assoc id: none prec 27] .
     op [_=_] : NeList{Field} Value -> Struct [ctor prec 26] .
-    op _>_ : Struct List{Field} -> Value [prec 28] .
+    op _|>_ : Struct List{Field} -> Value [prec 28] .
 
-    mb nil : Struct .
+    mb none : Struct .
 
     var xs : Struct .
     var flds : List{Field} .
     var fldsN fldsN2 : NeList{Field} .
+    var idf : IdField .
     var v : Value .
 
-    eq xs > nil = xs .
-    eq xs [ fldsN = v ] > fldsN  = v .
-    eq xs [ fldsN = v ] > fldsN fldsN2 = v > fldsN2 .
-    eq xs [ fldsN fldsN2 = v ] > fldsN = (xs > fldsN) [ fldsN2 = v ] .
-    eq xs [ fldsN = v ] > fldsN2 = xs > fldsN2 [owise] .
+    eq xs |> nil = xs .
+    eq xs · [ fldsN = v ] |> fldsN fldsN2 = v |> fldsN2 .
+    eq xs · [ fldsN fldsN2 = v ] |> fldsN = (xs |> fldsN) · [ fldsN2 = v ] .
+    eq xs · [ fldsN = v ] |> fldsN2 = xs |> fldsN2 [owise] .
+
+    mb xs |> flds idf : Struct .
 endfm
 
-red  [ fldsN = v ] > fldsN .
+red  [ fldsN = v ] |> fldsN .
+
+fmod Example{Field :: TRIV} is
+    pr STORAGE{Field, Int} .
+
+    ops $alice $bob $carol $account : -> IdField .
+    ops $balance : -> PrimField .
+    ops st stEx stEx2 : -> Struct .
+
+    eq stEx = st · [ $alice $account length = 10 ] .
+    eq stEx2 = st · [ $alice $account length = 10 ] · [ $alice $account 5 = 20 ] .
+endfm
+
+red stEx |> $alice $account length .
+red stEx |> $alice $account .
+red stEx2 |> $alice $account .
