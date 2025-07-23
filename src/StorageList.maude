@@ -1,18 +1,4 @@
-fth FIELD is
-    pr INT .
-    
-    sorts PrimIdentity Identity ValueConc Value .
-    sorts PrimField IdField Field .
-    subsort PrimField IdField < Field .
-    subsort ValueConc < Value .
-    subsort Int < Field .
-
-    op length : -> PrimField .
-endfth
-
-view FieldAsTriv from TRIV to FIELD is
-    sort Elt to Field .
-endv
+load FieldView .
     
 fmod STORAGE{Field :: FIELD} is
     pr LIST{FieldAsTriv}{Field} .
@@ -45,23 +31,6 @@ endfm
 
 red  [ fldsN = xs ] |> fldsN .
 
-fmod FieldExample is
-    pr INT .
-
-    sorts PrimIdentity Identity ValueConc Value .
-    sorts PrimField IdField Field .
-
-    subsort PrimField IdField < Field .
-    subsort Int < ValueConc < Value .
-    subsort Int < Field .
-
-    op length : -> PrimField .
-    ops $alice $bob $carol $account : -> IdField .
-    ops $balance : -> PrimField .
-endfm
-
-view FieldExView from FIELD to FieldExample is endv
-    
 fmod Example is
     pr STORAGE{FieldExView} .
 
