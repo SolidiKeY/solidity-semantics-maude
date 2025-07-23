@@ -1,39 +1,42 @@
-fmod FIELDS{Field :: TRIV, ValueConc :: TRIV} is
+fth FIELD is
     pr INT .
-    pr LIST{Field} .
-
-    sorts PrimIdentity Identity Value .
-    sorts PrimField IdField .
-    subsort PrimField IdField < Field$Elt .
-    subsort ValueConc$Elt < Value .
-    subsort Int < Field$Elt .
+    
+    sorts PrimIdentity Identity ValueConc Value .
+    sorts PrimField IdField Field .
+    subsort PrimField IdField < Field .
+    subsort ValueConc < Value .
+    subsort Int < Field .
 
     op length : -> PrimField .
-endfm
+endfth
 
-fmod STORAGE{Field :: TRIV, ValueConc :: TRIV} is
-    pr FIELDS{Field, ValueConc} .
-    pr LIST{Field} .
+view FieldAsTriv from TRIV to FIELD is
+    sort Elt to Field .
+endv
+    
+fmod STORAGE{Field :: FIELD} is
+    pr LIST{FieldAsTriv}{Field} .
     sorts Struct .
-    subsort Struct < Value .
+    subsort Struct < Field$Value .
 
     vars st1 st2 : Struct .
 
     op none : -> Struct [ctor] .
     op _·_ : Struct Struct -> Struct [ctor assoc id: none prec 27] .
-    op [_=_] : NeList{Field} Value -> Struct [ctor prec 26] .
-    op _|>_ : Struct List{Field} -> Value [prec 28] .
+    op [_=_] : NeList{FieldAsTriv}{Field} Field$Value -> Struct [ctor prec 26] .
+    op _|>_ : Struct List{FieldAsTriv}{Field} -> Field$Value [prec 28] .
 
     mb none : Struct .
 
     var xs : Struct .
-    var flds : List{Field} .
-    var fldsN fldsN2 : NeList{Field} .
-    var idf : IdField .
-    var v : Value .
+    var flds : List{FieldAsTriv}{Field} .
+    var fldsN fldsN2 : NeList{FieldAsTriv}{Field} .
+    var idf : Field$IdField .
+    var v : Field$Value .
 
     eq xs |> nil = xs .
-    eq xs · [ fldsN = v ] |> fldsN flds = v |> flds .
+    eq xs · [ fldsN = v ] |> fldsN = v .
+    eq xs · [ fldsN = v ] |> fldsN fldsN2 = v |> fldsN2 .
     eq xs · [ fldsN fldsN2 = v ] |> fldsN = (xs |> fldsN) · [ fldsN2 = v ] .
     eq xs · [ fldsN = v ] |> fldsN2 = xs |> fldsN2 [owise] .
 
@@ -42,11 +45,26 @@ endfm
 
 red  [ fldsN = xs ] |> fldsN .
 
-fmod Example{Field :: TRIV} is
-    pr STORAGE{Field, Int} .
+fmod FieldExample is
+    pr INT .
 
+    sorts PrimIdentity Identity ValueConc Value .
+    sorts PrimField IdField Field .
+
+    subsort PrimField IdField < Field .
+    subsort Int < ValueConc < Value .
+    subsort Int < Field .
+
+    op length : -> PrimField .
     ops $alice $bob $carol $account : -> IdField .
     ops $balance : -> PrimField .
+endfm
+
+view FieldExView from FIELD to FieldExample is endv
+    
+fmod Example is
+    pr STORAGE{FieldExView} .
+
     ops st stEx stEx2 : -> Struct .
 
     eq stEx = st · [ $alice $account length = 10 ] .
