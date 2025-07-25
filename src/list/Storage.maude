@@ -12,8 +12,6 @@ fmod STORAGE{Field :: FIELD} is
     op [_=_] : NeList{FieldAsTriv}{Field} Field$Value -> Struct [ctor prec 26] .
     op _|>_ : Struct List{FieldAsTriv}{Field} -> Field$Value [prec 28] .
 
-    mb none : Struct .
-
     var xs : Struct .
     var flds : List{FieldAsTriv}{Field} .
     var fldsN fldsN2 : NeList{FieldAsTriv}{Field} .

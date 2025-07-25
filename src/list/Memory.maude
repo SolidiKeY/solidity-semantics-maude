@@ -8,6 +8,35 @@ fmod MEMORY{Field :: FIELD} is
 
     op none : -> Memory [ctor] .
     op _·_ : Memory Memory -> Memory [ctor assoc id: none prec 27] .
-    op [_=_] : Field$Identity Field$Value -> Memory [ctor prec 26] .
-    op _|>_ : Memory List{FieldAsTriv}{Field} -> Field$Value [prec 28] .
+    op [_=_] : Field$NeIdentity Field$Value -> Memory [ctor prec 26] .
+    op _|>_ : Memory Field$NeIdentity -> Field$Value [prec 28] .
+    op <_> : Field$PrimIdentity -> Memory .
+    op default : Field$Field -> Field$Value .
+    op ⟦_⟧ : Field$Identity -> Field$PrimIdentity .
+
+    var xs : Memory .
+    vars id id2 : Field$Identity .
+    vars pId pId2 : Field$PrimIdentity .
+    vars f f2 : Field$Field .
+    var v : Field$Value .
+
+    eq ⟦ pId ⟧ = pId .
+    eq ⟦ id : f ⟧ = ⟦ id ⟧ .
+
+    eq xs · [ id : f = v ] |> id : f = v .
+    eq xs · [ id = v ] |> id2 = xs |> id2 [owise] .
+
+    eq xs · < pId > |> id : f = if pId == ⟦ id ⟧ then default(f) else xs |> id : f fi .
 endfm
+
+fmod Example is
+    pr MEMORY{FieldExView} .
+
+    ops mem memEx memEx2 : -> Memory .
+
+    eq memEx = mem · < aId > · [ aId : $age = 20 ] .
+endfm
+
+red memEx |> aId : $age .
+red memEx |> aId : $account .
+red memEx |> bId : $account .

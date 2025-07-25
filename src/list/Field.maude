@@ -1,15 +1,15 @@
 fth FIELD is
     pr INT .
     
-    sorts PrimIdentity Identity ValueConc Value .
+    sorts PrimIdentity Identity NeIdentity ValueConc Value .
     sorts PrimField IdField Field .
     subsort PrimField IdField < Field .
     subsort ValueConc < Value .
     subsort Int < Field .
-    subsort PrimIdentity < Identity .
+    subsort PrimIdentity NeIdentity < Identity .
 
     op length : -> PrimField [ctor] .
-    op _:_ : Identity Field -> Identity [ctor gather(e E)] .
+    op _:_ : Identity Field -> NeIdentity [ctor prec 25] .
 endfth
 
 view FieldAsTriv from TRIV to FIELD is
@@ -19,19 +19,19 @@ endv
 fmod FieldExample is
     pr INT .
 
-    sorts PrimIdentity Identity ValueConc Value .
+    sorts PrimIdentity Identity NeIdentity ValueConc Value .
     sorts PrimField IdField Field .
 
     subsort PrimField IdField < Field .
     subsort Int < ValueConc < Value .
     subsort Int < Field .
-    subsort PrimIdentity < Identity .
+    subsort PrimIdentity NeIdentity < Identity .
 
     op length : -> PrimField .
-    op _:_ : Identity Field -> Identity .
+    op _:_ : Identity Field -> NeIdentity [ctor prec 25] .
     ops $alice $bob $carol $account : -> IdField .
-    op aId : -> PrimIdentity .
-    ops $balance : -> PrimField .
+    ops aId bId : -> PrimIdentity .
+    ops $age $balance : -> PrimField .
 endfm
 
 view FieldExView from FIELD to FieldExample is endv
