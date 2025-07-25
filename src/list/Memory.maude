@@ -1,0 +1,13 @@
+load Field .
+
+fmod MEMORY{Field :: FIELD} is
+    pr LIST{FieldAsTriv}{Field} .
+
+    sort Memory .
+    subsort Memory < Field$Value .
+
+    op none : -> Memory [ctor] .
+    op _·_ : Memory Memory -> Memory [ctor assoc id: none prec 27] .
+    op [_=_] : Field$Identity Field$Value -> Memory [ctor prec 26] .
+    op _|>_ : Memory List{FieldAsTriv}{Field} -> Field$Value [prec 28] .
+endfm

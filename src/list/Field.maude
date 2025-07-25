@@ -6,8 +6,10 @@ fth FIELD is
     subsort PrimField IdField < Field .
     subsort ValueConc < Value .
     subsort Int < Field .
+    subsort PrimIdentity < Identity .
 
-    op length : -> PrimField .
+    op length : -> PrimField [ctor] .
+    op _:_ : Identity Field -> Identity [ctor gather(e E)] .
 endfth
 
 view FieldAsTriv from TRIV to FIELD is
@@ -23,10 +25,15 @@ fmod FieldExample is
     subsort PrimField IdField < Field .
     subsort Int < ValueConc < Value .
     subsort Int < Field .
+    subsort PrimIdentity < Identity .
 
     op length : -> PrimField .
+    op _:_ : Identity Field -> Identity .
     ops $alice $bob $carol $account : -> IdField .
+    op aId : -> PrimIdentity .
     ops $balance : -> PrimField .
 endfm
 
 view FieldExView from FIELD to FieldExample is endv
+
+red aId : $account : $account .

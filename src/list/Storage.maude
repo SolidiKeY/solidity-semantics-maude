@@ -2,7 +2,7 @@ load Field .
     
 fmod STORAGE{Field :: FIELD} is
     pr LIST{FieldAsTriv}{Field} .
-    sorts Struct .
+    sort Struct .
     subsort Struct < Field$Value .
 
     vars st1 st2 : Struct .
