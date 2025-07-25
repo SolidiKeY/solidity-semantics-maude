@@ -1,32 +1,31 @@
 load Field .
 
 fmod MEMORY{Field :: FIELD} is
-    pr LIST{FieldAsTriv}{Field} .
+    *** pr LIST{FieldAsTriv}{Field} .
+    pr FIELD-FM{Field} .
 
     sort Memory .
-    subsort Memory < Field$Value .
+    subsort Memory < Value .
 
     op none : -> Memory [ctor] .
     op _·_ : Memory Memory -> Memory [ctor assoc id: none prec 27] .
-    op [_=_] : Field$NeIdentity Field$Value -> Memory [ctor prec 26] .
-    op _|>_ : Memory Field$NeIdentity -> Field$Value [prec 28] .
+    op [_=_] : Identity Value -> Memory [ctor prec 26] .
+    op _|>_ : Memory Identity -> Value [prec 28] .
     op <_> : Field$PrimIdentity -> Memory .
-    op default : Field$Field -> Field$Value .
-    op ⟦_⟧ : Field$Identity -> Field$PrimIdentity .
+    op default : Field$Field -> Value .
 
     var xs : Memory .
-    vars id id2 : Field$Identity .
+    vars id id2 : Identity .
     vars pId pId2 : Field$PrimIdentity .
     vars f f2 : Field$Field .
-    var v : Field$Value .
-
-    eq ⟦ pId ⟧ = pId .
-    eq ⟦ id : f ⟧ = ⟦ id ⟧ .
+    var flds : List{FieldAsTriv}{Field} .
+    var v : Value .
 
     eq xs · [ id : f = v ] |> id : f = v .
     eq xs · [ id = v ] |> id2 = xs |> id2 [owise] .
 
-    eq xs · < pId > |> id : f = if pId == ⟦ id ⟧ then default(f) else xs |> id : f fi .
+    eq xs · < pId > |> pId : flds f = default(f) .
+    eq xs · < pId > |> id = xs |> id [owise] .
 endfm
 
 fmod Example is

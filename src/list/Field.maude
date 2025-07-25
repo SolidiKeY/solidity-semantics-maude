@@ -1,39 +1,43 @@
 fth FIELD is
     pr INT .
-    
-    sorts PrimIdentity Identity NeIdentity ValueConc Value .
-    sorts PrimField IdField Field .
-    subsort PrimField IdField < Field .
-    subsort ValueConc < Value .
-    subsort Int < Field .
-    subsort PrimIdentity NeIdentity < Identity .
+
+    sorts PrimField IdField Field PrimIdentity .
+    subsort PrimField IdField Int < Field .
 
     op length : -> PrimField [ctor] .
-    op _:_ : Identity Field -> NeIdentity [ctor prec 25] .
 endfth
 
 view FieldAsTriv from TRIV to FIELD is
     sort Elt to Field .
 endv
-    
+
+fmod FIELD-FM{Field :: FIELD} is
+    pr INT .
+    pr LIST{FieldAsTriv}{Field} .
+
+    sorts Identity NeIdentity ValueConc Value .
+    subsort ValueConc Int < Value .
+    subsort Field$PrimIdentity NeIdentity < Identity .
+
+    op _:_ : Field$PrimIdentity List{FieldAsTriv}{Field} -> Identity [ctor prec 25] .
+endfm
+
 fmod FieldExample is
     pr INT .
 
-    sorts PrimIdentity Identity NeIdentity ValueConc Value .
-    sorts PrimField IdField Field .
-
-    subsort PrimField IdField < Field .
-    subsort Int < ValueConc < Value .
-    subsort Int < Field .
-    subsort PrimIdentity NeIdentity < Identity .
-
+    sorts PrimField IdField Field PrimIdentity .
+    subsort PrimField IdField Int < Field .
     op length : -> PrimField .
-    op _:_ : Identity Field -> NeIdentity [ctor prec 25] .
+
     ops $alice $bob $carol $account : -> IdField .
-    ops aId bId : -> PrimIdentity .
     ops $age $balance : -> PrimField .
+    ops aId bId : -> PrimIdentity .
 endfm
 
 view FieldExView from FIELD to FieldExample is endv
 
-red aId : $account : $account .
+fmod Field-FM-Example is
+    pr FIELD-FM{FieldExView} .
+endfm
+
+red aId : $account $account .
