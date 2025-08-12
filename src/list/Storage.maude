@@ -2,29 +2,50 @@ load Field .
     
 fmod STORAGE{Field :: FIELD} is
     pr FIELD-FM{Field} .
-    sort Struct .
-    subsort Struct < Value .
+    sort Struct NeStruct SingleStruct IdList .
+    subsort SingleStruct < NeStruct < Struct < Value .
 
     vars st1 st2 : Struct .
 
     op none : -> Struct [ctor] .
     op _·_ : Struct Struct -> Struct [ctor assoc id: none prec 27] .
-    op [_=_] : NeList{FieldAsTriv}{Field} Value -> Struct [ctor prec 26] .
+    op _·_ : NeStruct Struct -> NeStruct [ditto] .
+    op _·_ : Struct NeStruct -> NeStruct [ditto] .
+    op [_=_] : NeList{FieldAsTriv}{Field} Value -> SingleStruct [ctor prec 26] .
     op _|>_ : Struct List{FieldAsTriv}{Field} -> Value [prec 28] .
+    op _|≥_ : Struct List{FieldAsTriv}{Field} -> Struct [prec 28] .
+    op redLast : Struct List{FieldAsTriv}{Field} -> Value .
+    op default : -> Value .
 
     var xs : Struct .
+    var sStr : SingleStruct .
+    vars xsN ysN : NeStruct .
     var flds : List{FieldAsTriv}{Field} .
     var fldsN fldsN2 : NeList{FieldAsTriv}{Field} .
     var idf : Field$IdField .
+    var pf : Field$PrimField .
     var v : Value .
 
-    eq xs |> nil = xs .
-    eq xs · [ fldsN = v ] |> fldsN = v .
-    eq xs · [ fldsN = v ] |> fldsN fldsN2 = v |> fldsN2 .
-    eq xs · [ fldsN fldsN2 = v ] |> fldsN = (xs |> fldsN) · [ fldsN2 = v ] .
-    eq xs · [ fldsN = v ] |> fldsN2 = xs |> fldsN2 [owise] .
+    eq xs |> flds pf = redLast(xs |≥ flds pf, flds pf) .
+    eq xs |> flds = xs |≥ flds [owise] .
 
-    mb xs |> flds idf : Struct .
+    eq xs |≥ nil = xs .
+    eq [ fldsN = v ] |≥ fldsN = v .
+    eq [ fldsN = v ] |≥ fldsN fldsN2 = v |≥ fldsN2 .
+    eq [ fldsN fldsN2 = v ] |≥ fldsN = [ fldsN2 = v ] .
+    eq [ fldsN = v ] |≥ fldsN2 = none [owise] .
+
+    eq xs · ysN |≥ flds = (xs |≥ flds) · (ysN |≥ flds) .
+
+    mb xs |≥ flds idf : Struct .
+
+    eq redLast(none, idf) = none .
+    eq redLast(none, pf) = default .
+
+    eq redLast(xs, nil) = xs .
+    eq redLast(xs · v, flds pf) = v .
+    eq redLast(sStr, flds idf) = sStr .
+    eq redLast(xs · ysN, flds idf) = redLast(xs, flds idf) · redLast(ysN, flds idf) .
 endfm
 
 red  [ fldsN = xs ] |> fldsN .
