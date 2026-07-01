@@ -42,10 +42,7 @@ fmod STORAGE{Field :: TRIV} is
     ceq push(st, fldsN, val) = save(nSt, fldsN length, s old_length)
         if old_length := find(st, fldsN length) /\ s nl := old_length /\ nSt := save(st, fldsN nl, val) .
     eq push(st, fldsN) = save(st, fldsN length, s find(st, fldsN length)) .
-
-    ceq pop(st, fldsN) = save(nSt, fldsN length, nl)
-        if old_length := find(st, fldsN length) /\ s nl := old_length
-        /\ nSt := save(st, fldsN nl, default(last(fldsN))) .
+    *** pop is defined below, in terms of del (delete the last element, skipping mappings)
 
     *** ---- delete (skips mappings) --------------------------------------
     op del : Struct NeList{Field} -> Struct .   *** lazy delete (skips mappings), resolved by find
@@ -69,6 +66,10 @@ fmod STORAGE{Field :: TRIV} is
 
     *** disjoint path / ancestor read: pass through to the original
     eq find(del(st, dp), qp) = find(st, qp) [owise] .
+
+    *** ---- pop = delete the last element (skips mappings), then shrink length ----
+    ceq pop(st, fldsN) = save(del(st, fldsN nl), fldsN length, nl)
+        if old_length := find(st, fldsN length) /\ s nl := old_length .
 endfm
 
 fmod Example{Field :: TRIV} is
@@ -77,7 +78,7 @@ fmod Example{Field :: TRIV} is
     ops $alice $bob $carol $account $a : -> IdField .
     ops $balance : -> PrimField .
     op $m : -> MapField .
-    ops st stEx stEx2 stD stArr : -> Struct .
+    ops st stEx stEx2 stD stArr stPop : -> Struct .
 
     var pf : PrimField .
     eq default(pf) = 0 .          *** every primitive reset is 0 (incl. default(length) = 0)
@@ -92,6 +93,9 @@ fmod Example{Field :: TRIV} is
     eq stD   = save(save(save(st, $alice $balance, 5), $alice $account $balance, 7), $alice $m 9, 42) .
     *** delete tests: a dynamic array (length slot + element)
     eq stArr = save(save(st, $a length, 3), $a 1, 100) .
+    *** pop test: array of structs, element 0 holds a nested mapping ($m) and a primitive ($balance)
+    *** mirrors ledgerUses[0].ledger.balances[1]=10 / .nonce=5  ($a=array, $account=nested struct)
+    eq stPop = save(save(save(st, $a length, 1), $a 0 $account $m 1, 10), $a 0 $account $balance, 5) .
 endfm
 
 red find(stEx, $alice $account length) .
@@ -114,3 +118,9 @@ red find(del(stD, $alice $m 9), $alice $m 3) .            *** find(st, $alice $m
 red find(del(stArr, $a),        $a length) .              *** 0   whole-array delete: length 0
 red find(del(stArr, $a 1),      $a length) .              *** 3   delete arr[1]: length untouched
 red find(del(stArr, $a 1),      $a 1) .                   *** 0
+
+*** ---- pop = delete last element (skips mappings) -------------------------
+red find(pop(stPop, $a), $a length) .                        *** 0
+red find(push(pop(stPop, $a), $a), $a length) .              *** 1
+red find(push(pop(stPop, $a), $a), $a 0 $account $m 1) .     *** 10  MAP PRESERVED across pop+push (paper's last test)
+red find(push(pop(stPop, $a), $a), $a 0 $account $balance) . *** 0   nested primitive reset by pop

@@ -71,19 +71,38 @@ fmod STORAGE{Field :: FIELD} is
     eq hasMap(nil)       = false .
     eq hasMap(mapf flds) = true .
     eq hasMap(f flds)    = hasMap(flds) [owise] .
+
+    *** ---- push / pop (pop = delete the last element, skipping mappings via delete) ----
+    op getLen : Struct NeList{FieldAsTriv}{Field} -> Int .   *** last length binding, by structural recursion
+    op push   : Struct NeList{FieldAsTriv}{Field} -> Struct .
+    op pop    : Struct NeList{FieldAsTriv}{Field} -> Struct .
+
+    vars i nl : Int .
+
+    *** getLen bypasses |> / |>= on purpose: that read layer loops on multi-binding none-rooted bags
+    eq getLen(xs · [ fldsN length = i ], fldsN) = i .
+    eq getLen(xs · sStr, fldsN) = getLen(xs, fldsN) [owise] .
+    eq getLen(none, fldsN) = 0 .
+
+    eq push(xs, fldsN) = xs · [ fldsN length = s getLen(xs, fldsN) ] .   *** grow length; reuse (do not clear) the slot
+    ceq pop(xs, fldsN) = delete(xs, fldsN nl) · [ fldsN length = nl ]     *** delete last element (skips mappings), shrink length
+        if s nl := getLen(xs, fldsN) .
 endfm
 
 red  [ fldsN = xs ] |> fldsN .
 
 fmod Example is
     pr STORAGE{FieldExView} .
-    ops st stEx stEx2 stFD : -> Struct .
+    ops st stEx stEx2 stFD stPop : -> Struct .
 
     eq stEx = st · [ $alice $account length = 10 ] .
     eq stEx2 = st · [ $alice $account length = 10 ] · [ $alice $account 5 = 20 ] .
 
     *** delete tests (concrete, none-rooted): a primitive, a nested struct, and a mapping entry
     eq stFD = [ $alice $balance = 5 ] · [ $alice $account $balance = 7 ] · [ $alice $m 9 = 42 ] .
+    *** pop test (none-rooted): array $alice, element 0 holds a nested mapping ($m) and a primitive ($balance)
+    *** mirrors ledgerUses[0].ledger.balances[1]=10 / .nonce=5  ($alice=array, $account=nested struct)
+    eq stPop = [ $alice length = 1 ] · [ $alice 0 $account $m 1 = 10 ] · [ $alice 0 $account $balance = 5 ] .
 endfm
 
 red stEx |> $alice $account length .
@@ -99,3 +118,10 @@ red delete(stFD, $alice) .                    *** [ $alice $m 9 = 42 ]   sibling
 red delete(stFD, $alice) |> $alice $m 9 .     *** 42   surviving map value still readable
 red delete(stFD, $alice $m) .                 *** stFD unchanged   (delete m : whole-mapping no-op)
 red delete(stFD, $alice $m 9) .               *** [ $alice $balance = 5 ] · [ $alice $account $balance = 7 ]   entry dropped, siblings kept
+
+*** ---- pop = delete last element (skips mappings); verified by bag inspection ------------
+red getLen(stPop, $alice) .                            *** 1
+red pop(stPop, $alice) .                               *** [$alice length = 1] · [$alice 0 $account $m 1 = 10] · [$alice length = 0]   MAP KEPT, map-free primitive DROPPED
+red getLen(pop(stPop, $alice), $alice) .               *** 0
+red push(pop(stPop, $alice), $alice) .                 *** ... · [$alice 0 $account $m 1 = 10] · ... · [$alice length = 1]   map binding survives pop+push
+red getLen(push(pop(stPop, $alice), $alice), $alice) . *** 1
