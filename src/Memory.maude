@@ -45,6 +45,8 @@ fmod BANK{Field :: TRIV} is
 
     eq read(delete(memory, idC(id, ls)), idC(id, ls ls2), pSel) = 0 .
     eq read(delete(memory, idC(id, ls)), idC(id, ls ls2), idS) = idC(id, ls ls2 idS) .
+    ceq read(delete(memory, idC(id, ls)), idC(idn, ls1), sel) = read(memory, idC(idn, ls1), sel)
+        if id =/= idn .          *** unrelated base object: pass through (mirrors add, :40-41)
 
     eq readR(memory, id1, ls3 sel) = read(memory, read(memory, id1, ls3), sel) .
 

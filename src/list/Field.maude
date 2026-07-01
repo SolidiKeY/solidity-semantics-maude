@@ -1,8 +1,8 @@
 fth FIELD is
     pr INT .
 
-    sorts PrimField IdField Field PrimIdentity .
-    subsort PrimField IdField Int < Field .
+    sorts PrimField IdField MapField Field PrimIdentity .
+    subsort PrimField IdField MapField Int < Field .
 
     op length : -> PrimField [ctor] .
 endfth
@@ -25,12 +25,13 @@ endfm
 fmod FieldExample is
     pr INT .
 
-    sorts PrimField IdField Field PrimIdentity .
-    subsort PrimField IdField Int < Field .
+    sorts PrimField IdField MapField Field PrimIdentity .
+    subsort PrimField IdField MapField Int < Field .
     op length : -> PrimField .
 
     ops $alice $bob $carol $account : -> IdField .
     ops $age $balance : -> PrimField .
+    op $m : -> MapField .
     ops aId bId : -> PrimIdentity .
 endfm
 

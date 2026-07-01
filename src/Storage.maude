@@ -46,20 +46,52 @@ fmod STORAGE{Field :: TRIV} is
     ceq pop(st, fldsN) = save(nSt, fldsN length, nl)
         if old_length := find(st, fldsN length) /\ s nl := old_length
         /\ nSt := save(st, fldsN nl, default(last(fldsN))) .
+
+    *** ---- delete (skips mappings) --------------------------------------
+    op del : Struct NeList{Field} -> Struct .   *** lazy delete (skips mappings), resolved by find
+
+    var pf : PrimField .   var idf : IdField .   var mapf : MapField .   var i : Int .
+    var dp : NeList{Field} .
+    vars pre rest qp : List{Field} .
+
+    eq del(st, pre mapf) = st .   *** delete m : whole-mapping no-op (fires before find can mis-recurse a map key)
+
+    *** read-through: query strictly below the deleted path dp
+    eq find(del(st, dp), dp pf)        = default(pf) .                          *** reset primitive member
+    eq find(del(st, dp), dp idf rest)  = find(del(st, dp idf), dp idf rest) .   *** recurse into referenced struct/array
+    eq find(del(st, dp), dp i rest)    = find(del(st, dp i),   dp i rest) .     *** recurse into keyed element
+    eq find(del(st, dp), dp mapf rest) = find(st, dp mapf rest) .               *** PRESERVE mapping: read original
+
+    *** exact read of the deleted node itself (query == dp)
+    eq find(del(st, pre idf), pre idf) = default(idf) .   *** deleted struct/array -> its default (e.g. mtSt)
+    eq find(del(st, pre i),   pre i)   = 0 .              *** deleted element / value at a key -> 0
+    eq find(del(st, pre pf),  pre pf)  = default(pf) .    *** deleted primitive -> its default (was the eager delete)
+
+    *** disjoint path / ancestor read: pass through to the original
+    eq find(del(st, dp), qp) = find(st, qp) [owise] .
 endfm
 
 fmod Example{Field :: TRIV} is
     pr STORAGE{Field} .
 
-    ops $alice $bob $carol $account : -> IdField .
+    ops $alice $bob $carol $account $a : -> IdField .
     ops $balance : -> PrimField .
-    ops st stEx stEx2 : -> Struct .
+    op $m : -> MapField .
+    ops st stEx stEx2 stD stArr : -> Struct .
 
+    var pf : PrimField .
+    eq default(pf) = 0 .          *** every primitive reset is 0 (incl. default(length) = 0)
     eq default($account) = mtSt .
+    eq default($a) = mtSt .
 
     eq stEx = save(save(st, $alice $account length, 10), $alice $account 5, 20) .
 
     eq stEx2 = save(st, $account length, 10) .
+
+    *** delete tests: struct with a primitive, a nested struct, and a mapping
+    eq stD   = save(save(save(st, $alice $balance, 5), $alice $account $balance, 7), $alice $m 9, 42) .
+    *** delete tests: a dynamic array (length slot + element)
+    eq stArr = save(save(st, $a length, 3), $a 1, 100) .
 endfm
 
 red find(stEx, $alice $account length) .
@@ -70,3 +102,15 @@ red push(stEx2, $account, 20) .
 red pop(stEx, $alice $account) .
 
 red push(stEx2, $account) .
+
+*** ---- delete (nested / lazy) --------------------------------------------
+red find(del(stEx2, $account length), $account length) .  *** 0   value-type reset
+red find(del(stD, $alice),      $alice $balance) .        *** 0   sibling primitive reset
+red find(del(stD, $alice),      $alice $account $balance) . *** 0  nested struct reset
+red find(del(stD, $alice),      $alice $m 9) .            *** 42  MAP PRESERVED (critical)
+red find(del(stD, $alice $m),   $alice $m 9) .            *** 42  delete m : no-op
+red find(del(stD, $alice $m 9), $alice $m 9) .            *** 0   delete m[9] : one entry reset
+red find(del(stD, $alice $m 9), $alice $m 3) .            *** find(st, $alice $m 3)  other key untouched
+red find(del(stArr, $a),        $a length) .              *** 0   whole-array delete: length 0
+red find(del(stArr, $a 1),      $a length) .              *** 3   delete arr[1]: length untouched
+red find(del(stArr, $a 1),      $a 1) .                   *** 0

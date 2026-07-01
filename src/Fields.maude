@@ -3,8 +3,8 @@ fmod FIELDS{Field :: TRIV} is
     pr LIST{Field} .
 
     sorts PrimIdentity Identity Value .
-    sorts PrimField IdField .
-    subsort PrimField IdField < Field$Elt .
+    sorts PrimField IdField MapField .
+    subsort PrimField IdField MapField < Field$Elt .
     subsort Int < Field$Elt .
     subsort Int Identity < Value .
 
