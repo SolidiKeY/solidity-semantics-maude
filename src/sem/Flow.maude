@@ -1,0 +1,162 @@
+*** src/sem/Flow.maude — Phase 3 of PLAN.md
+***
+*** Control flow: if/else, while, require/assert/revert, return.
+***  - `while` unfolds one iteration behind an `if` guard; the unfolded copy
+***    sits inside the then-block, so the head-of-k equations only ever see
+***    one loop head at a time — execution terminates iff the loop does,
+***    with no invariant needed to run, unlike KeY's unrolling taclets.
+***  - `require(false)` REVERTS: storage and net roll back to the entry
+***    snapshot, status `reverted` — a normal outcome. `assert(false)` rolls
+***    back the same way but flags `failed` — the outcome verification
+***    hunts, keeping SolKey's require/assert distinction — see
+***    solkey docs/require-assert.md.
+***  - `return e` stores the value in the out cell and cuts the continuation
+***    with cutK. Here cutK drops everything (top-level return); Phase 5
+***    adds frame markers that stop the cut at the call boundary.
+***  - `for` is not modeled (write the while form directly); break/continue
+***    need abrupt-completion markers and stay future work, as in SolKey.
+***  - guards are Ints (bools are 0/1): any nonzero guard is true; a
+***    reverting guard reverts the transaction.
+
+load Stmt .
+
+fmod SOL-FLOW{Field :: TRIV} is
+    pr SOL-STMT{Field} .
+
+    var C : Cells .   vars KK K1 K2 KB : K .   var E : Exp .
+    var V : Value .   var W : Value? .         var I : Int .
+    var S : Stmt .
+
+    *** ---- if / else -------------------------------------------------------
+    eq { k((if E { K1 }) KK) C } = { k((if E { K1 } else { nilK }) KK) C } .
+    eq { k((if E { K1 } else { K2 }) KK) C } = branch(eval(E, C), K1, K2, KK, C) .
+    op branch : Value? K K K Cells -> Conf .
+    ceq branch(I, K1, K2, KK, C) = { k(K1 KK) C } if I =/= 0 .
+    eq branch(0, K1, K2, KK, C) = { k(K2 KK) C } .
+    eq branch(rev, K1, K2, KK, C) = doRevert(k(nilK) C) .
+
+    *** ---- while ------------------------------------------------------------
+    eq { k((while E { KB }) KK) C } =
+        { k((if E { KB (while E { KB }) } else { nilK }) KK) C } .
+
+    *** ---- require / assert / revert ----------------------------------------
+    eq { k((require(E) ;) KK) C } = reqD(eval(E, C), KK, C) .
+    op reqD : Value? K Cells -> Conf .
+    ceq reqD(I, KK, C) = { k(KK) C } if I =/= 0 .
+    eq reqD(0, KK, C) = doRevert(k(nilK) C) .
+    eq reqD(rev, KK, C) = doRevert(k(nilK) C) .
+
+    eq { k((assert(E) ;) KK) C } = asrD(eval(E, C), KK, C) .
+    op asrD : Value? K Cells -> Conf .
+    ceq asrD(I, KK, C) = { k(KK) C } if I =/= 0 .
+    eq asrD(0, KK, C) = doFail(k(nilK) C) .
+    eq asrD(rev, KK, C) = doRevert(k(nilK) C) .
+
+    eq { k((revert() ;) KK) C } = doRevert(k(nilK) C) .
+
+    *** ---- return -------------------------------------------------------------
+    eq { k((return E ;) KK) C } = retD(eval(E, C), KK, C) .
+    op retD : Value? K Cells -> Conf .
+    eq retD(V, KK, out(W) C) = { k(cutK(KK)) out(V) C } .
+    eq retD(rev, KK, C) = doRevert(k(nilK) C) .
+
+    *** cut the continuation after a return: drop statements up to the first
+    *** frame marker (Phase 5 adds the marker equations; with none, drop all)
+    op cutK : K -> K .
+    eq cutK(nilK) = nilK .
+    eq cutK(S KK) = cutK(KK) [owise] .
+endfm
+
+*** ---- tests ---------------------------------------------------------------------
+
+fmod SOL-FLOW-TEST{Field :: TRIV} is
+    pr SOL-FLOW{Field} .
+
+    ops $alice $bob : -> IdField .
+    ops $balance $nonce : -> PrimField .
+    op $m : -> MapField .
+
+    eq default($balance) = 0 .   eq default($nonce) = 0 .
+    eq default(length) = 0 .
+    eq default($alice) = mtSt .  eq default($bob) = mtSt .
+
+    op run : K -> Conf .
+    var KK : K .
+    eq run(KK) = init(KK, mtSt) .
+
+    ops cIfT cIfF cSum cEvens cReq cAsr cRet cGrd cDrain : -> Conf .
+
+    eq cIfT = run(
+        var 'x := 4 ;
+        if 'x <. 5 { $alice · $balance := 1 ; } else { $alice · $balance := 2 ; } ) .
+
+    eq cIfF = run(
+        var 'x := 7 ;
+        if 'x <. 5 { $alice · $balance := 1 ; } else { $alice · $balance := 2 ; } ) .
+
+    *** sum 0..4 in a while loop
+    eq cSum = run(
+        var 'i := 0 ;
+        var 's := 0 ;
+        while 'i <. 5 {
+            's := 's +. 'i ;
+            'i ++ ;
+        } ) .
+
+    *** nested if inside while: count the even numbers below 7
+    eq cEvens = run(
+        var 'i := 0 ;
+        var 'n := 0 ;
+        while 'i <. 7 {
+            if 'i % 2 === 0 { 'n ++ ; }
+            'i ++ ;
+        } ) .
+
+    *** require(false) rolls the earlier write back
+    eq cReq = run(
+        $alice · $balance := 5 ;
+        require($alice · $balance >. 9) ;
+        $alice · $nonce := 1 ; ) .
+
+    *** assert violation: rolled back but FAILED
+    eq cAsr = run(
+        $alice · $balance := 5 ;
+        assert($alice · $balance >. 9) ; ) .
+
+    *** return: binds out, skips the rest
+    eq cRet = run(
+        var 'x := 3 ;
+        return 'x +. 1 ;
+        'x := 99 ; ) .
+
+    *** a reverting loop guard reverts the transaction
+    eq cGrd = run(
+        $alice · $balance := 5 ;
+        while 1 / 0 { $alice · $nonce := 1 ; } ) .
+
+    *** storage-driven loop: drain alice into bob one unit at a time
+    eq cDrain = run(
+        $alice · $balance := 3 ;
+        while $alice · $balance >. 0 {
+            $alice · $balance -- ;
+            $bob · $balance ++ ;
+        } ) .
+endfm
+
+red eread(cIfT, $alice · $balance) .    *** 1 — then branch
+red eread(cIfF, $alice · $balance) .    *** 2 — else branch
+red vread(cSum, 's) .                   *** 10
+red vread(cEvens, 'n) .                 *** 4 — 0 2 4 6
+red statOf(cReq) .                      *** reverted
+red eread(cReq, $alice · $balance) .    *** 0 — rolled back
+red eread(cReq, $alice · $nonce) .      *** 0 — never executed
+red statOf(cAsr) .                      *** failed — assert, not require
+red eread(cAsr, $alice · $balance) .    *** 0 — still rolled back
+red outOf(cRet) .                       *** 4
+red vread(cRet, 'x) .                   *** 3 — the trailing write was skipped
+red statOf(cRet) .                      *** ok
+red statOf(cGrd) .                      *** reverted
+red eread(cGrd, $alice · $balance) .    *** 0
+red statOf(cDrain) .                    *** ok
+red eread(cDrain, $alice · $balance) .  *** 0
+red eread(cDrain, $bob · $balance) .    *** 3

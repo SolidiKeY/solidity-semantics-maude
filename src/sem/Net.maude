@@ -1,0 +1,111 @@
+*** src/sem/Net.maude — Phase 4 of PLAN.md
+***
+*** The payment model of Ahrendt & Bubel, ISoLA 2020, as implemented by
+*** SolKey's first slice — see solkey docs/net.md and the "Payments"
+*** section of docs/taclets-implementation.md:
+***
+***   net : address → Int    net(a) = money received from a − money sent to a
+***
+*** maintained by the semantics, not the program. Here `net` is the Struct
+*** in the net cell, keyed directly by address Ints — find(N, a) — with
+*** find-on-mtSt giving the paper's implicit "initially net(a) = 0".
+***
+***  - Transaction entry (tx): credit msg.value to net(msg.sender) before
+***    the body runs — the paper's proof-obligation update. txNP is the
+***    non-payable variant: it prepends `require(msg·value === 0) ;`,
+***    turning the paper's strengthened precondition into program text.
+***  - `a.transfer(v)`: net(a) := net(a) − v, SolKey's transferNoCallback
+***    exactly — no balance check, no callback. The with-callback rule
+***    that SolKey has NOT implemented is NetCallback.maude, a system
+***    module, since re-entry is genuinely nondeterministic.
+***  - On revert the net cell rolls back to net0 = the PRE-credit ledger:
+***    a reverted call undoes its own value transfer, as in the EVM.
+
+load Flow .
+
+fmod SOL-NET{Field :: TRIV} is
+    pr SOL-FLOW{Field} .
+
+    var C : Cells .   var KK : K .   vars E1 E2 : Exp .
+    vars ST NT : Struct .             var W : Value? .
+    vars A VL SND VAL I : Int .
+
+    *** ---- transaction drivers -------------------------------------------------
+    *** tx(body, storage, net, sender, value) — payable entry
+    op tx : K Struct Struct Int Int -> Conf .
+    ceq tx(KK, ST, NT, SND, VAL) =
+        { k(KK) sto(ST) sto0(ST) mem(emptyMemory) env(mtEnv)
+          net(save(NT, SND, I + VAL)) net0(NT) msg(SND, VAL)
+          cnt(0) out(noV) stat(ok) }
+        if I := find(NT, SND) .
+
+    *** non-payable entry: msg.value must be zero or the call reverts
+    op txNP : K Struct Struct Int Int -> Conf .
+    eq txNP(KK, ST, NT, SND, VAL) =
+        tx((require(msg·value === 0) ;) KK, ST, NT, SND, VAL) .
+
+    *** ---- transfer (no-callback semantics) --------------------------------------
+    eq { k((E1 ·transfer(E2) ;) KK) C } = trD(eval(E1, C), eval(E2, C), KK, C) .
+    op trD : Value? Value? K Cells -> Conf .
+    ceq trD(A, VL, KK, net(NT) C) = { k(KK) net(save(NT, A, _-_(I, VL))) C }
+        if I := find(NT, A) .
+    eq trD(rev, W, KK, C) = doRevert(k(nilK) C) .
+    eq trD(W, rev, KK, C) = doRevert(k(nilK) C) .
+endfm
+
+*** ---- tests: the net-* starter shapes -------------------------------------------
+
+fmod SOL-NET-TEST{Field :: TRIV} is
+    pr SOL-NET{Field} .
+
+    op $bals : -> MapField .
+    ops $alice : -> IdField .
+    op $balance : -> PrimField .
+
+    eq default($balance) = 0 .   eq default(length) = 0 .
+    eq default($alice) = mtSt .
+
+    *** a two-transaction bank: deposit then withdraw 30, with the paper's
+    *** strong-data-integrity invariant  net(a) = bals[a]  checkable at exit
+    ops depositB withdrawB : -> K .
+    eq depositB = $bals [ msg·sender ] += msg·value ; .
+    eq withdrawB =
+        require($bals [ msg·sender ] >=. 30) ;
+        $bals [ msg·sender ] -= 30 ;
+        msg·sender ·transfer(30) ; .
+
+    ops cDep cPay cEcho cRevT cNP cWdr cOver : -> Conf .
+
+    eq cDep = tx(depositB, mtSt, mtSt, 7, 100) .              *** deposit 100 from address 7
+    eq cPay = tx((9 ·transfer(30) ;), mtSt, mtSt, 7, 0) .     *** contract pays 30 to address 9
+    eq cEcho = tx((msg·sender ·transfer(msg·value) ;),
+                  mtSt, mtSt, 7, 100) .                       *** send the money straight back
+    eq cRevT = tx((msg·sender ·transfer(50) ;) (revert() ;),
+                  mtSt, mtSt, 7, 0) .                         *** transfer then revert
+    eq cNP = txNP(nilK, mtSt, mtSt, 7, 5) .                   *** value sent to a non-payable function
+    eq cWdr = tx(withdrawB, stOf(cDep), netOf(cDep), 7, 0) .  *** withdraw after deposit
+    eq cOver = tx(withdrawB, mtSt, mtSt, 7, 0) .              *** withdraw with no balance
+endfm
+
+*** entry protocol
+red nread(cDep, 7) .                 *** 100 — msg.value credited to net(sender)
+red eread(cDep, $bals [ 7 ]) .       *** 100 — and booked by the contract
+red statOf(cDep) .                   *** ok
+
+*** transfer
+red nread(cPay, 9) .                 *** -30 — sent to 9
+red nread(cPay, 7) .                 *** 0
+red nread(cEcho, 7) .                *** 0 — 100 in, 100 back
+red statOf(cRevT) .                  *** reverted
+red nread(cRevT, 7) .                *** 0 — ledger rolled back with the revert
+
+*** non-payable
+red statOf(cNP) .                    *** reverted
+red nread(cNP, 7) .                  *** 0 — the value transfer was undone
+
+*** withdrawal pattern, and the paper's invariant net(a) = bals[a]
+red statOf(cWdr) .                   *** ok
+red eread(cWdr, $bals [ 7 ]) .       *** 70
+red nread(cWdr, 7) .                 *** 70 — strong data integrity holds at exit
+red statOf(cOver) .                  *** reverted — require caught the overdraw
+red nread(cOver, 7) .                *** 0
