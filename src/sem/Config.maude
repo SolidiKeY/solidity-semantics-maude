@@ -1,0 +1,180 @@
+*** src/sem/Config.maude — Phase 0 of PLAN.md
+***
+*** The execution configuration: an AC soup of cells wrapped in {_}, in the
+*** style of K-in-Maude semantics. Equations mention only the cells they
+*** touch; the rest is absorbed by a Cells variable, so later phases add
+*** behavior without changing this constructor. All restorable state has a
+*** twin snapshot cell (sto0/net0) taken at transaction entry: `revert`
+*** rolls storage and the ledger back but leaves memory/env — they are
+*** transaction-local and unobservable after the transaction, which is
+*** exactly the EVM's discard-on-revert.
+***
+*** Cells:
+***   k(K)          — the continuation (remaining statements)
+***   sto(S)/sto0(S)— contract storage and its entry snapshot
+***   mem(M)        — the memory heap (BANK model)
+***   env(E)        — local bindings: value (bv) or storage-alias path (bp);
+***                   a memory reference is bv of an Identity
+***   net(N)/net0(N)— the payment ledger (Phase 4), a Struct keyed by
+***                   address Ints: net(a) = find(N, a)
+***   msg(S,V)      — msg.sender / msg.value (Phase 4)
+***   cnt(I)        — fresh-identity counter for memory allocation
+***   out(W)        — function return value (Phase 5), noV if none
+***   stat(_)       — ok / reverted / failed (failed = assert violation)
+
+load Syntax .
+load ../Storage .
+load ../Memory .
+
+fmod SOL-CONFIG{Field :: TRIV} is
+    pr SOL-SYNTAX{Field} .
+    pr STORAGE{Field} .
+    pr BANK{Field} .
+
+    *** ---- evaluation results ---------------------------------------------
+    sort Value? .
+    subsort Value < Value? .
+    op rev : -> Value? [ctor] .    *** the expression reverted (e.g. division by zero)
+    op noV : -> Value? [ctor] .    *** no value (empty `out` cell)
+
+    *** ---- local environment ----------------------------------------------
+    sorts Binding Env .
+    op bv : Value -> Binding [ctor] .          *** value local (an Identity value = memory reference)
+    op bp : NeList{Field} -> Binding [ctor] .  *** storage alias: the access path, not the value
+    op mtEnv : -> Env [ctor] .
+    op envW : Env Qid Binding -> Env [ctor] .
+    op envR : Env Qid -> Binding .
+
+    vars EV : Env .  vars Q Q2 : Qid .  var B : Binding .
+    eq envR(envW(EV, Q, B), Q) = B .
+    ceq envR(envW(EV, Q, B), Q2) = envR(EV, Q2) if Q =/= Q2 .
+
+    *** ---- fresh memory identities ----------------------------------------
+    op pid : Int -> PrimIdentity [ctor] .
+
+    *** ---- zero-initialized storage ----------------------------------------
+    *** Solidity storage reads as zero before ever being written; the base
+    *** STORAGE model leaves find-on-mtSt stuck (SolKey states the same fact
+    *** as a per-example precondition `find(storage, sp·size) = 0`). These
+    *** default equations complete the model — in particular push/pop work
+    *** on never-touched arrays. Instances must define `default` per field
+    *** constant (explicitly per constant: a catch-all `default(PF) = 0`
+    *** overlaps with the struct-field defaults and breaks confluence).
+    var LFXS : List{Field} .  var PFd : PrimField .  var IDFd : IdField .
+    var Id : Int .
+    eq find(mtSt, LFXS PFd) = default(PFd) .
+    eq find(mtSt, LFXS IDFd) = default(IDFd) .
+    eq find(mtSt, LFXS Id) = 0 .    *** array elements / mapping values default to 0
+
+    *** reading THROUGH a stored struct value: the base model's owise
+    *** passthrough skips a whole-struct save when the query path extends the
+    *** saved path, so deep reads after a struct copy silently missed it.
+    *** (Latent in ../Storage.maude — its tests only ever read prefixes.
+    *** Flagged for the Agda/F*/Prolog twins.)
+    var FXSd FXSd2 : NeList{Field} .  var STd : Struct .  var Vd : Value .
+    eq find(save(STd, FXSd, Vd), FXSd FXSd2) = find(Vd, FXSd2) .
+
+    *** ---- deep memory access along a field path ---------------------------
+    *** (BANK's readR misses the singleton path; these helpers cover it and
+    *** resolve the intermediate Identity chain for writes.)
+    op mread : Memory Identity NeList{Field} -> Value .
+    op mwrite : Memory Identity NeList{Field} Value -> Memory .
+
+    var M : Memory .  var ID : Identity .  var F0 : Field$Elt .
+    var FXS : NeList{Field} .  var V : Value .
+    eq mread(M, ID, F0) = read(M, ID, F0) .
+    eq mread(M, ID, FXS F0) = read(M, mread(M, ID, FXS), F0) .
+    eq mwrite(M, ID, F0, V) = write(M, ID, F0, V) .
+    eq mwrite(M, ID, FXS F0, V) = write(M, mread(M, ID, FXS), F0, V) .
+
+    *** ---- configuration ----------------------------------------------------
+    sorts Cell Cells Conf Status .
+    subsort Cell < Cells .
+    op none : -> Cells [ctor] .
+    op __ : Cells Cells -> Cells [ctor assoc comm id: none] .
+    op {_} : Cells -> Conf [ctor] .
+
+    ops ok reverted failed : -> Status [ctor] .
+    op k : K -> Cell [ctor] .
+    op sto : Struct -> Cell [ctor] .
+    op sto0 : Struct -> Cell [ctor] .
+    op mem : Memory -> Cell [ctor] .
+    op env : Env -> Cell [ctor] .
+    op net : Struct -> Cell [ctor] .
+    op net0 : Struct -> Cell [ctor] .
+    op msg : Int Int -> Cell [ctor] .    *** msg(sender, value)
+    op cnt : Int -> Cell [ctor] .
+    op out : Value? -> Cell [ctor] .
+    op stat : Status -> Cell [ctor] .
+
+    *** ---- drivers -----------------------------------------------------------
+    *** init: plain execution from a given storage, no payment context.
+    op init : K Struct -> Conf .
+    var KK : K .  vars ST NT : Struct .
+    eq init(KK, ST) =
+        { k(KK) sto(ST) sto0(ST) mem(emptyMemory) env(mtEnv)
+          net(mtSt) net0(mtSt) msg(0, 0) cnt(0) out(noV) stat(ok) } .
+
+    *** ---- revert / failure --------------------------------------------------
+    *** doRevert: roll storage and ledger back to the entry snapshot, drop the
+    *** continuation. doFail (assert violation / paper's `failed`): state is
+    *** rolled back the same way, but flagged failed — the outcome proofs hunt.
+    var CS : Cells .  vars ST0 NT0 : Struct .  var SC : Status .
+    op doRevert : Cells -> Conf .
+    eq doRevert(k(KK) sto(ST) sto0(ST0) net(NT) net0(NT0) stat(SC) CS) =
+        { k(nilK) sto(ST0) sto0(ST0) net(NT0) net0(NT0) stat(reverted) CS } .
+    op doFail : Cells -> Conf .
+    eq doFail(k(KK) sto(ST) sto0(ST0) net(NT) net0(NT0) stat(SC) CS) =
+        { k(nilK) sto(ST0) sto0(ST0) net(NT0) net0(NT0) stat(failed) CS } .
+
+    *** ---- extractors (test interface) ----------------------------------------
+    op stOf : Conf -> Struct .      eq stOf({ sto(ST) CS }) = ST .
+    op memOf : Conf -> Memory .     eq memOf({ mem(M) CS }) = M .
+    op netOf : Conf -> Struct .     eq netOf({ net(NT) CS }) = NT .
+    op statOf : Conf -> Status .    eq statOf({ stat(SC) CS }) = SC .
+    op outOf : Conf -> Value? .     eq outOf({ out(W:Value?) CS }) = W:Value? .
+    op envOf : Conf -> Env .        eq envOf({ env(EV) CS }) = EV .
+
+    *** convenience reads for trailing test blocks
+    op sread : Conf NeList{Field} -> Value .
+    eq sread({ sto(ST) CS }, FXS) = find(ST, FXS) .
+    op nread : Conf Int -> Value .
+    var A : Int .
+    eq nread({ net(NT) CS }, A) = find(NT, A) .
+    op vread : Conf Qid -> Value? .
+    op bval : Binding -> Value? .
+    eq bval(bv(V)) = V .
+    eq bval(B) = noV [owise] .
+    eq vread({ env(EV) CS }, Q) = bval(envR(EV, Q)) .
+endfm
+
+*** eread — the universal test extractor evaluating a source expression in a
+*** final configuration — lives in Expr.maude: it needs eval, which needs
+*** this module, so declaring it here would be a dependency cycle.
+
+*** ---- tests -----------------------------------------------------------------
+
+fmod SOL-CONFIG-TEST{Field :: TRIV} is
+    pr SOL-CONFIG{Field} .
+
+    ops $alice : -> IdField .
+    ops $balance : -> PrimField .
+    op st1 : -> Struct .
+    op cf1 : -> Conf .
+
+    eq st1 = save(mtSt, $alice $balance, 7) .
+    eq cf1 = init(nilK, st1) .
+endfm
+
+red sread(cf1, $alice $balance) .                 *** 7
+red statOf(cf1) .                                 *** ok
+red vread(cf1, 'x) .                              *** noV — unbound local
+red envR(envW(envW(mtEnv, 'x, bv(1)), 'x, bv(2)), 'x) .   *** bv(2) — update wins
+red envR(envW(envW(mtEnv, 'x, bv(1)), 'y, bv(3)), 'x) .   *** bv(1) — pass-through
+red mread(write(write(emptyMemory, idC(pid(0), nil), $alice, idC(pid(1), nil)),
+                idC(pid(1), nil), $balance, 42),
+          idC(pid(0), nil), $alice $balance) .    *** 42 — deep read through the reference
+red statOf(doRevert(k('x := 1 ;) sto(save(st1, $alice $balance, 99)) sto0(st1)
+                    net(mtSt) net0(mtSt) stat(ok))) .          *** reverted
+red stOf(doRevert(k('x := 1 ;) sto(save(st1, $alice $balance, 99)) sto0(st1)
+                  net(mtSt) net0(mtSt) stat(ok))) .            *** st1 rolled back: find = 7

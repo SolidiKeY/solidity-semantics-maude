@@ -1,0 +1,228 @@
+*** src/sem/Expr.maude — Phase 1 of PLAN.md
+***
+*** Big-step expression evaluation over the configuration cells, mirroring
+*** SolKey's Tier-1 operator taclets (solkey docs/taclets-implementation.md):
+***  - unbounded ints, no overflow branch (Solidity Light);
+***  - `/` and `%` produce `rev` on a zero denominator (the calculus'
+***    revert branch) and `rev` propagates strictly through every operator;
+***  - `&&` / `||` genuinely short-circuit — the right operand is passed
+***    unevaluated and only touched when needed. SolKey defers this to its
+***    Tier-3 `if` rule; here it falls out of the equational order;
+***  - bools are Ints 0/1 (see Syntax.maude).
+***
+*** Lvalues lower to locations first (SolKey's `\sameAsTerm` path lowering):
+***   sloc(path)      — storage, a List{Field} from the root
+***   mloc(id, path)  — memory, base Identity + field path
+***   vloc(q)         — a value local in the environment
+*** A storage-alias local lowers straight to sloc of its bound path; index
+*** expressions are evaluated to Int fields during lowering, so SolKey's
+*** complex-receiver unfold rules have no counterpart here.
+
+load Config .
+
+fmod SOL-EVAL{Field :: TRIV} is
+    pr SOL-CONFIG{Field} .
+
+    sorts Loc Loc? .
+    subsort Loc < Loc? .
+    op sloc : NeList{Field} -> Loc [ctor] .
+    op mloc : Identity NeList{Field} -> Loc [ctor] .
+    op vloc : Qid -> Loc [ctor] .
+    op revL : -> Loc? [ctor] .
+
+    var C : Cells .    var EV : Env .     var M : Memory .    var ST : Struct .
+    var Q : Qid .      var LV : LValue .  vars E E1 E2 : Exp .
+    var V : Value .    vars W W1 W2 : Value? .
+    vars I I1 I2 : Int .                  var ID : Identity .
+    var PF : PrimField .  var IDF : IdField .  var MF : MapField .
+    var F0 : Field$Elt .  var FXS : NeList{Field} .
+    var L? : Loc? .       vars SND VAL : Int .
+
+    *** ---- lvalue lowering --------------------------------------------------
+    op lower : LValue Cells -> Loc? .
+    op lowB : Qid Binding -> Loc? .
+    op ext : Loc? Field$Elt Cells -> Loc? .
+    op extB : Binding Field$Elt -> Loc? .
+    op extI : Loc? Value? Cells -> Loc? .
+
+    eq lower(PF, C) = sloc(PF) .
+    eq lower(IDF, C) = sloc(IDF) .
+    eq lower(MF, C) = sloc(MF) .
+    eq lower(Q, env(EV) C) = lowB(Q, envR(EV, Q)) .
+    eq lowB(Q, bv(V)) = vloc(Q) .
+    eq lowB(Q, bp(FXS)) = sloc(FXS) .
+
+    eq lower(LV · F0, C) = ext(lower(LV, C), F0, C) .
+    eq lower(LV [ E ], C) = extI(lower(LV, C), eval(E, C), C) .
+
+    eq ext(sloc(FXS), F0, C) = sloc(FXS F0) .
+    eq ext(mloc(ID, FXS), F0, C) = mloc(ID, FXS F0) .
+    eq ext(vloc(Q), F0, env(EV) C) = extB(envR(EV, Q), F0) .
+    eq ext(revL, F0, C) = revL .
+    eq extB(bv(ID), F0) = mloc(ID, F0) .   *** member access on a memory reference
+
+    eq extI(L?, I, C) = ext(L?, I, C) .    *** an Int is a Field (array/mapping key)
+    eq extI(L?, rev, C) = revL .           *** index expression reverted
+
+    *** ---- location read ------------------------------------------------------
+    op readLoc : Loc? Cells -> Value? .
+    eq readLoc(sloc(FXS), sto(ST) C) = find(ST, FXS) .
+    eq readLoc(mloc(ID, FXS), mem(M) C) = mread(M, ID, FXS) .
+    eq readLoc(vloc(Q), env(EV) C) = bval(envR(EV, Q)) .
+    eq readLoc(revL, C) = rev .
+
+    *** ---- evaluation ---------------------------------------------------------
+    op eval : Exp Cells -> Value? .
+
+    eq eval(V, C) = V .
+    eq eval(LV, C) = readLoc(lower(LV, C), C) .
+    eq eval(msg·sender, msg(SND, VAL) C) = SND .
+    eq eval(msg·value, msg(SND, VAL) C) = VAL .
+
+    eq eval(E1 +. E2, C) = add?(eval(E1, C), eval(E2, C)) .
+    eq eval(E1 -. E2, C) = sub?(eval(E1, C), eval(E2, C)) .
+    eq eval(E1 *. E2, C) = mul?(eval(E1, C), eval(E2, C)) .
+    eq eval(E1 / E2, C) = div?(eval(E1, C), eval(E2, C)) .
+    eq eval(E1 % E2, C) = mod?(eval(E1, C), eval(E2, C)) .
+    eq eval(E1 ** E2, C) = pow?(eval(E1, C), eval(E2, C)) .
+    eq eval(neg E1, C) = neg?(eval(E1, C)) .
+
+    eq eval(E1 <. E2, C) = lt?(eval(E1, C), eval(E2, C)) .
+    eq eval(E1 <=. E2, C) = leq?(eval(E1, C), eval(E2, C)) .
+    eq eval(E1 >. E2, C) = lt?(eval(E2, C), eval(E1, C)) .
+    eq eval(E1 >=. E2, C) = leq?(eval(E2, C), eval(E1, C)) .
+    eq eval(E1 === E2, C) = eqV?(eval(E1, C), eval(E2, C)) .
+    eq eval(E1 !== E2, C) = neqV?(eval(E1, C), eval(E2, C)) .
+
+    eq eval(E1 && E2, C) = and?(eval(E1, C), E2, C) .
+    eq eval(E1 || E2, C) = or?(eval(E1, C), E2, C) .
+    eq eval(! E1, C) = not?(eval(E1, C)) .
+
+    *** ---- strict helpers (rev propagates) --------------------------------------
+    ops add? sub? mul? div? mod? pow? lt? leq? eqV? neqV? : Value? Value? -> Value? .
+    op neg? : Value? -> Value? .
+    op not? : Value? -> Value? .
+    op and? : Value? Exp Cells -> Value? .
+    op or? : Value? Exp Cells -> Value? .
+    op tv : Bool -> Int .
+
+    eq tv(true) = 1 .
+    eq tv(false) = 0 .
+
+    eq add?(I1, I2) = I1 + I2 .
+    eq add?(rev, W) = rev .    eq add?(W, rev) = rev .
+    eq sub?(I1, I2) = _-_(I1, I2) .    *** prefix form: `I1 - I2` also parses as the list `I1 (- I2)`
+    eq sub?(rev, W) = rev .    eq sub?(W, rev) = rev .
+    eq mul?(I1, I2) = I1 * I2 .
+    eq mul?(rev, W) = rev .    eq mul?(W, rev) = rev .
+
+    ceq div?(I1, I2) = I1 quo I2 if I2 =/= 0 .    *** Solidity `/` truncates toward zero, like quo
+    eq div?(I1, 0) = rev .                        *** the SolKey zero-denominator revert branch
+    eq div?(rev, W) = rev .    eq div?(W, rev) = rev .
+    ceq mod?(I1, I2) = I1 rem I2 if I2 =/= 0 .    *** sign of the dividend, like Solidity `%`
+    eq mod?(I1, 0) = rev .
+    eq mod?(rev, W) = rev .    eq mod?(W, rev) = rev .
+    ceq pow?(I1, I2) = I1 ^ I2 if I2 >= 0 .
+    ceq pow?(I1, I2) = rev if I2 < 0 .            *** cannot arise from uint programs
+    eq pow?(rev, W) = rev .    eq pow?(W, rev) = rev .
+    eq neg?(I1) = - I1 .
+    eq neg?(rev) = rev .
+
+    eq lt?(I1, I2) = tv(I1 < I2) .
+    eq lt?(rev, W) = rev .     eq lt?(W, rev) = rev .
+    eq leq?(I1, I2) = tv(I1 <= I2) .
+    eq leq?(rev, W) = rev .    eq leq?(W, rev) = rev .
+
+    *** `===` compares evaluated values; on fully concrete values this is
+    *** Solidity equality, on symbolic ones it is syntactic — a caveat shared
+    *** with any normal-form-based equality.
+    eq eqV?(V, V) = 1 .
+    ceq eqV?(W1, W2) = 0 if W1 =/= W2 /\ W1 =/= rev /\ W2 =/= rev .
+    eq eqV?(rev, W) = rev .    eq eqV?(W, rev) = rev .
+    eq neqV?(V, V) = 0 .
+    ceq neqV?(W1, W2) = 1 if W1 =/= W2 /\ W1 =/= rev /\ W2 =/= rev .
+    eq neqV?(rev, W) = rev .   eq neqV?(W, rev) = rev .
+
+    eq and?(0, E2, C) = 0 .                       *** short-circuit: E2 never evaluated
+    ceq and?(I, E2, C) = eval(E2, C) if I =/= 0 .
+    eq and?(rev, E2, C) = rev .
+    ceq or?(I, E2, C) = 1 if I =/= 0 .            *** short-circuit
+    eq or?(0, E2, C) = eval(E2, C) .
+    eq or?(rev, E2, C) = rev .
+    eq not?(0) = 1 .
+    ceq not?(I) = 0 if I =/= 0 .
+    eq not?(rev) = rev .
+
+    *** ---- eread: the universal test extractor ---------------------------------
+    *** Evaluate a source expression against a (final) configuration — the
+    *** trailing test blocks read storage, memory and locals through it.
+    op eread : Conf Exp -> Value? .
+    eq eread({ C }, E1) = eval(E1, C) .
+endfm
+
+*** ---- tests: the Tier-1 matrix ------------------------------------------------
+
+fmod SOL-EVAL-TEST{Field :: TRIV} is
+    pr SOL-EVAL{Field} .
+
+    ops $alice $account : -> IdField .
+    ops $balance $nonce : -> PrimField .
+    op $m : -> MapField .
+
+    op stT : -> Struct .
+    op memT : -> Memory .
+    op envT : -> Env .
+    op tc : -> Cells .
+
+    eq stT = save(save(save(mtSt, $alice $balance, 10),
+                       $alice $m 3, 42),
+                  $alice $account $nonce, 8) .
+    eq memT = write(write(emptyMemory, idC(pid(0), nil), $account, idC(pid(1), nil)),
+                    idC(pid(1), nil), $balance, 9) .
+    eq envT = envW(envW(envW(mtEnv, 'x, bv(4)),
+                        'a, bp($alice $account)),
+                   'p, bv(idC(pid(0), nil))) .
+    eq tc = sto(stT) mem(memT) env(envT) msg(77, 5) .
+endfm
+
+*** arithmetic
+red eval('x +. 1, tc) .            *** 5
+red eval('x -. 10, tc) .           *** -6
+red eval('x *. 'x, tc) .           *** 16
+red eval(9 / 'x, tc) .             *** 2   (truncating)
+red eval(neg 9 / 'x, tc) .         *** -2  (toward zero, like Solidity)
+red eval('x / 0, tc) .             *** rev — the revert branch
+red eval(7 % 'x, tc) .             *** 3
+red eval('x % 0, tc) .             *** rev
+red eval(2 ** 'x, tc) .            *** 16
+red eval(neg 'x, tc) .             *** -4
+red eval(1 +. 'x / 0, tc) .        *** rev — strict propagation
+
+*** relational / equality
+red eval('x <. 4, tc) .            *** 0
+red eval('x <=. 4, tc) .           *** 1
+red eval('x >. 3, tc) .            *** 1
+red eval('x >=. 5, tc) .           *** 0
+red eval('x === 4, tc) .           *** 1
+red eval('x !== 4, tc) .           *** 0
+
+*** logical, incl. genuine short-circuit
+red eval(1 && 'x <. 9, tc) .           *** 1
+red eval(0 && 1 / 0 === 0, tc) .       *** 0 — RHS never evaluated
+red eval(1 || 1 / 0 === 0, tc) .       *** 1 — RHS never evaluated
+red eval(0 || 'x === 4, tc) .          *** 1
+red eval(! ('x === 4), tc) .           *** 0
+red eval(1 / 0 === 0 && 1, tc) .       *** rev — LHS revert wins
+
+*** lvalue reads: storage root/field/index, alias, memory reference
+red eval($alice · $balance, tc) .        *** 10
+red eval($alice · $m [ 3 ], tc) .        *** 42
+red eval($alice · $m [ 'x -. 1 ], tc) .  *** 42 — computed index
+red eval('a · $nonce, tc) .              *** 8 — through the storage alias path
+red eval('p · $account · $balance, tc) . *** 9 — deep memory read
+red eval('x, tc) .                       *** 4 — value local
+red eval($alice · $m [ 1 / 0 ], tc) .    *** rev — index expression reverted
+
+*** environment
+red eval(msg·sender, tc) .           *** 77
+red eval(msg·value, tc) .            *** 5
