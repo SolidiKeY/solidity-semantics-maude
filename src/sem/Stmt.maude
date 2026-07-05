@@ -5,13 +5,13 @@
 *** location-pair dispatch of plain assignment — Solidity's copy semantics
 *** driven from source-level syntax, this repository's core artifact:
 ***
-***   storage := storage   deep VALUE copy         save of the struct value
-***   storage := memory    eager reference walk    copyMem — lazy struct that
+***   storage = storage   deep VALUE copy         save of the struct value
+***   storage = memory    eager reference walk    copyMem — lazy struct that
 ***                                                reads through the captured
 ***                                                memory term
-***   memory  := storage   fresh object + copySt   lazy copy of the captured
+***   memory  = storage   fresh object + copySt   lazy copy of the captured
 ***                                                struct value
-***   memory  := memory    reference ALIASING      no copy at all
+***   memory  = memory    reference ALIASING      no copy at all
 ***
 *** copySt / copyMem restate the equations of ../StorageToMemoryLazy.maude
 *** and ../MemoryToStorage.maude verbatim (those files cannot be `load`ed
@@ -61,12 +61,18 @@ fmod SOL-STMT{Field :: TRIV} is
 
     *** ---- plain assignment ---------------------------------------------------
     *** dispatch on the LHS shape: a bare Qid may be a path REBIND
-    eq { k((PF := E ;) KK) C } = asg(sloc(PF), eval(E, C), KK, C) .
-    eq { k((IDF := E ;) KK) C } = asg(sloc(IDF), eval(E, C), KK, C) .
-    eq { k((MF := E ;) KK) C } = asg(sloc(MF), eval(E, C), KK, C) .
-    eq { k((LV · F0 := E ;) KK) C } = asg(lower(LV · F0, C), eval(E, C), KK, C) .
-    eq { k((LV [ E2 ] := E ;) KK) C } = asg(lower(LV [ E2 ], C), eval(E, C), KK, C) .
-    eq { k((Q := E ;) KK) env(EV) C } = asgQ(Q, envR(EV, Q), E, KK, env(EV) C) .
+    eq { k((PF = E ;) KK) C } = asg(sloc(PF), eval(E, C), KK, C) .
+    eq { k((IDF = E ;) KK) C } = asg(sloc(IDF), eval(E, C), KK, C) .
+    eq { k((MF = E ;) KK) C } = asg(sloc(MF), eval(E, C), KK, C) .
+    eq { k((LV . F0 = E ;) KK) C } = asg(lower(LV . F0, C), eval(E, C), KK, C) .
+    eq { k((LV [ E2 ] = E ;) KK) C } = asg(lower(LV [ E2 ], C), eval(E, C), KK, C) .
+    eq { k((Q = E ;) KK) env(EV) C } = asgQ(Q, envR(EV, Q), E, KK, env(EV) C) .
+
+    *** storing a boolean (Solidity `flag = bal < 0 ;`): the RHS is a Prop,
+    *** evaluated to 1/0 and written like any value (never a path rebind).
+    var P : Prop .
+    eq { k((LV = P ;) KK) C } = asg(lower(LV, C), evalP(P, C), KK, C) .
+    eq { k((var Q = P ;) KK) C } = decV(Q, evalP(P, C), KK, C) .
 
     op asgQ : Qid Binding Exp K Cells -> Conf .
     eq asgQ(Q, bv(V), E, KK, C) = asg(vloc(Q), eval(E, C), KK, C) .
@@ -99,43 +105,43 @@ fmod SOL-STMT{Field :: TRIV} is
 
     *** ---- declarations ---------------------------------------------------------
     op decV : Qid Value? K Cells -> Conf .
-    eq { k((var Q := E ;) KK) C } = decV(Q, eval(E, C), KK, C) .
+    eq { k((var Q = E ;) KK) C } = decV(Q, eval(E, C), KK, C) .
     eq decV(Q, I, KK, env(EV) C) = { k(KK) env(envW(EV, Q, bv(I))) C } .
     eq decV(Q, rev, KK, C) = doRevert(k(nilK) C) .
 
     op decS : Qid Loc? K Cells -> Conf .
-    eq { k((storage Q := LV ;) KK) C } = decS(Q, lower(LV, C), KK, C) .
+    eq { k((storage Q = LV ;) KK) C } = decS(Q, lower(LV, C), KK, C) .
     eq decS(Q, sloc(FXS), KK, env(EV) C) = { k(KK) env(envW(EV, Q, bp(FXS))) C } .
     eq decS(Q, revL, KK, C) = doRevert(k(nilK) C) .
 
     op decM : Qid Value? K Cells -> Conf .
-    eq { k((memory Q := E ;) KK) C } = decM(Q, eval(E, C), KK, C) .
+    eq { k((memory Q = E ;) KK) C } = decM(Q, eval(E, C), KK, C) .
     eq decM(Q, ID, KK, env(EV) C) = { k(KK) env(envW(EV, Q, bv(ID))) C } .
     eq decM(Q, ST2, KK, env(EV) mem(M) cnt(N) C) =
         { k(KK) env(envW(EV, Q, bv(idC(pid(N), nil))))
           mem(copySt(M, pid(N), ST2)) cnt(N + 1) C } .
     eq decM(Q, rev, KK, C) = doRevert(k(nilK) C) .
-    eq { k((memory Q := new ;) KK) env(EV) mem(M) cnt(N) C } =
+    eq { k((memory Q = new ;) KK) env(EV) mem(M) cnt(N) C } =
         { k(KK) env(envW(EV, Q, bv(idC(pid(N), nil)))) mem(add(M, pid(N))) cnt(N + 1) C } .
 
     *** ---- compound assignment / inc / dec: honest desugaring --------------------
     *** sound because expressions are side-effect-free (the duplicated LV
     *** re-evaluates without observable effect); `/=` `%=` inherit the
     *** zero-denominator revert from eval.
-    eq { k((LV += E ;) KK) C } = { k((LV := LV +. E ;) KK) C } .
-    eq { k((LV -= E ;) KK) C } = { k((LV := LV -. E ;) KK) C } .
-    eq { k((LV *= E ;) KK) C } = { k((LV := LV *. E ;) KK) C } .
-    eq { k((LV /= E ;) KK) C } = { k((LV := LV / E ;) KK) C } .
-    eq { k((LV %= E ;) KK) C } = { k((LV := LV % E ;) KK) C } .
+    eq { k((LV += E ;) KK) C } = { k((LV = LV + E ;) KK) C } .
+    eq { k((LV -= E ;) KK) C } = { k((LV = _-_(LV, E) ;) KK) C } .
+    eq { k((LV *= E ;) KK) C } = { k((LV = LV * E ;) KK) C } .
+    eq { k((LV /= E ;) KK) C } = { k((LV = LV / E ;) KK) C } .
+    eq { k((LV %= E ;) KK) C } = { k((LV = LV % E ;) KK) C } .
 
-    eq { k((LV ++ ;) KK) C } = { k((LV := LV +. 1 ;) KK) C } .
-    eq { k((++ LV ;) KK) C } = { k((LV := LV +. 1 ;) KK) C } .
-    eq { k((LV -- ;) KK) C } = { k((LV := LV -. 1 ;) KK) C } .
-    eq { k((-- LV ;) KK) C } = { k((LV := LV -. 1 ;) KK) C } .
-    eq { k((Q := LV ++ ;) KK) C } = { k((Q := LV ;) (LV := LV +. 1 ;) KK) C } .
-    eq { k((Q := LV -- ;) KK) C } = { k((Q := LV ;) (LV := LV -. 1 ;) KK) C } .
-    eq { k((Q := ++ LV ;) KK) C } = { k((LV := LV +. 1 ;) (Q := LV ;) KK) C } .
-    eq { k((Q := -- LV ;) KK) C } = { k((LV := LV -. 1 ;) (Q := LV ;) KK) C } .
+    eq { k((LV ++ ;) KK) C } = { k((LV = LV + 1 ;) KK) C } .
+    eq { k((++ LV ;) KK) C } = { k((LV = LV + 1 ;) KK) C } .
+    eq { k((LV -- ;) KK) C } = { k((LV = _-_(LV, 1) ;) KK) C } .
+    eq { k((-- LV ;) KK) C } = { k((LV = _-_(LV, 1) ;) KK) C } .
+    eq { k((Q = LV ++ ;) KK) C } = { k((Q = LV ;) (LV = LV + 1 ;) KK) C } .
+    eq { k((Q = LV -- ;) KK) C } = { k((Q = LV ;) (LV = _-_(LV, 1) ;) KK) C } .
+    eq { k((Q = ++ LV ;) KK) C } = { k((LV = LV + 1 ;) (Q = LV ;) KK) C } .
+    eq { k((Q = -- LV ;) KK) C } = { k((LV = _-_(LV, 1) ;) (Q = LV ;) KK) C } .
 
     *** ---- delete -----------------------------------------------------------------
     *** storage: the lazy mapping-preserving del of ../Storage.maude (incl.
@@ -174,7 +180,7 @@ fmod SOL-STMT{Field :: TRIV} is
     ceq popA(ST, FXS) = save(del(ST, FXS NI), FXS length, NI)
         if s NI := find(ST, FXS length) .
 
-    eq { k((LV ·push(E) ;) KK) C } = pushD(lower(LV, C), eval(E, C), KK, C) .
+    eq { k((LV .push(E) ;) KK) C } = pushD(lower(LV, C), eval(E, C), KK, C) .
     op pushD : Loc? Value? K Cells -> Conf .
     eq pushD(sloc(FXS), I, KK, sto(ST) C) = { k(KK) sto(pushV(ST, FXS, I)) C } .
     eq pushD(sloc(FXS), ST2, KK, sto(ST) C) = { k(KK) sto(pushV(ST, FXS, ST2)) C } .
@@ -183,14 +189,14 @@ fmod SOL-STMT{Field :: TRIV} is
     eq pushD(revL, W, KK, C) = doRevert(k(nilK) C) .
     eq pushD(L?, rev, KK, C) = doRevert(k(nilK) C) .
 
-    eq { k((LV ·push() ;) KK) C } = pushE(lower(LV, C), KK, C) .
+    eq { k((LV .push() ;) KK) C } = pushE(lower(LV, C), KK, C) .
     op pushE : Loc? K Cells -> Conf .
     eq pushE(sloc(FXS), KK, sto(ST) C) = { k(KK) sto(pushL(ST, FXS)) C } .
     eq pushE(revL, KK, C) = doRevert(k(nilK) C) .
 
     *** pop on an empty array reverts (SolKey storagePopSave's empty branch);
     *** the nonempty branch inherits the mapping-preserving slot clear.
-    eq { k((LV ·pop() ;) KK) C } = popD(lower(LV, C), KK, C) .
+    eq { k((LV .pop() ;) KK) C } = popD(lower(LV, C), KK, C) .
     op popD : Loc? K Cells -> Conf .
     eq popD(sloc(FXS), KK, sto(ST) C) = popN(FXS, find(ST, FXS length), KK, sto(ST) C) .
     eq popD(revL, KK, C) = doRevert(k(nilK) C) .
@@ -223,162 +229,162 @@ fmod SOL-STMT-TEST{Field :: TRIV} is
 
     *** root-to-root struct copy is a VALUE copy
     eq cCopy = run(
-        $alice · $balance := 5 ;
-        $bob := $alice ;
-        $alice · $balance := 9 ; ) .
+        $alice . $balance = 5 ;
+        $bob = $alice ;
+        $alice . $balance = 9 ; ) .
 
     *** storage alias writes through to the aliased path
     eq cAlias = run(
-        storage 'a := $alice ;
-        'a · $balance := 7 ; ) .
+        storage 'a = $alice ;
+        'a . $balance = 7 ; ) .
 
     *** assigning to a bare alias local REBINDS the path
     eq cRebind = run(
-        $alice · $nonce := 1 ;
-        storage 'a := $alice ;
-        'a := $bob ;
-        'a · $nonce := 3 ; ) .
+        $alice . $nonce = 1 ;
+        storage 'a = $alice ;
+        'a = $bob ;
+        'a . $nonce = 3 ; ) .
 
     *** post-increment capture: old value into 'x, slot bumped
     eq cIncCap = run(
-        $alice · $nonce := 5 ;
-        var 'x := 0 ;
-        'x := $alice · $nonce ++ ;
-        ++ $alice · $balance ; ) .
+        $alice . $nonce = 5 ;
+        var 'x = 0 ;
+        'x = $alice . $nonce ++ ;
+        ++ $alice . $balance ; ) .
 
     *** delete resets primitives and nested structs, PRESERVES mappings
     eq cDel = run(
-        $alice · $balance := 5 ;
-        $alice · $account · $nonce := 7 ;
-        $alice · $m [ 9 ] := 42 ;
+        $alice . $balance = 5 ;
+        $alice . $account . $nonce = 7 ;
+        $alice . $m [ 9 ] = 42 ;
         delete $alice ; ) .
 
     *** whole-array delete resets the length (open refinement in SolKey)
     eq cDelArr = run(
-        $arr ·push(1) ;
-        $arr ·push(2) ;
+        $arr .push(1) ;
+        $arr .push(2) ;
         delete $arr ; ) .
 
     eq cPushPop = run(
-        $arr ·push(10) ;
-        $arr ·push(20) ;
-        $arr ·pop() ; ) .
+        $arr .push(10) ;
+        $arr .push(20) ;
+        $arr .pop() ; ) .
 
     *** pop on an empty array reverts the whole transaction
     eq cPopEmpty = run(
-        $arr ·push(1) ;
-        $arr ·pop() ;
-        $arr ·pop() ; ) .
+        $arr .push(1) ;
+        $arr .pop() ;
+        $arr .pop() ; ) .
 
     *** SolKey testDeepPopDoesNotResetMappingMember: a mapping nested in a
     *** popped element survives pop() and a later bare push()
     eq cDeepPop = run(
-        $arr2 ·push() ;
-        $arr2 [ 0 ] · $account · $m [ 1 ] := 10 ;
-        $arr2 [ 0 ] · $account · $nonce := 5 ;
-        $arr2 ·pop() ;
-        $arr2 ·push() ; ) .
+        $arr2 .push() ;
+        $arr2 [ 0 ] . $account . $m [ 1 ] = 10 ;
+        $arr2 [ 0 ] . $account . $nonce = 5 ;
+        $arr2 .pop() ;
+        $arr2 .push() ; ) .
 
     eq cMemNew = run(
-        memory 'p := new ;
-        'p · $balance := 9 ; ) .
+        memory 'p = new ;
+        'p . $balance = 9 ; ) .
 
     *** memory-to-memory assignment is reference aliasing
     eq cMemAlias = run(
-        memory 'p := new ;
-        'p · $balance := 1 ;
-        memory 'q := 'p ;
-        'q · $balance := 11 ; ) .
+        memory 'p = new ;
+        'p . $balance = 1 ;
+        memory 'q = 'p ;
+        'q . $balance = 11 ; ) .
 
     *** storage-to-memory is a copy: later storage writes are invisible
     eq cS2M = run(
-        $alice · $balance := 5 ;
-        $alice · $account · $nonce := 8 ;
-        memory 'p := $alice ;
-        $alice · $balance := 99 ; ) .
+        $alice . $balance = 5 ;
+        $alice . $account . $nonce = 8 ;
+        memory 'p = $alice ;
+        $alice . $balance = 99 ; ) .
 
     *** ... and writing the memory copy leaves storage untouched
     eq cS2MW = run(
-        $alice · $balance := 5 ;
-        memory 'p := $alice ;
-        'p · $balance := 7 ; ) .
+        $alice . $balance = 5 ;
+        memory 'p = $alice ;
+        'p . $balance = 7 ; ) .
 
     *** memory-to-storage is a copy: later memory writes are invisible
     eq cM2S = run(
-        memory 'p := new ;
-        'p · $balance := 123 ;
-        $carol := 'p ;
-        'p · $balance := 5 ; ) .
+        memory 'p = new ;
+        'p . $balance = 123 ;
+        $carol = 'p ;
+        'p . $balance = 5 ; ) .
 
     *** memory delete: primitive slot to 0, reference slot to fresh object
     eq cMemDel = run(
-        memory 'p := new ;
-        'p · $balance := 9 ;
-        'p · $account · $nonce := 4 ;
-        delete 'p · $balance ;
-        delete 'p · $account ; ) .
+        memory 'p = new ;
+        'p . $balance = 9 ;
+        'p . $account . $nonce = 4 ;
+        delete 'p . $balance ;
+        delete 'p . $account ; ) .
 
     *** /= 0 reverts and rolls the whole transaction back
     eq cDivZ = run(
-        $alice · $balance := 10 ;
-        $alice · $balance /= 0 ; ) .
+        $alice . $balance = 10 ;
+        $alice . $balance /= 0 ; ) .
 endfm
 
 *** copy semantics
-red eread(cCopy, $bob · $balance) .        *** 5 — value copy, unaffected by the later write
-red eread(cCopy, $alice · $balance) .      *** 9
-red eread(cAlias, $alice · $balance) .     *** 7
-red eread(cRebind, $bob · $nonce) .        *** 3
-red eread(cRebind, $alice · $nonce) .      *** 1 — untouched after the rebind
+red eread(cCopy, $bob . $balance) .        *** 5 — value copy, unaffected by the later write
+red eread(cCopy, $alice . $balance) .      *** 9
+red eread(cAlias, $alice . $balance) .     *** 7
+red eread(cRebind, $bob . $nonce) .        *** 3
+red eread(cRebind, $alice . $nonce) .      *** 1 — untouched after the rebind
 
 *** inc/dec
 red vread(cIncCap, 'x) .                   *** 5 — post-increment captures the old value
-red eread(cIncCap, $alice · $nonce) .      *** 6
-red eread(cIncCap, $alice · $balance) .    *** 1
+red eread(cIncCap, $alice . $nonce) .      *** 6
+red eread(cIncCap, $alice . $balance) .    *** 1
 
 *** compound assignment through a program
-red eread(run($alice · $balance := 10 ;
-              $alice · $balance += 5 ;
-              $alice · $balance -= 3 ;
-              $alice · $balance *= 4 ;
-              $alice · $balance /= 6 ;
-              $alice · $balance %= 5 ;), $alice · $balance) .   *** 3
+red eread(run($alice . $balance = 10 ;
+              $alice . $balance += 5 ;
+              $alice . $balance -= 3 ;
+              $alice . $balance *= 4 ;
+              $alice . $balance /= 6 ;
+              $alice . $balance %= 5 ;), $alice . $balance) .   *** 3
 
 *** delete
-red eread(cDel, $alice · $balance) .           *** 0
-red eread(cDel, $alice · $account · $nonce) .  *** 0
-red eread(cDel, $alice · $m [ 9 ]) .           *** 42 — MAPPING PRESERVED (critical)
-red eread(cDelArr, $arr · length) .            *** 0 — whole-array delete resets length
+red eread(cDel, $alice . $balance) .           *** 0
+red eread(cDel, $alice . $account . $nonce) .  *** 0
+red eread(cDel, $alice . $m [ 9 ]) .           *** 42 — MAPPING PRESERVED (critical)
+red eread(cDelArr, $arr . length) .            *** 0 — whole-array delete resets length
 red eread(cDelArr, $arr [ 0 ]) .               *** 0
 
 *** push / pop
-red eread(cPushPop, $arr · length) .           *** 1
+red eread(cPushPop, $arr . length) .           *** 1
 red eread(cPushPop, $arr [ 0 ]) .              *** 10
 red eread(cPushPop, $arr [ 1 ]) .              *** 0 — popped slot cleared
 red statOf(cPopEmpty) .                        *** reverted
-red eread(cPopEmpty, $arr · length) .          *** 0 — rollback to entry storage
-red eread(cDeepPop, $arr2 · length) .                    *** 1
-red eread(cDeepPop, $arr2 [ 0 ] · $account · $m [ 1 ]) . *** 10 — map survives pop+push
-red eread(cDeepPop, $arr2 [ 0 ] · $account · $nonce) .   *** 0 — primitive reset by pop
+red eread(cPopEmpty, $arr . length) .          *** 0 — rollback to entry storage
+red eread(cDeepPop, $arr2 . length) .                    *** 1
+red eread(cDeepPop, $arr2 [ 0 ] . $account . $m [ 1 ]) . *** 10 — map survives pop+push
+red eread(cDeepPop, $arr2 [ 0 ] . $account . $nonce) .   *** 0 — primitive reset by pop
 
 *** memory
-red eread(cMemNew, 'p · $balance) .            *** 9
-red eread(cMemAlias, 'p · $balance) .          *** 11 — 'q aliases 'p
-red eread(cS2M, 'p · $balance) .               *** 5 — copy took a snapshot
-red eread(cS2M, 'p · $account · $nonce) .      *** 8 — deep lazy read through the copy
-red eread(cS2M, $alice · $balance) .           *** 99
-red eread(cS2MW, 'p · $balance) .              *** 7
-red eread(cS2MW, $alice · $balance) .          *** 5 — storage untouched by the memory write
-red eread(cM2S, $carol · $balance) .           *** 123 — snapshot at assignment time
-red eread(cMemDel, 'p · $balance) .            *** 0
-red eread(cMemDel, 'p · $account · $nonce) .   *** 0 — fresh object after reference delete
+red eread(cMemNew, 'p . $balance) .            *** 9
+red eread(cMemAlias, 'p . $balance) .          *** 11 — 'q aliases 'p
+red eread(cS2M, 'p . $balance) .               *** 5 — copy took a snapshot
+red eread(cS2M, 'p . $account . $nonce) .      *** 8 — deep lazy read through the copy
+red eread(cS2M, $alice . $balance) .           *** 99
+red eread(cS2MW, 'p . $balance) .              *** 7
+red eread(cS2MW, $alice . $balance) .          *** 5 — storage untouched by the memory write
+red eread(cM2S, $carol . $balance) .           *** 123 — snapshot at assignment time
+red eread(cMemDel, 'p . $balance) .            *** 0
+red eread(cMemDel, 'p . $account . $nonce) .   *** 0 — fresh object after reference delete
 
 *** revert
 red statOf(cDivZ) .                            *** reverted
-red eread(cDivZ, $alice · $balance) .          *** 0 — rolled back past the first write
+red eread(cDivZ, $alice . $balance) .          *** 0 — rolled back past the first write
 
 *** locals and bools-as-ints
-red vread(run(var 'x := 3 ; 'x := 'x +. 4 ;), 'x) .              *** 7
-red vread(run($alice · $nonce := 5 ; var 'y := 0 ;
-              'y := ++ $alice · $nonce ;), 'y) .                 *** 6 — pre-increment captures the new value
-red eread(run($alice · $flag := 2 <. 3 ;), $alice · $flag) .     *** 1
+red vread(run(var 'x = 3 ; 'x = 'x + 4 ;), 'x) .              *** 7
+red vread(run($alice . $nonce = 5 ; var 'y = 0 ;
+              'y = ++ $alice . $nonce ;), 'y) .                 *** 6 — pre-increment captures the new value
+red eread(run($alice . $flag = 2 < 3 ;), $alice . $flag) .     *** 1

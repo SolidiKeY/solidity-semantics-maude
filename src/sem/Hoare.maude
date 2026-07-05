@@ -1,0 +1,117 @@
+*** src/sem/Hoare.maude — a Hoare-triple notation for the semantics
+***
+*** The user-facing "proved automatically" front end, the rewriting-logic
+*** analogue of a KeY proof obligation. A triple
+***
+***     < program > (postcondition)
+***
+*** runs `program` from empty storage and REDUCES to `true` exactly when the
+*** program terminates normally (status ok) and the postcondition holds in
+*** the final state. Because Maude evaluates it by reduction, checking a
+*** contract property is a single `red` — no interactive proof.
+***
+***   red < alice . balance = 10 ;
+***         x = alice . balance ; > (x == 10) .      *** true
+***
+*** Variants:
+***   < prog > post           from empty storage
+***   [ st ] < prog > post     from a given initial storage `st`
+***   < prog > reverts         the program reverts (a require/assert/÷0 fired)
+*** The postcondition is an ordinary Prop, so it may read storage roots,
+*** locals, mapping/array entries, and use the full comparison/logical algebra.
+
+load Contract .
+
+fmod SOL-HOARE{Field :: TRIV} is
+    pr SOL-CONTRACT{Field} .
+
+    var C : Cells .   var KK : K .   var P : Prop .   var ST : Struct .   var SC : Status .
+
+    *** the triple: run from empty storage, then check the postcondition
+    op <_>_ : K Prop -> Bool [prec 92 gather (& E)] .
+    eq < KK > P = holds(init(KK, ST0), P) .
+    op ST0 : -> Struct .   eq ST0 = mtSt .    *** default initial storage (instances may refine defaults)
+
+    *** the triple over an explicit initial storage
+    op [_]<_>_ : Struct K Prop -> Bool [prec 92 gather (& & E)] .
+    eq [ ST ]< KK > P = holds(init(KK, ST), P) .
+
+    *** reverts / fails are outcome postconditions: the program reverted
+    *** via require / division-by-zero / revert, or hit a failing assert.
+    *** Keeping SolKey's require/assert split, fails is distinct from reverts.
+    op reverts : -> Prop [ctor] .
+    op fails : -> Prop [ctor] .
+
+    *** holds: an outcome marker checks the status; any other postcondition
+    *** demands NORMAL termination and then evaluates to true (1).
+    op holds : Conf Prop -> Bool .
+    eq holds({ stat(SC) C }, reverts) = (SC == reverted) .
+    eq holds({ stat(SC) C }, fails) = (SC == failed) .
+    ceq holds({ stat(SC) C }, P) = (evalP(P, stat(SC) C) == 1)
+        if SC == ok /\ P =/= reverts /\ P =/= fails .
+    ceq holds({ stat(SC) C }, P) = false
+        if SC =/= ok /\ P =/= reverts /\ P =/= fails .
+endfm
+
+*** ---- the headline example ---------------------------------------------------
+
+fmod HOARE-DEMO{Field :: TRIV} is
+    pr SOL-HOARE{Field} .
+
+    *** a small bank domain (concrete instance of the abstract field signature)
+    ops $alice $bob $account : -> IdField .
+    ops $balance $nonce : -> PrimField .
+    op $accounts : -> MapField .
+    ops $set $get : -> FName .
+
+    *** zero-initialization defaults for this instance
+    eq default($balance) = 0 .   eq default($nonce) = 0 .   eq default(length) = 0 .
+    eq default($alice) = mtSt .  eq default($bob) = mtSt .  eq default($account) = mtSt .
+
+    *** a tiny contract: setter and getter over alice's balance
+    eq fpar($set) = 'v .
+    eq fbody($set) = $alice . $balance = 'v ; .
+    eq fpar($get) = 'a .
+    eq fbody($get) = return $alice . $balance ; .
+endfm
+
+*** THE example the request asked for — reads like Solidity, proves by `red`:
+red < $alice . $account . $balance = 10 ;
+      var 'x = $alice . $account . $balance ; > ('x == 10) .     *** true
+
+*** a false postcondition reduces to false (not a stuck term)
+red < $alice . $account . $balance = 10 ; > ($alice . $account . $balance == 11) .   *** false
+
+*** storage copy is a value copy: bob keeps 10 after alice changes
+red < $alice . $balance = 10 ;
+      $bob = $alice ;
+      $alice . $balance = 99 ; > ($bob . $balance == 10 && $alice . $balance == 99) .   *** true
+
+*** a mapping write and read
+red < $accounts [ 7 ] . $balance = 500 ; > ($accounts [ 7 ] . $balance == 500) .   *** true
+
+*** control flow: sum 1..4
+red < var 's = 0 ; var 'i = 1 ;
+      while 'i <= 4 { 's += 'i ; 'i ++ ; } > ('s == 10) .        *** true
+
+*** a function call and a captured return value
+red < var 'r = 0 ;
+      call $set (42) ;
+      'r = call $get (0) ; > ('r == 42 && $alice . $balance == 42) .    *** true
+
+*** require failure makes the program revert (and roll back)
+red < $alice . $balance = 5 ;
+      require($alice . $balance > 9) ;
+      $alice . $nonce = 1 ; > reverts .                          *** true
+*** ... and a normal postcondition on a reverting run is false (partial correctness)
+red < $alice . $balance = 5 ;
+      require($alice . $balance > 9) ; > ($alice . $balance == 5) .    *** false — the run reverted
+
+*** assert failure is distinct from a require revert
+red < assert(1 == 2) ; > fails .                                 *** true
+
+*** division by zero reverts
+red < var 'x = 1 / 0 ; > reverts .                               *** true
+
+*** starting from a non-empty storage
+red [ save(mtSt, $alice $balance, 100) ]< $alice . $balance += 5 ; > ($alice . $balance == 105) .   *** true

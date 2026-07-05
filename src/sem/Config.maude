@@ -174,7 +174,7 @@ red envR(envW(envW(mtEnv, 'x, bv(1)), 'y, bv(3)), 'x) .   *** bv(1) — pass-thr
 red mread(write(write(emptyMemory, idC(pid(0), nil), $alice, idC(pid(1), nil)),
                 idC(pid(1), nil), $balance, 42),
           idC(pid(0), nil), $alice $balance) .    *** 42 — deep read through the reference
-red statOf(doRevert(k('x := 1 ;) sto(save(st1, $alice $balance, 99)) sto0(st1)
+red statOf(doRevert(k('x = 1 ;) sto(save(st1, $alice $balance, 99)) sto0(st1)
                     net(mtSt) net0(mtSt) stat(ok))) .          *** reverted
-red stOf(doRevert(k('x := 1 ;) sto(save(st1, $alice $balance, 99)) sto0(st1)
+red stOf(doRevert(k('x = 1 ;) sto(save(st1, $alice $balance, 99)) sto0(st1)
                   net(mtSt) net0(mtSt) stat(ok))) .            *** st1 rolled back: find = 7

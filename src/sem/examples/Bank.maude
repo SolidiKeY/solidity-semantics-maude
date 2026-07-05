@@ -33,35 +33,35 @@ fmod BANK-CONTRACT{Field :: TRIV} is
 
     *** deposit(): credit msg.value to the caller's account and the total
     eq fbody($deposit) =
-        require(msg·value >. 0) ;
-        $accts [ msg·sender ] · $bal += msg·value ;
+        require(msg·value > 0) ;
+        $accts [ msg·sender ] . $bal += msg·value ;
         $total += msg·value ; .
 
     *** withdraw(amt): safe pattern — check, effects, then interaction
     eq fpar($withdraw) = 'amt .
     eq fbody($withdraw) =
-        require($accts [ msg·sender ] · $frozen === 0) ;
-        require($accts [ msg·sender ] · $bal >=. 'amt) ;
-        $accts [ msg·sender ] · $bal -= 'amt ;
+        require($accts [ msg·sender ] . $frozen == 0) ;
+        require($accts [ msg·sender ] . $bal >= 'amt) ;
+        $accts [ msg·sender ] . $bal -= 'amt ;
         $total -= 'amt ;
-        msg·sender ·transfer('amt) ; .
+        msg·sender .transfer('amt) ; .
 
     *** freeze(addr): set the frozen flag
     eq fpar($freeze) = 'a .
-    eq fbody($freeze) = $accts [ 'a ] · $frozen := 1 ; .
+    eq fbody($freeze) = $accts [ 'a ] . $frozen = 1 ; .
 
     *** balanceOf(addr): return a balance (read-only)
     eq fpar($balanceOf) = 'a .
-    eq fbody($balanceOf) = return $accts [ 'a ] · $bal ; .
+    eq fbody($balanceOf) = return $accts [ 'a ] . $bal ; .
 
     *** registerOnce(addr): append to $owners iff not already the last owner —
     *** exercises push and an array-length read in a guard
     eq fpar($registerOnce) = 'a .
     eq fbody($registerOnce) =
-        if $owners · length === 0 {
-            $owners ·push('a) ;
+        if $owners . length == 0 {
+            $owners .push('a) ;
         } else {
-            if $owners [ $owners · length -. 1 ] !== 'a { $owners ·push('a) ; }
+            if $owners [ $owners . length - 1 ] != 'a { $owners .push('a) ; }
         } .
 endfm
 
@@ -98,37 +98,37 @@ fmod BANK-DRIVER{Field :: TRIV} is
     var CF : Conf .   vars T B1 B2 : Int .
     ceq inv(CF) = T == B1 + B2
         if T := eread(CF, $total)
-        /\ B1 := eread(CF, $accts [ 1 ] · $bal)
-        /\ B2 := eread(CF, $accts [ 2 ] · $bal) .
+        /\ B1 := eread(CF, $accts [ 1 ] . $bal)
+        /\ B2 := eread(CF, $accts [ 2 ] . $bal) .
 endfm
 
 *** ---- deposit / withdraw lifecycle -------------------------------------------
-red eread(afterDep1, $accts [ 1 ] · $bal) .     *** 100
+red eread(afterDep1, $accts [ 1 ] . $bal) .     *** 100
 red nread(afterDep1, 1) .                       *** 100 — msg.value credited to net(sender)
-red eread(afterDep2, $accts [ 2 ] · $bal) .     *** 40
+red eread(afterDep2, $accts [ 2 ] . $bal) .     *** 40
 red eread(afterDep2, $total) .                  *** 140 — running total across both deposits
 
 red statOf(afterWdr) .                          *** ok
-red eread(afterWdr, $accts [ 1 ] · $bal) .      *** 70 — 100 deposited, 30 withdrawn
+red eread(afterWdr, $accts [ 1 ] . $bal) .      *** 70 — 100 deposited, 30 withdrawn
 red eread(afterWdr, $total) .                   *** 110
 red nread(afterWdr, 1) .                        *** 70 — received 100, sent 30 back
 
 *** the class invariant  $total == sum of account balances  holds at rest.
-*** (Maude-level ==/+ on the extracted values — the dotted +. / === are
+*** (Maude-level ==/+ on the extracted values — the dotted + / == are
 *** program syntax and only evaluate inside a running configuration.)
 red inv(afterWdr) .   *** true  (110 == 70 + 40)
 
 *** ---- access control -----------------------------------------------------------
-red eread(afterFreeze, $accts [ 1 ] · $frozen) .  *** 1
+red eread(afterFreeze, $accts [ 1 ] . $frozen) .  *** 1
 red statOf(afterFrozenWdr) .                      *** reverted — frozen account blocked
-red eread(afterFrozenWdr, $accts [ 1 ] · $bal) .  *** 100 — untouched by the reverted withdraw
+red eread(afterFrozenWdr, $accts [ 1 ] . $bal) .  *** 100 — untouched by the reverted withdraw
 
 *** ---- withdrawing more than the balance reverts --------------------------------
 red statOf(txn1($withdraw, 999, stOf(afterDep2), netOf(afterDep2), 1, 0)) .   *** reverted
 
 *** ---- registerOnce idempotence (push + length guard) ---------------------------
-red eread(reg1, $owners · length) .   *** 1
-red eread(reg2, $owners · length) .   *** 1 — same owner, not appended again
-red eread(reg3, $owners · length) .   *** 2 — a different owner is appended
+red eread(reg1, $owners . length) .   *** 1
+red eread(reg2, $owners . length) .   *** 1 — same owner, not appended again
+red eread(reg3, $owners . length) .   *** 2 — a different owner is appended
 red eread(reg3, $owners [ 0 ]) .      *** 1
 red eread(reg3, $owners [ 1 ]) .      *** 2

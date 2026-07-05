@@ -1,29 +1,28 @@
-*** src/sem/Syntax.maude — Phase 0 of PLAN.md
+*** src/sem/Syntax.maude — Phase 0 of PLAN.md (Solidity-like surface syntax)
 ***
 *** Deep embedding of the Solidity subset ("Solidity Light": unbounded ints,
-*** no gas, no bitwise, no inheritance). Statements carry their trailing `;`
-*** so programs read close to Solidity source; sequencing is juxtaposition.
+*** no gas, no bitwise, no inheritance) with syntax that reads like Solidity:
 ***
-*** Design notes:
-***  - `subsort Value < Exp` lets Int/Struct/Identity literals (and
-***    symbolic `find`/`read` terms) embed directly in programs, and
-***    state variables ARE field constants (`$balance := 5 ;`). The price:
-***    Exp shares a kind with Int, so the prelude's special operators
-***    + - * < <= > >= and unary - cannot be overloaded — the Solidity
-***    ones are dotted instead: +. -. *. <. <=. >. >=. and `neg`.
-***    `/ % ** === !== && || !` have no prelude clash and stay clean.
-***  - Solidity bools are modeled as Ints 0/1, EVM-style: comparisons and
-***    logical operators evaluate to 1 or 0, guards treat nonzero as true.
-***    Maude's Bool CANNOT be subsorted under Value — that would merge the
-***    Bool and Nat kinds, where the prelude's two `_xor_` declarations
-***    clash irreparably. Note also that the built-in `==` on Exp compares
-***    syntax trees, not Solidity values — always use `===` in programs.
-***  - member access is `·` (as in src/list/), because a bare `.` collides
-***    with Maude's command terminator; `;  :=  ·  +.` etc. are not
-***    self-delimiting — write them surrounded by spaces.
-***  - Int is deliberately NOT an LValue (it is a literal and an index
-***    field); write `lv [ i ]` for indexing and `lv · length` for the
-***    array length slot.
+***     < alice . account . balance = 10 ;
+***       x = alice . account . balance ; > (x == 10)
+***
+*** Token choices (and the Maude lexer facts behind them):
+***  - member access is `.` — Maude treats a spaced ` . ` as an operator
+***    token and only the FINAL `.` of a command as the terminator, so
+***    `alice . account . balance` parses as nested member access.
+***  - assignment is `=` (`x = e ;`); equality is `==`; both distinct tokens.
+***  - arithmetic `+ - *` reuse the prelude INT operators via `[ditto]`, so
+***    literal `1 + 2` folds to `3` while `x + 1` stays symbolic; `/ % **`
+***    are our own (INT has no `/` at this kind, and uses `^`/`quo`/`rem`).
+***  - COMPARISONS return a dedicated sort `Prop`, NOT `Int` and NOT `Bool`.
+***    A fresh range sort is what lets `< <= > >=` coexist with the prelude's
+***    Nat comparisons (same operand kind, different result) — at `Exp -> Exp`
+***    they would clash irreparably. This costs four benign load-time
+***    advisories ("different range kind"), whitelisted in run-tests.sh.
+***    Conditions (if/while/require/assert) and the triple postcondition are
+***    Prop; SOL-EVAL evaluates a Prop to the Solidity truth value 1/0.
+***  - `msg·sender` / `msg·value` keep the middle dot: `msg` is not itself an
+***    expression, so they are single atomic globals, not member access.
 
 load ../Fields .
 
@@ -31,45 +30,42 @@ fmod SOL-SYNTAX{Field :: TRIV} is
     pr FIELDS{Field} .
     pr QID .
 
-    sorts Exp LValue Stmt K FName .
+    sorts Exp Prop LValue Stmt K FName .
 
     *** ---- lvalues ---------------------------------------------------------
-    *** roots: a state variable (storage root field) or a local (Qid) —
-    *** a local may hold a value, a memory reference, or a storage alias path.
+    *** a root is a state variable (a storage field constant) or a local Qid;
+    *** a local may hold a value, a memory reference, or a storage-alias path.
     subsort PrimField IdField MapField < LValue .
     subsort Qid < LValue .
-    op _·_ : LValue Field$Elt -> LValue [ctor prec 15 gather (E e)] .   *** member access; `lv · length` reads the array length slot
-    op _[_] : LValue Exp -> LValue [ctor prec 15] .                     *** index access (arrays and mappings)
+    op _._ : LValue Field$Elt -> LValue [ctor prec 15 gather (E e)] .   *** member access; `lv . length` is the array-length slot
+    op _[_] : LValue Exp -> LValue [ctor prec 15] .                     *** index (arrays and mappings)
 
-    *** ---- expressions -----------------------------------------------------
+    *** ---- integer / reference expressions ---------------------------------
     subsort LValue < Exp .
-    subsort Value < Exp .      *** literals and symbolic state reads embed directly
+    subsort Value < Exp .      *** Int / Struct / Identity literals and symbolic state reads embed directly
 
-    *** arithmetic (dotted where the prelude token is taken)
-    op _+._ : Exp Exp -> Exp [ctor assoc comm prec 33] .
-    op _-._ : Exp Exp -> Exp [ctor prec 33 gather (E e)] .
-    op _*._ : Exp Exp -> Exp [ctor assoc comm prec 31] .
-    op _/_ : Exp Exp -> Exp [ctor prec 31 gather (E e)] .    *** reverts on zero denominator
-    op _%_ : Exp Exp -> Exp [ctor prec 31 gather (E e)] .    *** reverts on zero denominator
+    op _+_ : Exp Exp -> Exp [ditto] .
+    op _-_ : Exp Exp -> Exp [ditto] .
+    op _*_ : Exp Exp -> Exp [ditto] .
+    op _/_ : Exp Exp -> Exp [ctor prec 31 gather (E e)] .    *** reverts on a zero denominator
+    op _%_ : Exp Exp -> Exp [ctor prec 31 gather (E e)] .    *** reverts on a zero denominator
     op _**_ : Exp Exp -> Exp [ctor prec 29 gather (e E)] .
-    op neg_ : Exp -> Exp [ctor prec 15] .                    *** unary minus
+    op neg_ : Exp -> Exp [ctor prec 15] .                    *** unary minus (prelude `-` is special)
 
-    *** relational / equality (`===`/`!==` because `==`/`=/=` are Maude built-ins)
-    op _<._ : Exp Exp -> Exp [ctor prec 37] .
-    op _<=._ : Exp Exp -> Exp [ctor prec 37] .
-    op _>._ : Exp Exp -> Exp [ctor prec 37] .
-    op _>=._ : Exp Exp -> Exp [ctor prec 37] .
-    op _===_ : Exp Exp -> Exp [ctor prec 51] .
-    op _!==_ : Exp Exp -> Exp [ctor prec 51] .
-
-    *** logical — `&&` / `||` short-circuit (see SOL-EVAL), so not comm
-    op _&&_ : Exp Exp -> Exp [ctor prec 55 gather (e E)] .
-    op _||_ : Exp Exp -> Exp [ctor prec 59 gather (e E)] .
-    op !_ : Exp -> Exp [ctor prec 53] .
-
-    *** environment (Phase 4)
     op msg·sender : -> Exp [ctor] .
     op msg·value : -> Exp [ctor] .
+
+    *** ---- boolean expressions (Prop) --------------------------------------
+    op _<_  : Exp Exp -> Prop [ctor prec 37 gather (E E)] .
+    op _<=_ : Exp Exp -> Prop [ctor prec 37 gather (E E)] .
+    op _>_  : Exp Exp -> Prop [ctor prec 37 gather (E E)] .
+    op _>=_ : Exp Exp -> Prop [ctor prec 37 gather (E E)] .
+    op _==_ : Exp Exp -> Prop [ctor prec 51 gather (E E)] .
+    op _!=_ : Exp Exp -> Prop [ctor prec 51 gather (E E)] .
+    op _&&_ : Prop Prop -> Prop [ctor prec 55 gather (e E)] .   *** short-circuit (see SOL-EVAL)
+    op _||_ : Prop Prop -> Prop [ctor prec 59 gather (e E)] .   *** short-circuit
+    op !_ : Prop -> Prop [ctor prec 53] .
+    ops true false : -> Prop [ctor] .                          *** Solidity bool literals
 
     *** ---- statements ------------------------------------------------------
     subsort Stmt < K .
@@ -77,11 +73,13 @@ fmod SOL-SYNTAX{Field :: TRIV} is
     op __ : K K -> K [ctor assoc id: nilK prec 80] .
 
     *** assignment and declarations
-    op _:=_; : LValue Exp -> Stmt [ctor prec 70] .
-    op var_:=_; : Qid Exp -> Stmt [ctor prec 70] .        *** value local
-    op storage_:=_; : Qid LValue -> Stmt [ctor prec 70] . *** storage alias: binds the PATH
-    op memory_:=_; : Qid Exp -> Stmt [ctor prec 70] .     *** memory reference local
-    op memory_:= new ; : Qid -> Stmt [ctor prec 70] .     *** fresh empty memory object
+    op _=_; : LValue Exp -> Stmt [ctor prec 70] .
+    op _=_; : LValue Prop -> Stmt [ctor prec 70] .       *** store a bool (as 1/0), e.g. `frozen = bal < 0 ;`
+    op var_=_; : Qid Prop -> Stmt [ctor prec 70] .
+    op var_=_; : Qid Exp -> Stmt [ctor prec 70] .        *** value local
+    op storage_=_; : Qid LValue -> Stmt [ctor prec 70] . *** storage alias: binds the PATH
+    op memory_=_; : Qid Exp -> Stmt [ctor prec 70] .     *** memory reference local
+    op memory_= new ; : Qid -> Stmt [ctor prec 70] .     *** fresh empty memory object
 
     *** compound assignment
     op _+=_; : LValue Exp -> Stmt [ctor prec 70] .
@@ -95,48 +93,44 @@ fmod SOL-SYNTAX{Field :: TRIV} is
     op _-- ; : LValue -> Stmt [ctor prec 70] .
     op ++_ ; : LValue -> Stmt [ctor prec 70] .
     op --_ ; : LValue -> Stmt [ctor prec 70] .
-    op _:=_++ ; : Qid LValue -> Stmt [ctor prec 70] .
-    op _:=_-- ; : Qid LValue -> Stmt [ctor prec 70] .
-    op _:= ++_ ; : Qid LValue -> Stmt [ctor prec 70] .
-    op _:= --_ ; : Qid LValue -> Stmt [ctor prec 70] .
+    op _=_++ ; : Qid LValue -> Stmt [ctor prec 70] .
+    op _=_-- ; : Qid LValue -> Stmt [ctor prec 70] .
+    op _= ++_ ; : Qid LValue -> Stmt [ctor prec 70] .
+    op _= --_ ; : Qid LValue -> Stmt [ctor prec 70] .
 
     *** delete
     op delete_; : LValue -> Stmt [ctor prec 70] .
 
     *** dynamic arrays
-    op _·push(_) ; : LValue Exp -> Stmt [ctor prec 70] .
-    op _·push() ; : LValue -> Stmt [ctor prec 70] .
-    op _·pop() ; : LValue -> Stmt [ctor prec 70] .
+    op _.push(_) ; : LValue Exp -> Stmt [ctor prec 70] .
+    op _.push() ; : LValue -> Stmt [ctor prec 70] .
+    op _.pop() ; : LValue -> Stmt [ctor prec 70] .
 
-    *** control flow (Phase 3)
-    op if_{_} : Exp K -> Stmt [ctor prec 70] .
-    op if_{_}else{_} : Exp K K -> Stmt [ctor prec 70] .
-    op while_{_} : Exp K -> Stmt [ctor prec 70] .
-    op require(_) ; : Exp -> Stmt [ctor prec 70] .
-    op assert(_) ; : Exp -> Stmt [ctor prec 70] .
+    *** control flow — guards are Prop
+    op if_{_} : Prop K -> Stmt [ctor prec 70] .
+    op if_{_}else{_} : Prop K K -> Stmt [ctor prec 70] .
+    op while_{_} : Prop K -> Stmt [ctor prec 70] .
+    op require(_) ; : Prop -> Stmt [ctor prec 70] .
+    op assert(_) ; : Prop -> Stmt [ctor prec 70] .
     op revert() ; : -> Stmt [ctor prec 70] .
     op return_; : Exp -> Stmt [ctor prec 70] .
 
-    *** payments (Phase 4); call{value:} may re-enter — a rewrite RULE in
-    *** NetCallback.maude, unlike everything else
-    op _·transfer(_) ; : Exp Exp -> Stmt [ctor prec 70] .
-    op _·call{value:_} ; : Exp Exp -> Stmt [ctor prec 70] .
+    *** payments
+    op _.transfer(_) ; : Exp Exp -> Stmt [ctor prec 70] .
+    op _.call{value:_} ; : Exp Exp -> Stmt [ctor prec 70] .   *** may re-enter (NetCallback.maude)
 
-    *** events (Phase 5): evaluate the argument, no state effect
+    *** events: evaluate the argument, no state effect
     op emit_(_) ; : Qid Exp -> Stmt [ctor prec 70] .
 
-    *** function calls (Phase 5); FName constants are declared per example
+    *** function calls; FName constants are declared per example
     op call_() ; : FName -> Stmt [ctor prec 70] .
     op call_(_) ; : FName Exp -> Stmt [ctor prec 70] .
     op call_(_,_) ; : FName Exp Exp -> Stmt [ctor prec 70] .
-    op _:= call_() ; : Qid FName -> Stmt [ctor prec 70] .
-    op _:= call_(_) ; : Qid FName Exp -> Stmt [ctor prec 70] .
+    op _= call_() ; : Qid FName -> Stmt [ctor prec 70] .
+    op _= call_(_) ; : Qid FName Exp -> Stmt [ctor prec 70] .
 endfm
 
 *** ---- parse tests ---------------------------------------------------------
-*** Pure syntax: these are constructor terms, so each `red` must return the
-*** term itself (Int/Bool subterms built with the CLEAN prelude ops, like
-*** `1 + 2`, pre-reduce — that is expected and useful for literals).
 
 fmod SOL-SYNTAX-TEST{Field :: TRIV} is
     pr SOL-SYNTAX{Field} .
@@ -149,28 +143,27 @@ fmod SOL-SYNTAX-TEST{Field :: TRIV} is
     ops prog1 prog2 prog3 : -> K .
 
     eq prog1 =
-        $alice · $balance := 5 ;
-        var 'x := $alice · $balance +. 1 ;
+        $alice . $balance = 5 ;
+        var 'x = $alice . $balance + 1 ;
         'x ++ ;
-        $alice · $m [ 'x ] := 'x *. 2 ; .
+        $alice . $m [ 'x ] = 'x * 2 ; .
 
     eq prog2 =
-        storage 'a := $alice ;
-        'a · $account · $nonce += 3 ;
-        delete 'a · $account ;
-        $alice · $m ·push('x) ;
-        $alice · $m ·pop() ; .
+        storage 'a = $alice ;
+        'a . $account . $nonce += 3 ;
+        delete 'a . $account ;
+        $alice . $m .push('x) ;
+        $alice . $m .pop() ; .
 
     eq prog3 =
-        require(msg·value >=. 1) ;
-        if 'x <. 5 { 'x := 'x +. 1 ; } else { while 'x >. 0 { 'x -- ; } }
-        msg·sender ·transfer(2) ;
+        require(msg·value >= 1) ;
+        if 'x < 5 { 'x = 'x + 1 ; } else { while 'x > 0 { 'x -- ; } }
+        msg·sender .transfer(2) ;
         return 'x ; .
 endfm
 
 red prog1 .              *** the term itself (constructor normal form)
 red prog2 .              *** the term itself
 red prog3 .              *** the term itself
-red ('x := 1 + 2 ;) .    *** 'x := 3 ; — clean + is Int addition, pre-reduces
-red (3 <. 5) .           *** 3 <. 5 — dotted ops are syntax, evaluated by SOL-EVAL
-red ('x <. 5) .          *** 'x <. 5
+red ('x = 1 + 2 ;) .     *** 'x = 3 ; — literal `+` folds via the prelude
+red (prog1 prog2) .      *** the two programs sequenced

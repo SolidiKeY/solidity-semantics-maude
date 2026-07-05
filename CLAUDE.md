@@ -68,11 +68,18 @@ Everything is built on an abstract field signature and layered upward. `load` st
   if/while/require/return, `SOL-NET` the ISoLA payment ledger, `SOL-CONTRACT`
   calls/frames/struct-literals); only genuinely nondeterministic behavior is a
   rewrite rule (`SOL-CALLBACK`, a system `mod`: `call{value:}` re-entrancy,
-  which `search` explores to find/exclude the DAO drain). Conventions: bools
-  are Ints 0/1, Solidity operators are dotted (`+.` `===`), member access is
-  `·`, modules are `SOL-`prefixed. Where driving the models from source-level
-  syntax exposed gaps in the base `STORAGE`/`BANK` specs, the fix lives in
-  `src/sem/` and is flagged in-comment for the Agda/F\*/Prolog twins.
+  which `search` explores to find/exclude the DAO drain). `Hoare.maude` adds
+  the Solidity-looking triple `< prog > (post)` that reduces to `true`/`false`
+  — a property checked by one `red`. Syntax reads like Solidity: member
+  access `.`, assignment `=`, equality `==`, comparisons `< <= > >=`,
+  `&& || !`. Conventions: conditions are a dedicated sort `Prop` (evaluated
+  by `evalP` to the truth value 1/0, so guards stay Int-based); `+ - *` reuse
+  the prelude INT ops, so a surface `a - b` also parses as the field-list
+  `a (neg b)` and internal equations use the prefix `_-_(a,b)` (the two
+  benign parser advisories are whitelisted in `run-tests.sh`); modules are
+  `SOL-`prefixed. Where driving the models from source-level syntax exposed
+  gaps in the base `STORAGE`/`BANK` specs, the fix lives in `src/sem/` and is
+  flagged in-comment for the Agda/F\*/Prolog twins.
 
 - **`src/list/`** — an alternative model expressed with a proper parameterized `FIELD` theory and Maude `view`s (`Field.maude`, `Memory.maude`, `Storage.maude`), using an assoc list representation (`_·_`, `[_=_]`).
 

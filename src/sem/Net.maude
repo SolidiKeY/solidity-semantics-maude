@@ -12,9 +12,9 @@
 ***
 ***  - Transaction entry (tx): credit msg.value to net(msg.sender) before
 ***    the body runs — the paper's proof-obligation update. txNP is the
-***    non-payable variant: it prepends `require(msg·value === 0) ;`,
+***    non-payable variant: it prepends `require(msg·value == 0) ;`,
 ***    turning the paper's strengthened precondition into program text.
-***  - `a.transfer(v)`: net(a) := net(a) − v, SolKey's transferNoCallback
+***  - `a.transfer(v)`: net(a) = net(a) − v, SolKey's transferNoCallback
 ***    exactly — no balance check, no callback. The with-callback rule
 ***    that SolKey has NOT implemented is NetCallback.maude, a system
 ***    module, since re-entry is genuinely nondeterministic.
@@ -42,10 +42,10 @@ fmod SOL-NET{Field :: TRIV} is
     *** non-payable entry: msg.value must be zero or the call reverts
     op txNP : K Struct Struct Int Int -> Conf .
     eq txNP(KK, ST, NT, SND, VAL) =
-        tx((require(msg·value === 0) ;) KK, ST, NT, SND, VAL) .
+        tx((require(msg·value == 0) ;) KK, ST, NT, SND, VAL) .
 
     *** ---- transfer (no-callback semantics) --------------------------------------
-    eq { k((E1 ·transfer(E2) ;) KK) C } = trD(eval(E1, C), eval(E2, C), KK, C) .
+    eq { k((E1 .transfer(E2) ;) KK) C } = trD(eval(E1, C), eval(E2, C), KK, C) .
     op trD : Value? Value? K Cells -> Conf .
     ceq trD(A, VL, KK, net(NT) C) = { k(KK) net(save(NT, A, _-_(I, VL))) C }
         if I := find(NT, A) .
@@ -70,17 +70,17 @@ fmod SOL-NET-TEST{Field :: TRIV} is
     ops depositB withdrawB : -> K .
     eq depositB = $bals [ msg·sender ] += msg·value ; .
     eq withdrawB =
-        require($bals [ msg·sender ] >=. 30) ;
+        require($bals [ msg·sender ] >= 30) ;
         $bals [ msg·sender ] -= 30 ;
-        msg·sender ·transfer(30) ; .
+        msg·sender .transfer(30) ; .
 
     ops cDep cPay cEcho cRevT cNP cWdr cOver : -> Conf .
 
     eq cDep = tx(depositB, mtSt, mtSt, 7, 100) .              *** deposit 100 from address 7
-    eq cPay = tx((9 ·transfer(30) ;), mtSt, mtSt, 7, 0) .     *** contract pays 30 to address 9
-    eq cEcho = tx((msg·sender ·transfer(msg·value) ;),
+    eq cPay = tx((9 .transfer(30) ;), mtSt, mtSt, 7, 0) .     *** contract pays 30 to address 9
+    eq cEcho = tx((msg·sender .transfer(msg·value) ;),
                   mtSt, mtSt, 7, 100) .                       *** send the money straight back
-    eq cRevT = tx((msg·sender ·transfer(50) ;) (revert() ;),
+    eq cRevT = tx((msg·sender .transfer(50) ;) (revert() ;),
                   mtSt, mtSt, 7, 0) .                         *** transfer then revert
     eq cNP = txNP(nilK, mtSt, mtSt, 7, 5) .                   *** value sent to a non-payable function
     eq cWdr = tx(withdrawB, stOf(cDep), netOf(cDep), 7, 0) .  *** withdraw after deposit

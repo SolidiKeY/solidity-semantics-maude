@@ -15,7 +15,7 @@
 *** than it owes"), which the paper states as an assume/assert invariant,
 *** becomes a reachability question we can decide by search.
 ***
-*** Two rules fire on `E ·call{value: E2} ;`:
+*** Two rules fire on `E .call{value: E2} ;`:
 ***   [nocall]  the callee does nothing — just the net update, then continue
 ***   [reenter] the callee re-enters the public body (pub cell) once,
 ***             consuming one unit of the re-entrancy budget (re cell),
@@ -43,14 +43,14 @@ mod SOL-CALLBACK{Field :: TRIV} is
 
     *** no callback: like transfer, but a rule so it branches against reenter
     crl [nocall] :
-        { k((E ·call{value: E2} ;) KK) C }
+        { k((E .call{value: E2} ;) KK) C }
         =>
         { k(KK) payNet(C, A, VL) }
         if A := eval(E, C) /\ VL := eval(E2, C) .
 
     *** callback: splice the public body in front of the continuation
     crl [reenter] :
-        { k((E ·call{value: E2} ;) KK) re(B) pub(PB) C }
+        { k((E .call{value: E2} ;) KK) re(B) pub(PB) C }
         =>
         { k(PB KK) payNet(re(_-_(B, 1)) pub(PB) C, A, VL) }
         if B > 0 /\ A := eval(E, re(B) pub(PB) C) /\ VL := eval(E2, re(B) pub(PB) C) .
@@ -77,16 +77,16 @@ mod SOL-CALLBACK-TEST{Field :: TRIV} is
 
     *** naive: send BEFORE zeroing (checks-interactions-effects) — the DAO bug
     eq withdrawNaive =
-        require($bals [ msg·sender ] >. 0) ;
-        msg·sender ·call{value: $bals [ msg·sender ] } ;
-        $bals [ msg·sender ] := 0 ; .
+        require($bals [ msg·sender ] > 0) ;
+        msg·sender .call{value: $bals [ msg·sender ] } ;
+        $bals [ msg·sender ] = 0 ; .
 
     *** safe: zero BEFORE sending (checks-effects-interactions)
     eq withdrawSafe =
-        require($bals [ msg·sender ] >. 0) ;
-        var 'amt := $bals [ msg·sender ] ;
-        $bals [ msg·sender ] := 0 ;
-        msg·sender ·call{value: 'amt } ; .
+        require($bals [ msg·sender ] > 0) ;
+        var 'amt = $bals [ msg·sender ] ;
+        $bals [ msg·sender ] = 0 ;
+        msg·sender .call{value: 'amt } ; .
 
     op stInit : -> Struct .
     eq stInit = save(mtSt, $bals 1, 100) .

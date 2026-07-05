@@ -5,18 +5,31 @@
 > (also wired into `.github/workflows/maude.yml`). Files, in `load` order:
 > `Syntax.maude` · `Config.maude` · `Expr.maude` · `Stmt.maude` ·
 > `Flow.maude` · `Net.maude` · `Contract.maude` · `NetCallback.maude`
-> (a system module) · `examples/Bank.maude` (end-to-end). Each file's
-> trailing `red`/`search` block is its test suite with expected results in
+> (a system module) · `Hoare.maude` (the `< prog > (post)` triple front
+> end) · `examples/Bank.maude` (end-to-end). Each file's trailing
+> `red`/`search` block is its test suite with expected results in
 > `*** …` comments.
 >
+> Syntax reads like Solidity: `< alice . account . balance = 10 ;
+> x = alice . account . balance ; > (x == 10)` — member access `.`,
+> assignment `=`, equality `==`, comparisons `< <= > >=`, `&& || !`, and a
+> Hoare-triple `< prog > (post)` (in `Hoare.maude`) that reduces to
+> `true`/`false` — a contract property checked by a single `red`.
+>
 > Deviations from the plan below, and why:
-> - **Bools are Ints 0/1 (EVM-style), not Maude `Bool`.** Subsorting `Bool`
->   under `Value` merges the Bool and Nat kinds, where the prelude's two
->   `_xor_` declarations clash irreparably. Guards treat nonzero as true.
-> - **Solidity operators are dotted** (`+.` `-.` `<.` `===` …). Because
->   `Value < Exp`, `Exp` shares a kind with `Int`, so the prelude's special
->   `+ - * < …` cannot be overloaded. Member access is `·` (a bare `.` ends
->   a Maude command).
+> - **Conditions are a dedicated sort `Prop`; result values stay Ints 0/1
+>   (EVM-style).** Solidity's `< <= > >=` can use their real tokens only by
+>   returning a fresh sort (a plain `Exp -> Exp` comparison clashes
+>   irreparably with the prelude's Nat one; a fresh range coexists as a
+>   benign ad-hoc overload). `evalP` maps a `Prop` to the truth value 1/0,
+>   so guards still read `=/= 0`. Bools can be stored (`flag = bal < 0 ;`).
+> - **Arithmetic `+ - *` reuse the prelude INT ops (`[ditto]`); `/ % **` are
+>   ours.** `-` on Int-capable operands is genuinely ambiguous with the
+>   field-list `a (neg b)` (Int is both an Exp and a mapping/array key), so
+>   internal DEFINING equations use the prefix form `_-_(a,b)`; surface
+>   programs keep `a - b` and Maude reliably takes the arithmetic parse
+>   (the two benign advisory categories are whitelisted in run-tests.sh,
+>   with the expected-result comments as the real correctness gate).
 > - **Modules are `SOL-`prefixed** (`SOL-SYNTAX`, `SOL-STMT`, …) and the
 >   whole tree lives in `src/sem/`, so nothing clashes with the sibling
 >   `STORAGE`/`BANK` variants (CLAUDE.md).
