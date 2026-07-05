@@ -127,8 +127,8 @@ fmod SOL-SYNTAX{Field :: TRIV} is
     op call_() ; : FName -> Stmt [ctor prec 70] .
     op call_(_) ; : FName Exp -> Stmt [ctor prec 70] .
     op call_(_,_) ; : FName Exp Exp -> Stmt [ctor prec 70] .
-    op _:=call_() ; : Qid FName -> Stmt [ctor prec 70] .
-    op _:=call_(_) ; : Qid FName Exp -> Stmt [ctor prec 70] .
+    op _:= call_() ; : Qid FName -> Stmt [ctor prec 70] .
+    op _:= call_(_) ; : Qid FName Exp -> Stmt [ctor prec 70] .
 endfm
 
 *** ---- parse tests ---------------------------------------------------------

@@ -1,0 +1,165 @@
+*** src/sem/Contract.maude — Phase 5 of PLAN.md
+***
+*** Functions and calls, SolKey's ExpandFunctionBody done properly:
+***  - a per-example function table — `fbody` gives the body K, `fpar` /
+***    `fpar1`+`fpar2` name the parameters — declared as equations next to
+***    the FName constants, like the paper's hand-written obligations;
+***  - `call F(args) ;` evaluates the arguments in the caller's cells,
+***    then runs the body in a FRESH environment with only the parameters
+***    bound — callee locals cannot leak into or read the caller's — and
+***    appends a frame marker `fr(callerEnv)` that restores the caller
+***    environment when execution falls off the body's end;
+***  - `return e ;` (SOL-FLOW) binds the out cell and cuts the
+***    continuation with cutK; the marker equations here stop the cut at
+***    the innermost frame, so returns nest — recursion works;
+***  - `q := call F(args) ;` uses `frv(callerEnv, q)`, which additionally
+***    moves the out value into q and resets out;
+***  - `emit Ev(e) ;` evaluates its argument (reverting if it does) and
+***    has no state effect — the SolKey skip rule;
+***  - struct literals need no new machinery: Struct terms are Exps, so
+***    `$arr ·push(store(mtSt, $balance, 42)) ;` and whole-struct writes
+***    from a value — both open items in SolKey — just work.
+*** Internal calls only: msg is unchanged across a call. External calls
+*** with value and callbacks are NetCallback.maude.
+
+load Net .
+
+fmod SOL-CONTRACT{Field :: TRIV} is
+    pr SOL-NET{Field} .
+
+    *** ---- per-example function table -------------------------------------
+    op fbody : FName -> K .
+    op fpar : FName -> Qid .            *** 1-parameter functions
+    ops fpar1 fpar2 : FName -> Qid .    *** 2-parameter functions
+
+    *** ---- frame markers (internal, never written in source) ---------------
+    op fr : Env -> Stmt [ctor] .
+    op frv : Env Qid -> Stmt [ctor] .
+
+    var C : Cells .   var KK : K .   vars E E1 E2 : Exp .
+    vars EV EV2 : Env .   var Q : Qid .   var F : FName .
+    vars V V2 : Value .   var W : Value? .
+
+    *** return's cut stops at the innermost frame marker
+    eq cutK(fr(EV) KK) = fr(EV) KK .
+    eq cutK(frv(EV, Q) KK) = frv(EV, Q) KK .
+
+    *** marker execution: restore the caller environment (and bind the result)
+    eq { k(fr(EV) KK) env(EV2) C } = { k(KK) env(EV) C } .
+    eq { k(frv(EV, Q) KK) env(EV2) out(V) C } =
+        { k(KK) env(envW(EV, Q, bv(V))) out(noV) C } .
+
+    *** ---- calls -------------------------------------------------------------
+    eq { k((call F () ;) KK) env(EV) C } =
+        { k(fbody(F) fr(EV) KK) env(mtEnv) C } .
+    eq { k((call F (E) ;) KK) env(EV) C } =
+        call1(F, eval(E, env(EV) C), fr(EV) KK, env(EV) C) .
+    eq { k((call F (E1, E2) ;) KK) env(EV) C } =
+        call2(F, eval(E1, env(EV) C), eval(E2, env(EV) C), fr(EV) KK, env(EV) C) .
+    eq { k((Q := call F () ;) KK) env(EV) C } =
+        { k(fbody(F) frv(EV, Q) KK) env(mtEnv) C } .
+    eq { k((Q := call F (E) ;) KK) env(EV) C } =
+        call1(F, eval(E, env(EV) C), frv(EV, Q) KK, env(EV) C) .
+
+    *** helpers: the K argument already carries the frame marker
+    op call1 : FName Value? K Cells -> Conf .
+    eq call1(F, V, KK, env(EV) C) =
+        { k(fbody(F) KK) env(envW(mtEnv, fpar(F), bv(V))) C } .
+    eq call1(F, rev, KK, C) = doRevert(k(nilK) C) .
+    op call2 : FName Value? Value? K Cells -> Conf .
+    eq call2(F, V, V2, KK, env(EV) C) =
+        { k(fbody(F) KK) env(envW(envW(mtEnv, fpar1(F), bv(V)), fpar2(F), bv(V2))) C } .
+    eq call2(F, rev, W, KK, C) = doRevert(k(nilK) C) .
+    eq call2(F, W, rev, KK, C) = doRevert(k(nilK) C) .
+
+    *** ---- events ---------------------------------------------------------------
+    eq { k((emit Q (E) ;) KK) C } = emitD(eval(E, C), KK, C) .
+    op emitD : Value? K Cells -> Conf .
+    eq emitD(V, KK, C) = { k(KK) C } .
+    eq emitD(rev, KK, C) = doRevert(k(nilK) C) .
+endfm
+
+*** ---- tests -----------------------------------------------------------------------
+
+fmod SOL-CONTRACT-TEST{Field :: TRIV} is
+    pr SOL-CONTRACT{Field} .
+
+    ops $alice $arr : -> IdField .
+    ops $balance $nonce : -> PrimField .
+    op $bals : -> MapField .
+
+    eq default($balance) = 0 .   eq default($nonce) = 0 .
+    eq default(length) = 0 .
+    eq default($alice) = mtSt .  eq default($arr) = mtSt .
+
+    ops $setB $twice $fact $guard $pay : -> FName .
+
+    eq fpar($setB) = 'v .
+    eq fbody($setB) = $alice · $balance := 'v ; .
+
+    eq fpar($twice) = 'v .
+    eq fbody($twice) = return 'v *. 2 ; .
+
+    eq fpar($fact) = 'n .
+    eq fbody($fact) =
+        if 'n <=. 1 { return 1 ; }
+        var 'r := 0 ;
+        'r := call $fact ('n -. 1) ;
+        return 'n *. 'r ; .
+
+    eq fpar($guard) = 'v .
+    eq fbody($guard) =
+        if 'v === 0 { return 0 ; }
+        $alice · $nonce := 9 ; .
+
+    eq fpar1($pay) = 'to .   eq fpar2($pay) = 'amt .
+    eq fbody($pay) = $bals [ 'to ] += 'amt ; .
+
+    op run : K -> Conf .
+    var KK : K .
+    eq run(KK) = init(KK, mtSt) .
+
+    ops cSet cTwice cFact cScope cGrd0 cGrd1 cPay2 cEmit cEmitRev cLit cLitPush : -> Conf .
+
+    eq cSet = run(call $setB (42) ;) .
+    eq cTwice = run(var 'r := 0 ; 'r := call $twice (21) ;) .
+    eq cFact = run(var 'x := 0 ; 'x := call $fact (5) ;) .
+
+    *** the callee binds its own 'v; the caller's survives the call
+    eq cScope = run(var 'v := 7 ; call $setB (1) ;) .
+
+    eq cGrd0 = run(call $guard (0) ;) .
+    eq cGrd1 = run(call $guard (1) ;) .
+
+    eq cPay2 = run(call $pay (3, 40) ;) .
+
+    eq cEmit = run(emit 'Paid (2 +. 3) ; $alice · $nonce := 1 ;) .
+    eq cEmitRev = run($alice · $nonce := 1 ; emit 'Bad (1 / 0) ;) .
+
+    *** whole-struct write from a struct VALUE, and a struct-literal push —
+    *** SolKey's open `alice = pVal;` refinement and its disabled
+    *** testStorageArrayPushPop, `tokens.push(Token(42));`. Literals are
+    *** save-built: the base model's find cannot read past a non-matching
+    *** outermost store, so store-built literals only reduce field-by-field.
+    eq cLit = run($alice := save(save(mtSt, $balance, 3), $nonce, 4) ;) .
+    eq cLitPush = run(
+        $arr ·push(save(mtSt, $balance, 42)) ;
+        $arr ·push(save(mtSt, $balance, 43)) ; ) .
+endfm
+
+red eread(cSet, $alice · $balance) .      *** 42
+red vread(cTwice, 'r) .                   *** 42
+red vread(cFact, 'x) .                    *** 120 — recursion through nested frames
+red vread(cScope, 'v) .                   *** 7 — caller env restored
+red eread(cScope, $alice · $balance) .    *** 1
+red eread(cGrd0, $alice · $nonce) .       *** 0 — early return skipped the write
+red eread(cGrd1, $alice · $nonce) .       *** 9
+red statOf(cGrd0) .                       *** ok
+red eread(cPay2, $bals [ 3 ]) .           *** 40 — two-parameter call
+red eread(cEmit, $alice · $nonce) .       *** 1 — emit is a skip
+red statOf(cEmitRev) .                    *** reverted — but its argument still evaluates
+red eread(cEmitRev, $alice · $nonce) .    *** 0
+red eread(cLit, $alice · $balance) .      *** 3
+red eread(cLit, $alice · $nonce) .        *** 4
+red eread(cLitPush, $arr · length) .      *** 2
+red eread(cLitPush, $arr [ 1 ] · $balance) .   *** 43 — struct literal pushed and read back
