@@ -1,0 +1,134 @@
+*** src/sem/examples/Bank.maude — Phase 6 of PLAN.md
+***
+*** An end-to-end contract exercising the whole stack in one instance,
+*** the counterpart of SolKey's mainFeatures/PaperTest.sol suite. A Bank
+*** holds a mapping of accounts (a struct with a balance and a frozen
+*** flag), a dynamic array of all account owners, and the net ledger.
+*** Functions compose storage, memory, control flow, calls and payments;
+*** the trailing block runs them as whole transactions and reads the
+*** result back through eread / nread — the file is green when every
+*** result matches its `*** …` comment.
+***
+*** Field vocabulary (concrete instance of the abstract signature):
+***   $accts   : MapField   address -> Account struct
+***   $bal     : PrimField  account balance
+***   $frozen  : PrimField  1 = frozen
+***   $owners  : IdField    dynamic array of owner addresses (·length, [i])
+***   $total   : PrimField  running total of deposits (a class invariant witness)
+
+load ../Contract .
+
+fmod BANK-CONTRACT{Field :: TRIV} is
+    pr SOL-CONTRACT{Field} .
+
+    op $accts : -> MapField .
+    ops $bal $frozen $total : -> PrimField .
+    op $owners : -> IdField .
+
+    eq default($bal) = 0 .    eq default($frozen) = 0 .
+    eq default($total) = 0 .  eq default(length) = 0 .
+    eq default($owners) = mtSt .
+
+    ops $deposit $withdraw $freeze $balanceOf $registerOnce : -> FName .
+
+    *** deposit(): credit msg.value to the caller's account and the total
+    eq fbody($deposit) =
+        require(msg·value >. 0) ;
+        $accts [ msg·sender ] · $bal += msg·value ;
+        $total += msg·value ; .
+
+    *** withdraw(amt): safe pattern — check, effects, then interaction
+    eq fpar($withdraw) = 'amt .
+    eq fbody($withdraw) =
+        require($accts [ msg·sender ] · $frozen === 0) ;
+        require($accts [ msg·sender ] · $bal >=. 'amt) ;
+        $accts [ msg·sender ] · $bal -= 'amt ;
+        $total -= 'amt ;
+        msg·sender ·transfer('amt) ; .
+
+    *** freeze(addr): set the frozen flag
+    eq fpar($freeze) = 'a .
+    eq fbody($freeze) = $accts [ 'a ] · $frozen := 1 ; .
+
+    *** balanceOf(addr): return a balance (read-only)
+    eq fpar($balanceOf) = 'a .
+    eq fbody($balanceOf) = return $accts [ 'a ] · $bal ; .
+
+    *** registerOnce(addr): append to $owners iff not already the last owner —
+    *** exercises push and an array-length read in a guard
+    eq fpar($registerOnce) = 'a .
+    eq fbody($registerOnce) =
+        if $owners · length === 0 {
+            $owners ·push('a) ;
+        } else {
+            if $owners [ $owners · length -. 1 ] !== 'a { $owners ·push('a) ; }
+        } .
+endfm
+
+fmod BANK-DRIVER{Field :: TRIV} is
+    pr BANK-CONTRACT{Field} .
+
+    *** run a public function as a payable transaction from `sender`
+    op txn : FName Struct Struct Int Int -> Conf .
+    var F : FName .  vars ST NT : Struct .  vars SND VAL : Int .
+    eq txn(F, ST, NT, SND, VAL) = tx((call F () ;), ST, NT, SND, VAL) .
+    op txn1 : FName Value Struct Struct Int Int -> Conf .
+    var V : Value .
+    eq txn1(F, V, ST, NT, SND, VAL) = tx((call F (V) ;), ST, NT, SND, VAL) .
+
+    *** two deposits then a withdraw, threading storage and net through
+    ops afterDep1 afterDep2 afterWdr afterFreeze : -> Conf .
+    eq afterDep1 = txn($deposit, mtSt, mtSt, 1, 100) .
+    eq afterDep2 = txn($deposit, stOf(afterDep1), netOf(afterDep1), 2, 40) .
+    eq afterWdr  = txn1($withdraw, 30, stOf(afterDep2), netOf(afterDep2), 1, 0) .
+    eq afterFreeze = txn1($freeze, 1, stOf(afterDep2), netOf(afterDep2), 9, 0) .
+
+    *** a frozen account cannot withdraw
+    op afterFrozenWdr : -> Conf .
+    eq afterFrozenWdr = txn1($withdraw, 10, stOf(afterFreeze), netOf(afterFreeze), 1, 0) .
+
+    *** registerOnce is idempotent on a repeat
+    ops reg1 reg2 reg3 : -> Conf .
+    eq reg1 = txn1($registerOnce, 1, mtSt, mtSt, 9, 0) .
+    eq reg2 = txn1($registerOnce, 1, stOf(reg1), netOf(reg1), 9, 0) .
+    eq reg3 = txn1($registerOnce, 2, stOf(reg2), netOf(reg2), 9, 0) .
+
+    *** the two-account solvency invariant: $total == bal[1] + bal[2]
+    op inv : Conf -> Bool .
+    var CF : Conf .   vars T B1 B2 : Int .
+    ceq inv(CF) = T == B1 + B2
+        if T := eread(CF, $total)
+        /\ B1 := eread(CF, $accts [ 1 ] · $bal)
+        /\ B2 := eread(CF, $accts [ 2 ] · $bal) .
+endfm
+
+*** ---- deposit / withdraw lifecycle -------------------------------------------
+red eread(afterDep1, $accts [ 1 ] · $bal) .     *** 100
+red nread(afterDep1, 1) .                       *** 100 — msg.value credited to net(sender)
+red eread(afterDep2, $accts [ 2 ] · $bal) .     *** 40
+red eread(afterDep2, $total) .                  *** 140 — running total across both deposits
+
+red statOf(afterWdr) .                          *** ok
+red eread(afterWdr, $accts [ 1 ] · $bal) .      *** 70 — 100 deposited, 30 withdrawn
+red eread(afterWdr, $total) .                   *** 110
+red nread(afterWdr, 1) .                        *** 70 — received 100, sent 30 back
+
+*** the class invariant  $total == sum of account balances  holds at rest.
+*** (Maude-level ==/+ on the extracted values — the dotted +. / === are
+*** program syntax and only evaluate inside a running configuration.)
+red inv(afterWdr) .   *** true  (110 == 70 + 40)
+
+*** ---- access control -----------------------------------------------------------
+red eread(afterFreeze, $accts [ 1 ] · $frozen) .  *** 1
+red statOf(afterFrozenWdr) .                      *** reverted — frozen account blocked
+red eread(afterFrozenWdr, $accts [ 1 ] · $bal) .  *** 100 — untouched by the reverted withdraw
+
+*** ---- withdrawing more than the balance reverts --------------------------------
+red statOf(txn1($withdraw, 999, stOf(afterDep2), netOf(afterDep2), 1, 0)) .   *** reverted
+
+*** ---- registerOnce idempotence (push + length guard) ---------------------------
+red eread(reg1, $owners · length) .   *** 1
+red eread(reg2, $owners · length) .   *** 1 — same owner, not appended again
+red eread(reg3, $owners · length) .   *** 2 — a different owner is appended
+red eread(reg3, $owners [ 0 ]) .      *** 1
+red eread(reg3, $owners [ 1 ]) .      *** 2

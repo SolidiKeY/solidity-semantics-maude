@@ -13,3 +13,5 @@ jobs:
             apt: maude
         - name: Use Maude
           run: maude full-maude.maude
+        - name: Run sem/ semantics test suite
+          run: bash src/sem/run-tests.sh

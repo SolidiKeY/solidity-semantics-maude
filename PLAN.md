@@ -1,5 +1,37 @@
 # PLAN — A SolidiKeY-style Solidity Semantics in Maude
 
+> **Status (executed).** All six phases are implemented and green in
+> `src/sem/`. Run the whole suite with `bash src/sem/run-tests.sh`
+> (also wired into `.github/workflows/maude.yml`). Files, in `load` order:
+> `Syntax.maude` · `Config.maude` · `Expr.maude` · `Stmt.maude` ·
+> `Flow.maude` · `Net.maude` · `Contract.maude` · `NetCallback.maude`
+> (a system module) · `examples/Bank.maude` (end-to-end). Each file's
+> trailing `red`/`search` block is its test suite with expected results in
+> `*** …` comments.
+>
+> Deviations from the plan below, and why:
+> - **Bools are Ints 0/1 (EVM-style), not Maude `Bool`.** Subsorting `Bool`
+>   under `Value` merges the Bool and Nat kinds, where the prelude's two
+>   `_xor_` declarations clash irreparably. Guards treat nonzero as true.
+> - **Solidity operators are dotted** (`+.` `-.` `<.` `===` …). Because
+>   `Value < Exp`, `Exp` shares a kind with `Int`, so the prelude's special
+>   `+ - * < …` cannot be overloaded. Member access is `·` (a bare `.` ends
+>   a Maude command).
+> - **Modules are `SOL-`prefixed** (`SOL-SYNTAX`, `SOL-STMT`, …) and the
+>   whole tree lives in `src/sem/`, so nothing clashes with the sibling
+>   `STORAGE`/`BANK` variants (CLAUDE.md).
+> - **Base-model gaps found while driving the models from syntax** (all
+>   worked around in `src/sem/`, flagged here for the Agda/F\*/Prolog twins):
+>   `find` could not read *through* a stored struct value (completed in
+>   `SOL-CONFIG`); storage `push` is off by one and stuck on empty arrays
+>   (replaced by `pushV`/`pushL`/`popA` in `SOL-STMT`); `readR` misses
+>   singleton paths (`mread` in `SOL-CONFIG`); `find`-on-`mtSt` was stuck
+>   (zero-init defaults in `SOL-CONFIG`).
+> - **Phase 6 differential testing against solc / random statement
+>   generation, and the Agda metatheory port, are left as the documented
+>   next steps** (see the end of this file) — the executable suite and the
+>   end-to-end `Bank` example are done.
+
 Goal: grow this repository from a formalization of Solidity's *data locations*
 (memory, storage, and copies between them) into a formalization of *Solidity
 program semantics* comparable in coverage to SolKey/SolidiKeY
