@@ -1,0 +1,121 @@
+*** src/sem/NetCallback.maude — Phase 4b of PLAN.md
+***
+*** The with-callback external call — SolKey's UNIMPLEMENTED Step 4 (see
+*** solkey docs/net.md §4 and the "Payments" note in
+*** docs/taclets-implementation.md: "Not yet done: the with-callback rule").
+*** Where `transfer` (SOL-NET) is gas-limited and cannot call back — a
+*** deterministic equation — `a.call{value: v}` hands control to the
+*** callee, which MAY re-enter the contract's public functions before
+*** returning. That is genuine nondeterminism, so it is a rewrite RULE,
+*** not an equation, and `search` explores every interleaving — the
+*** rewriting-logic analogue of a proof split.
+***
+*** This is where the executable semantics gets AHEAD of the taclet
+*** calculus: strong data integrity ("the contract never pays out more
+*** than it owes"), which the paper states as an assume/assert invariant,
+*** becomes a reachability question we can decide by search.
+***
+*** Two rules fire on `E ·call{value: E2} ;`:
+***   [nocall]  the callee does nothing — just the net update, then continue
+***   [reenter] the callee re-enters the public body (pub cell) once,
+***             consuming one unit of the re-entrancy budget (re cell),
+***             BEFORE the original continuation resumes — exactly EVM
+***             control transfer: callee runs to completion, then control
+***             returns to the call site.
+*** A finite budget keeps the search space finite (bounded re-entrancy),
+*** which is enough to expose the DAO bug.
+
+load Contract .
+
+mod SOL-CALLBACK{Field :: TRIV} is
+    pr SOL-CONTRACT{Field} .
+
+    op re : Int -> Cell [ctor] .     *** re-entrancy budget (remaining callbacks)
+    op pub : K -> Cell [ctor] .      *** the public function body a callback re-enters
+
+    var C : Cells .    var KK PB : K .    vars E E2 : Exp .
+    var NT : Struct .   vars A VL B I SND : Int .
+
+    *** update the net cell inside a cell soup: pay VL out to address A
+    op payNet : Cells Int Int -> Cells .
+    ceq payNet(net(NT) C, A, VL) = net(save(NT, A, _-_(I, VL))) C
+        if I := find(NT, A) .
+
+    *** no callback: like transfer, but a rule so it branches against reenter
+    crl [nocall] :
+        { k((E ·call{value: E2} ;) KK) C }
+        =>
+        { k(KK) payNet(C, A, VL) }
+        if A := eval(E, C) /\ VL := eval(E2, C) .
+
+    *** callback: splice the public body in front of the continuation
+    crl [reenter] :
+        { k((E ·call{value: E2} ;) KK) re(B) pub(PB) C }
+        =>
+        { k(PB KK) payNet(re(_-_(B, 1)) pub(PB) C, A, VL) }
+        if B > 0 /\ A := eval(E, re(B) pub(PB) C) /\ VL := eval(E2, re(B) pub(PB) C) .
+
+    *** driver: run body with a re-entrancy budget and a re-entrant target
+    op txCB : K K Struct Int Int Int -> Conf .
+    ceq txCB(KK, PB, NT, SND, VL, B) =
+        { k(KK) sto(NT) sto0(NT) mem(emptyMemory) env(mtEnv)
+          net(save(mtSt, SND, I + VL)) net0(mtSt) msg(SND, VL)
+          cnt(0) out(noV) stat(ok) re(B) pub(PB) }
+        if I := find(mtSt, SND) .
+endm
+
+*** ---- re-entrancy as a reachability check --------------------------------------
+
+mod SOL-CALLBACK-TEST{Field :: TRIV} is
+    pr SOL-CALLBACK{Field} .
+
+    op $bals : -> MapField .
+    eq default(length) = 0 .
+
+    *** the attacker is address 1, with 100 recorded in $bals
+    ops withdrawNaive withdrawSafe : -> K .
+
+    *** naive: send BEFORE zeroing (checks-interactions-effects) — the DAO bug
+    eq withdrawNaive =
+        require($bals [ msg·sender ] >. 0) ;
+        msg·sender ·call{value: $bals [ msg·sender ] } ;
+        $bals [ msg·sender ] := 0 ; .
+
+    *** safe: zero BEFORE sending (checks-effects-interactions)
+    eq withdrawSafe =
+        require($bals [ msg·sender ] >. 0) ;
+        var 'amt := $bals [ msg·sender ] ;
+        $bals [ msg·sender ] := 0 ;
+        msg·sender ·call{value: 'amt } ; .
+
+    op stInit : -> Struct .
+    eq stInit = save(mtSt, $bals 1, 100) .
+
+    *** entry: attacker (address 1) calls withdraw with value 0, budget 1
+    ops cNaive cSafe : -> Conf .
+    eq cNaive = txCB(withdrawNaive, withdrawNaive, stInit, 1, 0, 1) .
+    eq cSafe  = txCB(withdrawSafe,  withdrawSafe,  stInit, 1, 0, 1) .
+
+    *** "drained": the attacker extracted more than the 100 they were owed.
+    *** paid to address 1 = - net(1); drained iff net(1) < -100.
+    op drained : Struct -> Bool .
+    var NT : Struct .   var I : Int .
+    ceq drained(NT) = true if I := find(NT, 1) /\ I < -100 .
+    eq drained(NT) = false [owise] .
+endm
+
+*** How much the attacker gets on the no-callback path (both contracts): 100.
+rew in SOL-CALLBACK-TEST : cNaive .   *** SOME final config (rew takes one path)
+
+*** THE HEADLINE RESULTS — decided by search, not proof:
+*** naive contract: a re-entrant final state DRAINS the contract (net(1) = -200)
+search cNaive =>! { net(NT:Struct) stat(ok) C:Cells } such that drained(NT:Struct) .
+*** expected: >= 1 solution, with net(NT) having find(NT, 1) = -200
+
+*** safe contract: NO reachable ok final state is drained — re-entrancy reverts
+search cSafe =>! { net(NT:Struct) stat(ok) C:Cells } such that drained(NT:Struct) .
+*** expected: No solution.
+
+*** for contrast: how many ok final states each reaches (naive: drained + clean)
+search cNaive =>! { net(NT:Struct) stat(ok) C:Cells } .
+search cSafe  =>! { net(NT:Struct) stat(ok) C:Cells } .

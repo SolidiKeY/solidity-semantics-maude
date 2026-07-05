@@ -117,8 +117,10 @@ fmod SOL-SYNTAX{Field :: TRIV} is
     op revert() ; : -> Stmt [ctor prec 70] .
     op return_; : Exp -> Stmt [ctor prec 70] .
 
-    *** payments (Phase 4)
+    *** payments (Phase 4); call{value:} may re-enter — a rewrite RULE in
+    *** NetCallback.maude, unlike everything else
     op _·transfer(_) ; : Exp Exp -> Stmt [ctor prec 70] .
+    op _·call{value:_} ; : Exp Exp -> Stmt [ctor prec 70] .
 
     *** events (Phase 5): evaluate the argument, no state effect
     op emit_(_) ; : Qid Exp -> Stmt [ctor prec 70] .
