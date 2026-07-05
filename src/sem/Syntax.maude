@@ -54,6 +54,7 @@ fmod SOL-SYNTAX{Field :: TRIV} is
 
     op msg·sender : -> Exp [ctor] .
     op msg·value : -> Exp [ctor] .
+    op net[_] : Exp -> Exp [ctor prec 15] .   *** read the payment ledger: net[a] = net(address a)
 
     *** ---- boolean expressions (Prop) --------------------------------------
     op _<_  : Exp Exp -> Prop [ctor prec 37 gather (E E)] .

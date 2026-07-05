@@ -26,6 +26,12 @@ roots=(
   "$here/NetCallback.maude"
   "$here/Hoare.maude"
   "$here/examples/Bank.maude"
+  "$here/examples/solkey/Arithmetic.maude"
+  "$here/examples/solkey/Storage.maude"
+  "$here/examples/solkey/Memory.maude"
+  "$here/examples/solkey/PushPop.maude"
+  "$here/examples/solkey/Net.maude"
+  "$here/examples/solkey/MainFeatures.maude"
 )
 
 # A result is "stuck" if it still mentions an internal operator that a

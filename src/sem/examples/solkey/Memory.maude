@@ -1,0 +1,61 @@
+*** src/sem/examples/solkey/Memory.maude
+***
+*** Mirror of the SolKey memory taclets:
+***   memory-decl-fresh, memory-decl-default, memory-deep-field,
+***   memory-field-alias, memory-root-alias, memory-delete,
+***   memory-root-delete-fresh, memory-array-index, memory-to-storage.
+*** SolKey's default-initialized "Person memory carol" becomes a fresh
+*** allocation, memory 'carol = new. Memory-to-memory assignment is
+*** reference ALIASING; a storage/memory assignment is a value COPY. All
+*** triples start from empty memory (SolKey's memory = mtMem precondition).
+
+load Store .
+
+fmod MEMORY-DEMO{Field :: TRIV} is
+    pr PAPER-STORE{Field} .
+endfm
+
+*** ---- fresh declaration (memory-decl-fresh, memory-decl-default) ----
+red < memory 'carol = new ; > true .                          *** true   fresh alloc terminates
+red < memory 'carol = new ; > ('carol . $age == 0) .          *** true   default-initialized to 0
+
+*** ---- deep field write/read (memory-deep-field) ----
+red < memory 'carol = new ;
+      'carol . $account . $balance = 10 ; > ('carol . $account . $balance == 10) .  *** true
+
+*** ---- field aliasing: a memory Account handle shares storage (memory-field-alias) ----
+red < memory 'carol = new ;
+      memory 'acc = 'carol . $account ;
+      'acc . $balance = 100 ; > ('carol . $account . $balance == 100) .   *** true — write through the alias
+
+*** ---- root aliasing: carol = david makes them the same object (memory-root-alias) ----
+red < memory 'carol = new ; memory 'david = new ;
+      'david . $age = 40 ;
+      'carol = 'david ;
+      'carol . $age = 41 ; > ('david . $age == 41) .           *** true — alias sees the update
+
+*** ---- delete (memory-delete, memory-root-delete-fresh) ----
+red < memory 'carol = new ; delete 'carol ; > true .          *** true   root delete terminates
+*** delete carol.age resets the primitive; a captured account alias keeps its value,
+*** while carol.account is rebound to a FRESH (zeroed) object
+red < memory 'carol = new ;
+      memory 'acc = 'carol . $account ;
+      'carol . $age = 20 ;
+      'acc . $balance = 100 ;
+      delete 'carol . $age ;
+      delete 'carol . $account ; >
+      ('carol . $age == 0 && 'acc . $balance == 100 && 'carol . $account . $balance == 0) .  *** true
+
+*** ---- memory array index (memory-array-index) ----
+red < memory 'xs = new ;
+      'xs [ 1 ] = 33 ; > ('xs [ 1 ] == 33) .                   *** true
+
+*** ---- memory -> storage is a value COPY (memory-to-storage) ----
+red < memory 'carol = new ;
+      'carol . $age = 44 ;
+      $alice = 'carol ; > ($alice . $age == 44) .              *** true
+*** ... and later memory writes do not touch the storage copy
+red < memory 'carol = new ;
+      'carol . $age = 44 ;
+      $alice = 'carol ;
+      'carol . $age = 99 ; > ($alice . $age == 44) .           *** true

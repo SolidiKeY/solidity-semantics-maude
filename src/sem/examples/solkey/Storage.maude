@@ -1,0 +1,83 @@
+*** src/sem/examples/solkey/Storage.maude
+***
+*** Mirror of the SolKey storage taclets: field read/write/copy, deep fields,
+*** delete (incl. mapping-preserving struct delete), compound assignment,
+*** pre/post increment/decrement, storage aliases and rebinding, indexed
+*** arrays and mappings. SolKey files referenced inline per block.
+
+load Store .
+
+fmod STORAGE-DEMO{Field :: TRIV} is
+    pr PAPER-STORE{Field} .
+endfm
+
+*** ---- field write / read (storage-field-global-age, storage-field-deep-write-read) ----
+red < $alice . $age = 34 ; > ($alice . $age == 34) .                          *** true
+red < $alice . $account . $balance = 100 ; > ($alice . $account . $balance == 100) . *** true
+red < $alice . $account . $token . $value = 3 ; > ($alice . $account . $token . $value == 3) . *** true
+
+*** disjoint fields / roots stay independent (storage-field-disjoint-fields / -roots)
+red < $alice . $age = 1 ; $alice . $account . $balance = 2 ; > ($alice . $age == 1 && $alice . $account . $balance == 2) . *** true
+red < $alice . $age = 1 ; $bob . $age = 2 ; > ($alice . $age == 1 && $bob . $age == 2) .   *** true
+
+*** ---- whole-struct copy is a VALUE copy (storage-field-copy-struct, storage-field-deep-value) ----
+red < $bob . $account . $balance = 11 ;
+      storage 'acc = $bob . $account ;
+      $alice . $account = 'acc ;
+      $alice . $account . $balance = 99 ; > ($bob . $account . $balance == 11) .   *** true — source unaffected
+red < $bob . $account . $balance = 11 ;
+      $alice . $account = $bob . $account ; > ($alice . $account . $balance == 11) .  *** true   root-to-field copy
+
+*** ---- compound assignment (storage-field-add/sub/mul/div/mod-assign, deep too) ----
+red < $alice . $age = 30 ; $alice . $age += 4 ; > ($alice . $age == 34) .     *** true   add-assign
+red < $alice . $age = 30 ; $alice . $age -= 4 ; > ($alice . $age == 26) .     *** true   sub-assign
+red < $alice . $age = 6 ; $alice . $age *= 7 ; > ($alice . $age == 42) .      *** true   mul-assign
+red < $alice . $age = 20 ; $alice . $age /= 6 ; > ($alice . $age == 3) .      *** true   div-assign
+red < $alice . $age = 17 ; $alice . $age %= 5 ; > ($alice . $age == 2) .      *** true   mod-assign
+red < $alice . $account . $balance = 10 ; $alice . $account . $balance += 5 ; > ($alice . $account . $balance == 15) . *** true deep-add-assign
+
+*** compound div/mod by zero revert
+red < $alice . $age = 10 ; $alice . $age /= 0 ; > reverts .                   *** true
+
+*** ---- increment / decrement (storage-field-{pre,post}{increment,decrement}[-assign]) ----
+red < $alice . $age = 30 ; $alice . $age ++ ; > ($alice . $age == 31) .       *** true   postincrement
+red < $alice . $age = 30 ; $alice . $age -- ; > ($alice . $age == 29) .       *** true   postdecrement
+red < $alice . $age = 30 ; ++ $alice . $age ; > ($alice . $age == 31) .       *** true   preincrement
+red < $alice . $age = 30 ; -- $alice . $age ; > ($alice . $age == 29) .       *** true   predecrement
+*** post-increment CAPTURES the old value (storage-field-postincrement-assign)
+red < $alice . $age = 30 ; var 'r = 0 ; 'r = $alice . $age ++ ; > ('r == 30 && $alice . $age == 31) .  *** true
+*** pre-increment captures the NEW value (storage-deep-field-preincrement)
+red < $alice . $age = 30 ; var 'r = 0 ; 'r = ++ $alice . $age ; > ('r == 31) .   *** true
+
+*** ---- delete (storage-field-delete; the mapping-preserving struct delete) ----
+red < $alice . $age = 30 ; delete $alice . $age ; > ($alice . $age == 0) .    *** true   primitive reset
+red < $alice . $age = 5 ;
+      $alice . $account . $balance = 7 ;
+      $balances [ 9 ] = 42 ;
+      delete $alice ; > ($alice . $age == 0 && $alice . $account . $balance == 0) .  *** true — nested reset
+
+*** ---- storage aliases (storage-alias-write-balance, storage-alias-rebind-*) ----
+red < storage 'p = $alice ;
+      storage 'acc = 'p . $account ;
+      'acc . $balance = 100 ;
+      'p . $account . $token . $value = 3 ; > ($alice . $account . $balance == 100 && $alice . $account . $token . $value == 3) . *** true
+*** rebinding the alias local retargets it, leaving the old target intact
+red < $alice . $age = 1 ; $bob . $age = 2 ;
+      storage 'p = $alice ;
+      'p = $bob ;
+      'p . $age = 9 ; > ($bob . $age == 9 && $alice . $age == 1) .            *** true
+
+*** ---- indexed arrays (storage-index-write-read, -add-assign, -delete) ----
+*** SolKey guards array writes with `i < size`; here we push to grow first.
+red < $values .push(0) ; $values .push(0) ;
+      $values [ 1 ] = 40 ; > ($values [ 1 ] == 40) .                          *** true   index write/read
+red < $values .push(0) ; $values .push(0) ;
+      $values [ 1 ] = 40 ; $values [ 1 ] += 2 ; > ($values [ 1 ] == 42) .     *** true   index add-assign
+red < $values .push(0) ; $values .push(7) ;
+      delete $values [ 1 ] ; > ($values [ 1 ] == 0) .                         *** true   index delete
+
+*** ---- mappings (storage-index-mapping-*, storage-index-delete-mapping-bool) ----
+red < $balances [ 1 ] = 10 ; > ($balances [ 1 ] == 10) .                      *** true   mapping write/read
+red < $flags [ 1 ] = true ; delete $flags [ 1 ] ; > ($flags [ 1 ] == 0) .     *** true   mapping-bool delete (SolKey: FALSE)
+red < $balances [ 1 ] = 10 ; $balances [ 2 ] = 20 ;
+      delete $balances [ 1 ] ; > ($balances [ 1 ] == 0 && $balances [ 2 ] == 20) .  *** true — one key reset, sibling kept

@@ -1,0 +1,50 @@
+*** src/sem/examples/solkey/Arithmetic.maude
+***
+*** Mirror of the SolKey Tier-1 expression taclets:
+***   addition-simple, addition-storage-*, multiplication-simple,
+***   division-simple, modulo-simple, power-simple, less-than-simple,
+***   less-equal-simple, greater-than-simple, greater-equal-simple,
+***   not-equal-simple, logical-and/or/not-simple.
+*** Each SolKey `result = e; (result = v)` becomes a Hoare triple whose
+*** postcondition checks the value. Bools are EVM ints, so SolKey's
+*** TRUE/FALSE become 1/0.
+
+load Store .
+
+fmod ARITHMETIC-DEMO{Field :: TRIV} is
+    pr PAPER-STORE{Field} .
+endfm
+
+*** ---- arithmetic (addition-simple, multiplication, division, modulo, power) ----
+red < var 'result = 1 + 2 ; > ('result == 3) .          *** true   addition-simple
+red < var 'result = 6 * 7 ; > ('result == 42) .         *** true   multiplication-simple
+red < var 'result = 8 / 2 ; > ('result == 4) .          *** true   division-simple
+red < var 'result = 17 % 5 ; > ('result == 2) .         *** true   modulo-simple
+red < var 'result = 2 ** 10 ; > ('result == 1024) .     *** true   power-simple
+
+*** addition-storage-read / -write / -both / addition-both-storage
+red < $age = 30 ; var 'result = $age + 4 ; > ('result == 34) .   *** true   addition-storage-read
+red < $age = 30 ; $total = $age + 4 ; > ($total == 34) .         *** true   addition-storage-write
+red < $age = 30 ; $total = 12 ; $balance = $age + $total ; > ($balance == 42) .  *** true addition-both-storage
+
+*** ---- relational (all return a Solidity bool = 1/0) ----
+red < var 'r = 3 < 5 ; > ('r == 1) .          *** true   less-than-simple  (SolKey: result = TRUE)
+red < var 'r = 5 < 3 ; > ('r == 0) .          *** true
+red < var 'r = 5 <= 5 ; > ('r == 1) .         *** true   less-equal-simple
+red < var 'r = 7 > 2 ; > ('r == 1) .          *** true   greater-than-simple
+red < var 'r = 2 >= 7 ; > ('r == 0) .         *** true   greater-equal-simple
+red < var 'r = 3 != 4 ; > ('r == 1) .         *** true   not-equal-simple
+red < var 'r = 4 != 4 ; > ('r == 0) .         *** true
+
+*** ---- logical (logical-and/or/not-simple) ----
+red < var 'r = true && false ; > ('r == 0) .  *** true   logical-and-simple (SolKey: result = FALSE)
+red < var 'r = true || false ; > ('r == 1) .  *** true   logical-or-simple
+red < var 'r = ! false ; > ('r == 1) .        *** true   logical-not-simple
+
+*** the postcondition may BE the comparison directly (no result variable)
+red < $age = 30 ; > ($age < 100) .            *** true
+red < var 'x = 8 / 2 ; > ('x == 4 && 4 < 5) . *** true
+
+*** division / modulo by zero revert (SolKey: /,% zero-denominator revert branch)
+red < var 'x = 1 / 0 ; > reverts .            *** true
+red < var 'x = 1 % 0 ; > reverts .            *** true

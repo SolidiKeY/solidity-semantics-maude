@@ -79,6 +79,11 @@ fmod SOL-EVAL{Field :: TRIV} is
     eq eval(LV, C) = readLoc(lower(LV, C), C) .
     eq eval(msg·sender, msg(SND, VAL) C) = SND .
     eq eval(msg·value, msg(SND, VAL) C) = VAL .
+    eq eval(net[E1], C) = readNet(eval(E1, C), C) .
+
+    op readNet : Value? Cells -> Value? .
+    eq readNet(I1, net(ST) C) = find(ST, I1) .   *** net(a) = find(ledger, a); 0 on an untouched address
+    eq readNet(rev, C) = rev .
 
     eq eval(E1 + E2, C) = add?(eval(E1, C), eval(E2, C)) .
     eq eval(_-_(E1, E2), C) = sub?(eval(E1, C), eval(E2, C)) .   *** prefix: `E1 - E2` with Int operands also parses as the field-list `E1 (-E2)`

@@ -1,0 +1,46 @@
+*** src/sem/examples/solkey/PushPop.maude
+***
+*** Mirror of the SolKey dynamic-array taclets:
+***   storage-push-value, storage-push-empty, storage-push-nonsimple-arg,
+***   storage-push-return-assign, storage-pop-nonempty, storage-pop-after-push,
+***   storage-pop-empty-box.
+*** SolKey states a size precondition (values.size = 2); here we grow the
+*** array by pushing first, then perform the operation. Array length is read
+*** as `$values . length`.
+
+load Store .
+
+fmod PUSHPOP-DEMO{Field :: TRIV} is
+    pr PAPER-STORE{Field} .
+endfm
+
+*** ---- push a value, then read it back and the new length (storage-push-value) ----
+red < $values .push(10) ; $values .push(20) ;
+      $values .push(42) ; > ($values [ 2 ] == 42 && $values . length == 3) .   *** true
+
+*** ---- push() with no argument grows the length by one (storage-push-empty) ----
+red < $values .push(10) ; $values .push(20) ;
+      $values .push() ; > ($values . length == 3) .                 *** true
+
+*** ---- push a non-simple (computed) argument (storage-push-nonsimple-arg) ----
+red < $values .push(0) ; $values .push(0) ;
+      var 'x = 40 ; var 'y = 2 ;
+      $values .push('x + 'y) ; > ($values [ 2 ] == 42 && $values . length == 3) .   *** true
+
+*** ---- push()=42 desugars to push(42) (storage-push-return-assign) ----
+red < $values .push(0) ; $values .push(0) ;
+      $values .push(42) ; > ($values [ 2 ] == 42) .                 *** true
+
+*** ---- pop a nonempty array clears the last slot and shrinks (storage-pop-nonempty) ----
+red < $values .push(10) ; $values .push(20) ;
+      $values .pop() ; > ($values [ 1 ] == 0 && $values . length == 1) .   *** true
+
+*** ---- push then pop returns to the original length (storage-pop-after-push) ----
+red < $values .push() ; $values .pop() ; > ($values . length == 0) .    *** true
+
+*** ---- pop on an EMPTY array reverts (storage-pop-empty-box: box-false) ----
+red < $values .pop() ; > reverts .                                  *** true
+
+*** ---- a struct-value push (SolKey's disabled testStorageArrayPushPop) ----
+*** push a Token(42) literal, then read its field back
+red < $values .push(save(mtSt, $value, 42)) ; > ($values [ 0 ] . $value == 42) .   *** true

@@ -1,0 +1,104 @@
+*** src/sem/examples/solkey/MainFeatures.maude
+***
+*** Mirror of the SolKey end-to-end mainFeatures (PaperTest.sol): programs
+*** with inline assert-sequences and a `true` postcondition — the triple is
+*** true iff the program runs to the end without a failing assert (SolKey's
+*** `\<{ ... asserts ... }\> true`). Covered:
+***   testStorageRootDeepCopy, testNestedStorageWrites, testStorageAliases,
+***   testMemoryAliasing, testStorageMapReadWriteAndDelete,
+***   testStorageStructDeleteSkipsMappingMember, testStorageMapStructCopy.
+***
+*** KNOWN DIVERGENCES from SolKey (found by this cross-check):
+***  - testStorageEvaluationOrder uses `a[++i] = ++i`, i.e. increment as an
+***    EXPRESSION with a side effect. Here ++/-- are statements, so
+***    expression-embedded increments are out of scope.
+***  - testStorageMapStructCopy does `accountMap[2] = accountMap[1]`, a
+***    whole-struct copy from a MAPPING entry. SolKey disambiguates the read
+***    with types (find<[Struct]> vs find<[int]>); this untyped model cannot
+***    tell an Int-keyed struct slot from an Int-keyed primitive slot for a
+***    whole-value read, so the copy is stuck (see the commented red below).
+***    Field-by-field copy still works; only the whole-entry form diverges.
+
+load Store .
+
+fmod MAINFEATURES-DEMO{Field :: TRIV} is
+    pr PAPER-STORE{Field} .
+
+    *** extra PaperTest.sol vocabulary (beyond PaperStore's)
+    op $ledger : -> IdField .          *** struct Ledger { nonce ; balances }
+    op $nonce : -> PrimField .
+    ops $accountMap $valuesMap : -> MapField .
+    eq default($nonce) = 0 .   eq default($ledger) = mtSt .
+endfm
+
+*** ---- testStorageRootDeepCopy: root-to-root copy is a deep VALUE copy ----
+red < $bob . $age = 21 ;
+      $bob . $account . $balance = 11 ;
+      $alice = $bob ;
+      $bob . $age = 30 ;
+      $bob . $account . $balance = 12 ;
+      assert($alice . $age == 21) ;
+      assert($alice . $account . $balance == 11) ; > true .        *** true
+
+*** ---- testNestedStorageWrites: deep writes then reads into locals ----
+red < $alice . $account . $balance = 10 ;
+      $alice . $account . $token . $value = 5 ;
+      var 'b = $alice . $account . $balance ;
+      var 'v = $alice . $account . $token . $value ;
+      assert('b == 10) ;
+      assert('v == 5) ; > true .                                   *** true
+
+*** ---- testStorageAliases: aliases write through to the aliased path ----
+red < storage 'p = $alice ;
+      storage 'acc = 'p . $account ;
+      'acc . $balance = 100 ;
+      'p . $account . $token . $value = 3 ;
+      assert($alice . $account . $balance == 100) ;
+      assert($alice . $account . $token . $value == 3) ; > true .  *** true
+
+*** ---- testMemoryAliasing: a memory field handle shares the object ----
+red < memory 'carol = new ;
+      memory 'carolAcc = 'carol . $account ;
+      'carolAcc . $balance = 100 ;
+      assert('carol . $account . $balance == 100) ; > true .       *** true
+
+*** ---- testStorageMapReadWriteAndDelete: mapping read/write, delete one key ----
+red < $valuesMap [ 1 ] = 10 ;
+      $valuesMap [ 2 ] = 20 ;
+      var 'v = $valuesMap [ 1 ] ;
+      var 'kept = $valuesMap [ 2 ] ;
+      delete $valuesMap [ 1 ] ;
+      assert('v == 10) ;
+      assert('kept == 20) ;
+      assert($valuesMap [ 1 ] == 0) ;
+      assert($valuesMap [ 2 ] == 20) ; > true .                    *** true
+
+*** ---- testStorageStructDeleteSkipsMappingMember: delete a struct, keep its mapping ----
+red < $ledger . $nonce = 5 ;
+      $ledger . $balances [ 1 ] = 10 ;
+      $ledger . $balances [ 2 ] = 20 ;
+      delete $ledger ;
+      assert($ledger . $nonce == 0) ;
+      assert($ledger . $balances [ 1 ] == 10) ;
+      assert($ledger . $balances [ 2 ] == 20) ;
+      delete $ledger . $balances [ 1 ] ;
+      assert($ledger . $balances [ 1 ] == 0) ;
+      assert($ledger . $balances [ 2 ] == 20) ; > true .           *** true
+
+*** ---- testStorageMapStructCopy: KNOWN DIVERGENCE (see header) ----
+*** The whole-entry copy `$accountMap [ 2 ] = $accountMap [ 1 ] ;` is stuck
+*** here (no type to mark the Int-keyed slot as a struct). Kept commented so
+*** the file stays green; field-by-field copy below is the supported form.
+*** red < $accountMap [ 1 ] . $balance = 10 ;
+***       $accountMap [ 1 ] . $token . $value = 7 ;
+***       $accountMap [ 2 ] = $accountMap [ 1 ] ;                  <-- stuck
+***       ... > true .
+*** the supported field-by-field copy DOES agree with SolKey's postcondition:
+red < $accountMap [ 1 ] . $balance = 10 ;
+      $accountMap [ 1 ] . $token . $value = 7 ;
+      $accountMap [ 2 ] . $balance = $accountMap [ 1 ] . $balance ;
+      $accountMap [ 2 ] . $token . $value = $accountMap [ 1 ] . $token . $value ;
+      $accountMap [ 1 ] . $balance = 20 ;
+      $accountMap [ 1 ] . $token . $value = 9 ;
+      assert($accountMap [ 2 ] . $balance == 10) ;
+      assert($accountMap [ 2 ] . $token . $value == 7) ; > true .  *** true

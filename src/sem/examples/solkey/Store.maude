@@ -1,0 +1,46 @@
+*** src/sem/examples/solkey/Store.maude
+***
+*** The PaperStore.sol field vocabulary shared by the solkey mirror suite.
+*** Each sibling file loads this and re-expresses the corresponding
+*** `keyext.solidity.examples` `.key` problems as Maude Hoare triples, so we
+*** can cross-check that this semantics agrees with what SolKey proves.
+***
+*** Translation dictionary (SolKey .key  ->  Maude):
+***   \<{ P }\>(Q)                 < P > (Q)         diamond triple, from empty storage
+***   pre -> \<{ P }\>(Q)          [ pre-storage ]< P > (Q)   or set pre up inside P
+***   alice.age                    $alice . $age
+***   values[1]                    $values [ 1 ]
+***   result = e; ... (result=v)   folded into the postcondition, or `var 'result = e ;`
+***   TRUE / FALSE                 1 / 0   (bools are EVM ints here)
+***   find<[int]>(storage, cons2(A,B))   $A . $B   (read in the postcondition)
+***   \[{ P }\](false)             < P > reverts   (box-false = the program blocks/reverts)
+***
+*** PaperStore structs (nesting mirrored by the field paths):
+***   Token   { value }             $value:Prim
+***   Account { balance, token }    $balance:Prim  $token:Id
+***   Person  { account, age }      $account:Id    $age:Prim
+***   top-level: total age balance (Prim), owner (Prim/address),
+***     values matrix persons (Id arrays), balances people flags (Map),
+***     alice bob (Id, Person).
+*** `age`/`balance` double as top-level slots and struct members — the same
+*** selector on a different PATH, so one constant each serves both.
+
+load ../../Hoare .
+
+fmod PAPER-STORE{Field :: TRIV} is
+    pr SOL-HOARE{Field} .
+
+    *** reference-valued selectors (structs and arrays)
+    ops $alice $bob $account $token $values $matrix $persons : -> IdField .
+    *** primitive selectors
+    ops $value $balance $age $total $owner : -> PrimField .
+    *** mapping selectors
+    ops $balances $people $flags : -> MapField .
+
+    *** zero-initialization: primitives to 0, references (structs/arrays) to mtSt
+    eq default($value) = 0 .    eq default($balance) = 0 .   eq default($age) = 0 .
+    eq default($total) = 0 .    eq default($owner) = 0 .     eq default(length) = 0 .
+    eq default($alice) = mtSt .  eq default($bob) = mtSt .   eq default($account) = mtSt .
+    eq default($token) = mtSt .  eq default($values) = mtSt . eq default($matrix) = mtSt .
+    eq default($persons) = mtSt .
+endfm
