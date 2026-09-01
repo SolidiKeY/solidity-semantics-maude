@@ -5,20 +5,21 @@ fmod STORAGE{Field :: TRIV} is
 
     sort Struct .
 
-    subsort Struct < Value .
+    subsort Struct < StValue .   *** structHeader.key: Struct \extends StValue
 
+    *** signatures mirror SolKey structRules.key: storage holds StValue
     op mtSt : -> Struct .
-    op store : Struct Field$Elt Value -> Struct .
-    op select : Struct Field$Elt -> Value .
-    op find : Struct List{Field} -> Value .
+    op storeSt : Struct Field$Elt StValue -> Struct .
+    op selectSt : Struct Field$Elt -> StValue .
+    op find : Struct List{Field} -> StValue .
 
-    var st : Value .
+    var st : StValue .
     var fld : Field$Elt .
-    var val : Value .
+    var val : StValue .
     var flds flds2 : NeList{Field} .
 
     eq find(val, nil) = val .
-    eq find(store(st, fld, val), fld flds) = find(val, flds) .
+    eq find(storeSt(st, fld, val), fld flds) = find(val, flds) .
 
     eq find(st, flds flds2) = find(find(st, flds), flds2) .
 endfm

@@ -59,14 +59,14 @@ fmod HOARE-DEMO{Field :: TRIV} is
     pr SOL-HOARE{Field} .
 
     *** a small bank domain (concrete instance of the abstract field signature)
-    ops $alice $bob $account : -> IdField .
+    ops $alice $bob $account : -> RefField .
     ops $balance $nonce : -> PrimField .
     op $accounts : -> MapField .
     ops $set $get : -> FName .
 
     *** zero-initialization defaults for this instance
-    eq default($balance) = 0 .   eq default($nonce) = 0 .   eq default(length) = 0 .
-    eq default($alice) = mtSt .  eq default($bob) = mtSt .  eq default($account) = mtSt .
+    eq defaultValue($balance) = 0 .   eq defaultValue($nonce) = 0 .   eq defaultValue(length) = 0 .
+    eq defaultValue($alice) = mtSt .  eq defaultValue($bob) = mtSt .  eq defaultValue($account) = mtSt .
 
     *** a tiny contract: setter and getter over alice's balance
     eq fpar($set) = 'v .

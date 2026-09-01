@@ -35,7 +35,7 @@ fmod SOL-SYNTAX{Field :: TRIV} is
     *** ---- lvalues ---------------------------------------------------------
     *** a root is a state variable (a storage field constant) or a local Qid;
     *** a local may hold a value, a memory reference, or a storage-alias path.
-    subsort PrimField IdField MapField < LValue .
+    subsort PrimField RefField MapField < LValue .
     subsort Qid < LValue .
     op _._ : LValue Field$Elt -> LValue [ctor prec 15 gather (E e)] .   *** member access; `lv . length` is the array-length slot
     op _[_] : LValue Exp -> LValue [ctor prec 15] .                     *** index (arrays and mappings)
@@ -136,7 +136,7 @@ endfm
 fmod SOL-SYNTAX-TEST{Field :: TRIV} is
     pr SOL-SYNTAX{Field} .
 
-    ops $alice $account : -> IdField .
+    ops $alice $account : -> RefField .
     ops $balance $nonce : -> PrimField .
     op $m : -> MapField .
     op $deposit : -> FName .

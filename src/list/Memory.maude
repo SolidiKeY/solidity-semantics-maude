@@ -11,12 +11,12 @@ fmod MEMORY{Field :: FIELD} is
     op _·_ : Memory Memory -> Memory [ctor assoc id: none prec 27] .
     op [_=_] : Identity Value -> Memory [ctor prec 26] .
     op _|>_ : Memory Identity -> Value [prec 28] .
-    op <_> : Field$PrimIdentity -> Memory .
-    op default : Field$Field -> Value .
+    op <_> : Field$IdentityPrim -> Memory .
+    op defaultValue : Field$Field -> Value .
 
     var xs : Memory .
     vars id id2 : Identity .
-    vars pId pId2 : Field$PrimIdentity .
+    vars pId pId2 : Field$IdentityPrim .
     vars f f2 : Field$Field .
     var flds : List{FieldAsTriv}{Field} .
     var v : Value .
@@ -24,7 +24,7 @@ fmod MEMORY{Field :: FIELD} is
     eq xs · [ id : f = v ] |> id : f = v .
     eq xs · [ id = v ] |> id2 = xs |> id2 [owise] .
 
-    eq xs · < pId > |> pId : flds f = default(f) .
+    eq xs · < pId > |> pId : flds f = defaultValue(f) .
     eq xs · < pId > |> id = xs |> id [owise] .
 endfm
 

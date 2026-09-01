@@ -1,27 +1,37 @@
 *** src/sem/examples/solkey/Store.maude
 ***
-*** The PaperStore.sol field vocabulary shared by the solkey mirror suite.
+*** The TestSuite.sol field vocabulary shared by the solkey mirror suite.
 *** Each sibling file loads this and re-expresses the corresponding
-*** `keyext.solidity.examples` `.key` problems as Maude Hoare triples, so we
-*** can cross-check that this semantics agrees with what SolKey proves.
+*** `keyext.solidity.examples/TestSuite.sol` functions (the ones SolKey
+*** proves with postcondition `true`) as Maude Hoare triples, so we can
+*** cross-check that this semantics agrees with what SolKey proves.
 ***
-*** Translation dictionary (SolKey .key  ->  Maude):
-***   \<{ P }\>(Q)                 < P > (Q)         diamond triple, from empty storage
-***   pre -> \<{ P }\>(Q)          [ pre-storage ]< P > (Q)   or set pre up inside P
-***   alice.age                    $alice . $age
-***   values[1]                    $values [ 1 ]
-***   result = e; ... (result=v)   folded into the postcondition, or `var 'result = e ;`
-***   TRUE / FALSE                 1 / 0   (bools are EVM ints here)
+*** Translation dictionary (SolKey  ->  Maude):
+***   \<{ f()@TestSuite; }\>(true)  < body-of-f > (post)   diamond triple, empty storage
+***   /// @custom:key box + require(x == v)   the pin becomes `var 'x = v ;`
+***   require(arr.length == n)      n leading pushes (zero-init makes length 0)
+***   alice.age                     $alice . $age
+***   values[1]                     $values [ 1 ]
+***   result = e; ... (result=v)    folded into the postcondition, or `var 'result = e ;`
+***   TRUE / FALSE                  1 / 0   (bools are EVM ints here)
 ***   find<[int]>(storage, cons2(A,B))   $A . $B   (read in the postcondition)
-***   \[{ P }\](false)             < P > reverts   (box-false = the program blocks/reverts)
+***   \[{ P }\](false)              < P > reverts   (box-false = the program blocks/reverts)
 ***
-*** PaperStore structs (nesting mirrored by the field paths):
+*** Field sorts mirror SolKey's parse-time sort stamping (fieldSortFor):
+***   value member            -> PrimField      (SolKey: plain Field)
+***   struct / array member   -> RefField
+***   mapping member          -> MapField
+*** ...and the element-kind refinements RefArrField / RefMapField mark
+*** containers whose ELEMENTS are structs/arrays, standing in for SolKey's
+*** MappingSort/ArraySort value sorts + the find<[Struct]> cast.
+***
+*** TestSuite.sol structs (nesting mirrored by the field paths):
 ***   Token   { value }             $value:Prim
-***   Account { balance, token }    $balance:Prim  $token:Id
-***   Person  { account, age }      $account:Id    $age:Prim
-***   top-level: total age balance (Prim), owner (Prim/address),
-***     values matrix persons (Id arrays), balances people flags (Map),
-***     alice bob (Id, Person).
+***   Account { balance, token }    $balance:Prim  $token:Ref
+***   Person  { account, age }      $account:Ref   $age:Prim
+***   Ledger  { nonce, balances }   $nonce:Prim    $balances:Map
+***   Toggle  { on, n }             $on:Prim
+***   TokenBucket { tokens }        $tokens:RefArr
 *** `age`/`balance` double as top-level slots and struct members — the same
 *** selector on a different PATH, so one constant each serves both.
 
@@ -30,17 +40,24 @@ load ../../Hoare .
 fmod PAPER-STORE{Field :: TRIV} is
     pr SOL-HOARE{Field} .
 
-    *** reference-valued selectors (structs and arrays)
-    ops $alice $bob $account $token $values $matrix $persons : -> IdField .
+    *** reference-valued selectors (structs, and arrays of primitives)
+    ops $alice $bob $account $token $values $boolFlags $toggle $bucket $ledger : -> RefField .
+    *** arrays of structs/arrays: an indexed read is a Struct
+    ops $matrix $persons $tokens : -> RefArrField .
     *** primitive selectors
-    ops $value $balance $age $total $owner : -> PrimField .
-    *** mapping selectors
-    ops $balances $people $flags : -> MapField .
+    ops $value $balance $age $total $owner $flag $flag2 $on $nonce : -> PrimField .
+    *** mappings with primitive values
+    ops $balances $flags : -> MapField .
+    *** mappings with struct values: an indexed read is a Struct
+    ops $people $accountMap : -> RefMapField .
 
     *** zero-initialization: primitives to 0, references (structs/arrays) to mtSt
-    eq default($value) = 0 .    eq default($balance) = 0 .   eq default($age) = 0 .
-    eq default($total) = 0 .    eq default($owner) = 0 .     eq default(length) = 0 .
-    eq default($alice) = mtSt .  eq default($bob) = mtSt .   eq default($account) = mtSt .
-    eq default($token) = mtSt .  eq default($values) = mtSt . eq default($matrix) = mtSt .
-    eq default($persons) = mtSt .
+    eq defaultValue($value) = 0 .    eq defaultValue($balance) = 0 .   eq defaultValue($age) = 0 .
+    eq defaultValue($total) = 0 .    eq defaultValue($owner) = 0 .     eq defaultValue(length) = 0 .
+    eq defaultValue($flag) = 0 .     eq defaultValue($flag2) = 0 .     eq defaultValue($on) = 0 .
+    eq defaultValue($nonce) = 0 .
+    eq defaultValue($alice) = mtSt .   eq defaultValue($bob) = mtSt .     eq defaultValue($account) = mtSt .
+    eq defaultValue($token) = mtSt .   eq defaultValue($values) = mtSt .  eq defaultValue($matrix) = mtSt .
+    eq defaultValue($persons) = mtSt . eq defaultValue($tokens) = mtSt .  eq defaultValue($boolFlags) = mtSt .
+    eq defaultValue($toggle) = mtSt .  eq defaultValue($bucket) = mtSt .  eq defaultValue($ledger) = mtSt .
 endfm

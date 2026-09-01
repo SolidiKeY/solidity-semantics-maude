@@ -81,3 +81,8 @@ red < $balances [ 1 ] = 10 ; > ($balances [ 1 ] == 10) .                      **
 red < $flags [ 1 ] = true ; delete $flags [ 1 ] ; > ($flags [ 1 ] == 0) .     *** true   mapping-bool delete (SolKey: FALSE)
 red < $balances [ 1 ] = 10 ; $balances [ 2 ] = 20 ;
       delete $balances [ 1 ] ; > ($balances [ 1 ] == 0 && $balances [ 2 ] == 20) .  *** true — one key reset, sibling kept
+
+*** storageIndexDeleteMappingStruct: delete of a struct-valued mapping entry
+*** — $people : RefMapField — resets its fields through the delAt read-through
+red < delete $people [ 1 ] ; >
+      ($people [ 1 ] . $age == 0 && $people [ 1 ] . $account . $balance == 0) .     *** true

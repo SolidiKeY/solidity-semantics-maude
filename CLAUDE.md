@@ -47,11 +47,11 @@ Other tools:
 
 Everything is built on an abstract field signature and layered upward. `load` statements wire the dependency graph.
 
-- **`Fields.maude`** — `FIELDS{Field :: TRIV}`, the shared abstract signature. Key sorts: `Identity` (an object reference), `Value`, and `Field$Elt` split into `PrimField` (primitive-valued, e.g. a balance) vs `IdField` (reference-valued, points to another object). An `Identity` is `idC(PrimIdentity, List{Field})` — a base object plus an access path of fields.
+- **`Fields.maude`** — `FIELDS{Field :: TRIV}`, the shared abstract signature, mirroring SolKey's logic-sort hierarchy (`solidityDLHeader.key` + theory headers): `Prim < StValue MemValue < Value` with `Int < Prim`, `Identity < MemValue`, and `Struct < StValue` (declared in `Storage.maude`) — storage ops take/return `StValue`, memory ops `MemValue`. `Field$Elt` splits into `PrimField` (primitive-valued, e.g. a balance), `RefField` (reference-valued, points to another object), and `MapField`; the element-kind refinements `RefArrField < RefField` / `RefMapField < MapField` mark containers whose *elements* are structs (the executable stand-in for SolKey's `find<[Struct]>` cast — they let `accountMap[2] = accountMap[1]` copy a whole entry). An `Identity` is `idC(IdentityPrim, List{Field})` — a base object plus an access path of fields. The Agda/F\*/Prolog twins still use the flat pre-hierarchy names (`store`/`select`/`add`/`del`/`default`/`IdField`/`PrimIdentity`).
 
-- **`Memory.maude`** — `BANK{Field :: TRIV}`, the memory model: `add`/`read`/`write`/`delete`/`erase` keyed by `Identity` + field path. Reads/writes are defined equationally (`read(write(m,id,sel,val),id,sel) = val`, with conditional commutation over distinct id/selector pairs). `readR` reads along a `NeList{Field}` path.
+- **`Memory.maude`** — `BANK{Field :: TRIV}`, the memory model: `addM`/`read`/`write`/`delete`/`erase` keyed by `Identity` + field path. Reads/writes are defined equationally (`read(write(m,id,sel,val),id,sel) = val`, with conditional commutation over distinct id/selector pairs). `readR` reads along a `NeList{Field}` path.
 
-- **`Storage.maude`** — `STORAGE{Field :: TRIV}`, the storage model as nested `Struct`s: `store`/`select`/`find`/`save`/`push`/`pop`. `find(st, path)` navigates a `List{Field}` into nested structs. `StorageSelect.maude` is a `select`-based variant.
+- **`Storage.maude`** — `STORAGE{Field :: TRIV}`, the storage model as nested `Struct`s: `storeSt`/`selectSt`/`find`/`save`/`push`/`pop`. `find(st, path)` navigates a `List{Field}` into nested structs. `StorageSelect.maude` is a `selectSt`-based variant.
 
 - **Translations** (the core research artifact) — encode Solidity's copy semantics between the two models:
   - `MemoryToStorage.maude`, `MemoryToStorage-Eager.maude`, `MemoryToStorageSelect.maude` — memory → storage (`copyMem`).

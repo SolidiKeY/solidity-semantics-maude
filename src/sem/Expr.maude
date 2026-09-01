@@ -35,7 +35,7 @@ fmod SOL-EVAL{Field :: TRIV} is
     vars P1 P2 : Prop .
     var V : Value .    vars W W1 W2 : Value? .
     vars I I1 I2 : Int .                  var ID : Identity .
-    var PF : PrimField .  var IDF : IdField .  var MF : MapField .
+    var PF : PrimField .  var IDF : RefField .  var MF : MapField .
     var F0 : Field$Elt .  var FXS : NeList{Field} .
     var L? : Loc? .       vars SND VAL : Int .
 
@@ -180,7 +180,7 @@ endfm
 fmod SOL-EVAL-TEST{Field :: TRIV} is
     pr SOL-EVAL{Field} .
 
-    ops $alice $account : -> IdField .
+    ops $alice $account : -> RefField .
     ops $balance $nonce : -> PrimField .
     op $m : -> MapField .
 

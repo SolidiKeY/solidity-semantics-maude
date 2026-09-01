@@ -5,13 +5,14 @@ fmod BANK{Field :: TRIV} is
 
     sort Memory .
 
+    *** signatures mirror SolKey memoryRules.key: memory holds MemValue
     op mtMem : -> Memory .
-    op add : Memory PrimIdentity -> Memory .
-    op read : Memory Identity Field$Elt -> Value .
-    op readR : Memory Identity NeList{Field} -> Value .
-    op write : Memory Identity Field$Elt Value -> Memory .
+    op addM : Memory IdentityPrim -> Memory .
+    op read : Memory Identity Field$Elt -> MemValue .
+    op readR : Memory Identity NeList{Field} -> MemValue .
+    op write : Memory Identity Field$Elt MemValue -> Memory .
     op delete : Memory Identity -> Memory .
-    op idC : PrimIdentity List{Field} -> Identity .
+    op idC : IdentityPrim List{Field} -> Identity .
 
     op erase : Memory -> Memory .
     op _:_ : Identity List{Field} -> Identity .
@@ -20,12 +21,12 @@ fmod BANK{Field :: TRIV} is
 
     vars i j size : Int .
     var memory : Memory .
-    vars id idn : PrimIdentity .
+    vars id idn : IdentityPrim .
     var idComplex id1 id2 : Identity .
-    var val : Value .
+    var val : MemValue .
     var sel sel1 sel2 : Field$Elt .
     var pSel : PrimField .
-    var idS : IdField .
+    var idS : RefField .
     var ls ls1 ls2 : List{Field} .
     var ls3 : NeList{Field} .
 
@@ -35,9 +36,9 @@ fmod BANK{Field :: TRIV} is
     ceq read(write(memory, id1, sel1, val), id2, sel2) = read(memory, id2, sel2)
         if id1 =/= id2 or sel1 =/= sel2 .
 
-    eq read(add(memory, id), idC(id, ls), pSel) = 0 .
-    eq read(add(memory, id), idC(id, ls), idS) = idC(id, ls idS) .
-    ceq read(add(memory, id), idC(idn, ls), sel) = read(memory, idC(idn, ls), sel)
+    eq read(addM(memory, id), idC(id, ls), pSel) = 0 .
+    eq read(addM(memory, id), idC(id, ls), idS) = idC(id, ls idS) .
+    ceq read(addM(memory, id), idC(idn, ls), sel) = read(memory, idC(idn, ls), sel)
         if id =/= idn .
 
     eq read(emptyMemory, id1, pSel) = 0 .
@@ -46,7 +47,7 @@ fmod BANK{Field :: TRIV} is
     eq read(delete(memory, idC(id, ls)), idC(id, ls ls2), pSel) = 0 .
     eq read(delete(memory, idC(id, ls)), idC(id, ls ls2), idS) = idC(id, ls ls2 idS) .
     ceq read(delete(memory, idC(id, ls)), idC(idn, ls1), sel) = read(memory, idC(idn, ls1), sel)
-        if id =/= idn .          *** unrelated base object: pass through (mirrors add, :40-41)
+        if id =/= idn .          *** unrelated base object: pass through (mirrors addM, :40-41)
 
     eq readR(memory, id1, ls3 sel) = read(memory, read(memory, id1, ls3), sel) .
 
@@ -62,12 +63,12 @@ fmod BANK-ERASE-LAZY{Field :: TRIV} is
 
     vars i j size : Int .
     var memory : Memory .
-    vars id : PrimIdentity .
+    vars id : IdentityPrim .
     var idComplex id1 id2 : Identity .
-    var val : Value .
+    var val : MemValue .
     var sel sel1 sel2 : Field$Elt .
     var pSel : PrimField .
-    var idS : IdField .
+    var idS : RefField .
     var ls ls1 ls2 : List{Field} .
 
     eq read(erase(memory), idC(id, ls) , idS) = idC(id, idS ls) .
@@ -79,10 +80,10 @@ fmod TEST-BANK-FIELDS{Field :: TRIV} is
     pr BANK{Field} .
 
     ops abMemory memory wMemory cMemory : -> Memory .
-    ops aliceC bobC bAccC : -> PrimIdentity .
+    ops aliceC bobC bAccC : -> IdentityPrim .
     ops alice bob bAcc : -> Identity .
     op $balance : -> PrimField .
-    op $account : -> IdField .
+    op $account : -> RefField .
 
     eq alice = idC(aliceC, nil) .
     eq bob = idC(bobC, nil) .
@@ -128,17 +129,17 @@ fmod BANK-ERASE{Field :: TRIV} is
 
     vars i j size : Int .
     var memory : Memory .
-    vars id : PrimIdentity .
+    vars id : IdentityPrim .
     var idComplex id1 id2 id3 : Identity .
-    var val : Value .
+    var val : MemValue .
     var sel sel1 sel2 : Field$Elt .
     var pSel : PrimField .
-    var idS : IdField .
+    var idS : RefField .
     var ls ls1 ls2 ls3 : List{Field} .
 
 
     eq erase(mtMem) = mtMem .
-    eq erase(add(memory, id)) = add(erase(memory), id) .
+    eq erase(addM(memory, id)) = addM(erase(memory), id) .
     eq erase(write(memory, id1, pSel, val)) = write(erase(memory), id1, pSel, val) .
 
     op copy : Memory Identity Identity -> Memory .
@@ -147,7 +148,7 @@ fmod BANK-ERASE{Field :: TRIV} is
 
     eq copy(mtMem, id1, id2) = mtMem .
     *** Add does not change anything, it can just skip
-    eq copy(add(memory, id), id1, id2) = memory .
+    eq copy(addM(memory, id), id1, id2) = memory .
     eq copy(write(memory, idC(id, ls1 ls2), sel, val), id3, idC(id, ls1)) =
         write(write(copy(memory, id3, idC(id, ls1)),
             idC(id, ls1 ls2), sel, val), id3 : ls2, sel, val) .

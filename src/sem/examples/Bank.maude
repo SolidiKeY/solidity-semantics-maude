@@ -13,7 +13,7 @@
 ***   $accts   : MapField   address -> Account struct
 ***   $bal     : PrimField  account balance
 ***   $frozen  : PrimField  1 = frozen
-***   $owners  : IdField    dynamic array of owner addresses (·length, [i])
+***   $owners  : RefField    dynamic array of owner addresses (·length, [i])
 ***   $total   : PrimField  running total of deposits (a class invariant witness)
 
 load ../Contract .
@@ -23,11 +23,11 @@ fmod BANK-CONTRACT{Field :: TRIV} is
 
     op $accts : -> MapField .
     ops $bal $frozen $total : -> PrimField .
-    op $owners : -> IdField .
+    op $owners : -> RefField .
 
-    eq default($bal) = 0 .    eq default($frozen) = 0 .
-    eq default($total) = 0 .  eq default(length) = 0 .
-    eq default($owners) = mtSt .
+    eq defaultValue($bal) = 0 .    eq defaultValue($frozen) = 0 .
+    eq defaultValue($total) = 0 .  eq defaultValue(length) = 0 .
+    eq defaultValue($owners) = mtSt .
 
     ops $deposit $withdraw $freeze $balanceOf $registerOnce : -> FName .
 

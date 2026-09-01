@@ -50,42 +50,49 @@ fmod SOL-CONFIG{Field :: TRIV} is
     ceq envR(envW(EV, Q, B), Q2) = envR(EV, Q2) if Q =/= Q2 .
 
     *** ---- fresh memory identities ----------------------------------------
-    op pid : Int -> PrimIdentity [ctor] .
+    op pid : Int -> IdentityPrim [ctor] .
 
     *** ---- zero-initialized storage ----------------------------------------
     *** Solidity storage reads as zero before ever being written; the base
     *** STORAGE model leaves find-on-mtSt stuck (SolKey states the same fact
     *** as a per-example precondition `find(storage, sp·size) = 0`). These
     *** default equations complete the model — in particular push/pop work
-    *** on never-touched arrays. Instances must define `default` per field
-    *** constant (explicitly per constant: a catch-all `default(PF) = 0`
+    *** on never-touched arrays. Instances must define `defaultValue` per field
+    *** constant (explicitly per constant: a catch-all `defaultValue(PF) = 0`
     *** overlaps with the struct-field defaults and breaks confluence).
-    var LFXS : List{Field} .  var PFd : PrimField .  var IDFd : IdField .
+    var LFXS : List{Field} .  var PFd : PrimField .  var IDFd : RefField .
     var Id : Int .
-    eq find(mtSt, LFXS PFd) = default(PFd) .
-    eq find(mtSt, LFXS IDFd) = default(IDFd) .
-    eq find(mtSt, LFXS Id) = 0 .    *** array elements / mapping values default to 0
+    var RMFd : RefMapField .  var RAFd : RefArrField .
+    eq find(mtSt, LFXS PFd) = defaultValue(PFd) .
+    eq find(mtSt, LFXS IDFd) = defaultValue(IDFd) .
+    *** struct-element containers (SolKey: MappingSort/ArraySort with a
+    *** reference value sort): an untouched keyed slot is an empty struct
+    eq find(mtSt, LFXS RMFd Id) = mtSt .
+    eq find(mtSt, LFXS RAFd Id) = mtSt .
+    *** [owise] so the two struct-element defaults above win; NB any future
+    *** non-owise find(mtSt, …) equation would silently pre-empt this 0
+    eq find(mtSt, LFXS Id) = 0 [owise] .    *** prim elements / mapping values default to 0
 
     *** reading THROUGH a stored struct value: the base model's owise
     *** passthrough skips a whole-struct save when the query path extends the
     *** saved path, so deep reads after a struct copy silently missed it.
     *** (Latent in ../Storage.maude — its tests only ever read prefixes.
     *** Flagged for the Agda/F*/Prolog twins.)
-    var FXSd FXSd2 : NeList{Field} .  var STd : Struct .  var Vd : Value .
+    var FXSd FXSd2 : NeList{Field} .  var STd : Struct .  var Vd : StValue .
     eq find(save(STd, FXSd, Vd), FXSd FXSd2) = find(Vd, FXSd2) .
 
     *** ---- deep memory access along a field path ---------------------------
     *** (BANK's readR misses the singleton path; these helpers cover it and
     *** resolve the intermediate Identity chain for writes.)
-    op mread : Memory Identity NeList{Field} -> Value .
-    op mwrite : Memory Identity NeList{Field} Value -> Memory .
+    op mread : Memory Identity NeList{Field} -> MemValue .
+    op mwrite : Memory Identity NeList{Field} MemValue -> Memory .
 
     var M : Memory .  var ID : Identity .  var F0 : Field$Elt .
-    var FXS : NeList{Field} .  var V : Value .
+    var FXS : NeList{Field} .  var V : Value .  var MV : MemValue .
     eq mread(M, ID, F0) = read(M, ID, F0) .
     eq mread(M, ID, FXS F0) = read(M, mread(M, ID, FXS), F0) .
-    eq mwrite(M, ID, F0, V) = write(M, ID, F0, V) .
-    eq mwrite(M, ID, FXS F0, V) = write(M, mread(M, ID, FXS), F0, V) .
+    eq mwrite(M, ID, F0, MV) = write(M, ID, F0, MV) .
+    eq mwrite(M, ID, FXS F0, MV) = write(M, mread(M, ID, FXS), F0, MV) .
 
     *** ---- configuration ----------------------------------------------------
     sorts Cell Cells Conf Status .
@@ -157,7 +164,7 @@ endfm
 fmod SOL-CONFIG-TEST{Field :: TRIV} is
     pr SOL-CONFIG{Field} .
 
-    ops $alice : -> IdField .
+    ops $alice : -> RefField .
     ops $balance : -> PrimField .
     op st1 : -> Struct .
     op cf1 : -> Conf .

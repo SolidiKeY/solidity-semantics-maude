@@ -17,7 +17,7 @@
 ***  - `emit Ev(e) ;` evaluates its argument (reverting if it does) and
 ***    has no state effect — the SolKey skip rule;
 ***  - struct literals need no new machinery: Struct terms are Exps, so
-***    `$arr .push(store(mtSt, $balance, 42)) ;` and whole-struct writes
+***    `$arr .push(storeSt(mtSt, $balance, 42)) ;` and whole-struct writes
 ***    from a value — both open items in SolKey — just work.
 *** Internal calls only: msg is unchanged across a call. External calls
 *** with value and callbacks are NetCallback.maude.
@@ -84,13 +84,13 @@ endfm
 fmod SOL-CONTRACT-TEST{Field :: TRIV} is
     pr SOL-CONTRACT{Field} .
 
-    ops $alice $arr : -> IdField .
+    ops $alice $arr : -> RefField .
     ops $balance $nonce : -> PrimField .
     op $bals : -> MapField .
 
-    eq default($balance) = 0 .   eq default($nonce) = 0 .
-    eq default(length) = 0 .
-    eq default($alice) = mtSt .  eq default($arr) = mtSt .
+    eq defaultValue($balance) = 0 .   eq defaultValue($nonce) = 0 .
+    eq defaultValue(length) = 0 .
+    eq defaultValue($alice) = mtSt .  eq defaultValue($arr) = mtSt .
 
     ops $setB $twice $fact $guard $pay : -> FName .
 
@@ -140,7 +140,7 @@ fmod SOL-CONTRACT-TEST{Field :: TRIV} is
     *** SolKey's open `alice = pVal;` refinement and its disabled
     *** testStorageArrayPushPop, `tokens.push(Token(42));`. Literals are
     *** save-built: the base model's find cannot read past a non-matching
-    *** outermost store, so store-built literals only reduce field-by-field.
+    *** outermost storeSt, so storeSt-built literals only reduce field-by-field.
     eq cLit = run($alice = save(save(mtSt, $balance, 3), $nonce, 4) ;) .
     eq cLitPush = run(
         $arr .push(save(mtSt, $balance, 42)) ;

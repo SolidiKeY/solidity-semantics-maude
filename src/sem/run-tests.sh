@@ -32,6 +32,12 @@ roots=(
   "$here/examples/solkey/PushPop.maude"
   "$here/examples/solkey/Net.maude"
   "$here/examples/solkey/MainFeatures.maude"
+  "$here/examples/solkey/Bool.maude"
+  "$here/examples/solkey/Branching.maude"
+  "$here/examples/solkey/NseIndex.maude"
+  "$here/examples/solkey/Matrix.maude"
+  "$here/examples/solkey/ComplexReceiver.maude"
+  "$here/examples/solkey/CrossCopy.maude"
 )
 
 # A result is "stuck" if it still mentions an internal operator that a

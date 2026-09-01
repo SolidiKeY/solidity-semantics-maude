@@ -37,27 +37,40 @@ fmod SOL-STMT{Field :: TRIV} is
     vars ST ST2 : Struct .                var N : Int .
     var Q : Qid .      var LV : LValue .  vars E E1 E2 : Exp .
     var V : Value .    var W : Value? .   vars I I2 : Int .
-    vars ID ID2 : Identity .              vars PID PID2 : PrimIdentity .
-    var PF : PrimField .  var IDF : IdField .  var MF : MapField .
+    vars ID ID2 : Identity .              vars PID PID2 : IdentityPrim .
+    var PF : PrimField .  var IDF : RefField .  var MF : MapField .
     var F0 : Field$Elt .  vars FXS FXS2 : NeList{Field} .
     var LFXS : List{Field} .              var L? : Loc? .
     var KK : K .
 
     *** ---- the lazy cross-location copies (restated, see header) ------------
-    op copySt : Memory PrimIdentity Value -> Memory .
-    ceq read(copySt(M, PID, V), idC(PID2, LFXS), F0) = read(M, idC(PID2, LFXS), F0)
+    *** copySt(Memory, IdentityPrim, Struct) — structMemoryRules.key
+    op copySt : Memory IdentityPrim Struct -> Memory .
+    ceq read(copySt(M, PID, ST2), idC(PID2, LFXS), F0) = read(M, idC(PID2, LFXS), F0)
         if PID =/= PID2 .
-    eq read(copySt(M, PID, V), idC(PID, LFXS), IDF) = idC(PID, LFXS IDF) .
-    eq read(copySt(M, PID, V), idC(PID, LFXS), PF) = find(V, LFXS PF) .
+    eq read(copySt(M, PID, ST2), idC(PID, LFXS), IDF) = idC(PID, LFXS IDF) .
+    eq read(copySt(M, PID, ST2), idC(PID, LFXS), PF) = find(ST2, LFXS PF) .
 
     op copyMem : Struct Memory Identity -> Struct .
     eq find(copyMem(ST2, M, ID), LFXS PF) = mread(M, ID, LFXS PF) .
     eq find(copyMem(ST2, M, ID), LFXS I) = mread(M, ID, LFXS I) .
 
-    *** a find along an IdField-ended path IS a struct value (the base model
+    *** a find along an RefField-ended path IS a struct value (the base model
     *** only states this for single-field paths) — needed so the copy
     *** dispatch below can recognize a struct-valued right-hand side
     mb find(ST, LFXS IDF) : Struct .
+
+    *** ... and so is a find of an Int-KEYED slot when the container field is
+    *** declared struct-element (RefMapField / RefArrField): the Maude
+    *** analogue of SolKey's find<[Struct]> cast, whose sort the converter
+    *** stamps from the declared mapping/array value type. This is what lets
+    *** `accountMap[2] = accountMap[1]` copy a whole mapping entry.
+    *** Theory note: after `delete a[i]` the base model reads the reset slot
+    *** as 0 (Storage.maude's exact-read equation), so this membership is not
+    *** sort-decreasing on that corner — flagged for the Agda/F*/Prolog twins.
+    var RMF : RefMapField .   var RAF : RefArrField .
+    mb find(ST, LFXS RMF I) : Struct .
+    mb find(ST, LFXS RAF I) : Struct .
 
     *** ---- plain assignment ---------------------------------------------------
     *** dispatch on the LHS shape: a bare Qid may be a path REBIND
@@ -122,7 +135,7 @@ fmod SOL-STMT{Field :: TRIV} is
           mem(copySt(M, pid(N), ST2)) cnt(N + 1) C } .
     eq decM(Q, rev, KK, C) = doRevert(k(nilK) C) .
     eq { k((memory Q = new ;) KK) env(EV) mem(M) cnt(N) C } =
-        { k(KK) env(envW(EV, Q, bv(idC(pid(N), nil)))) mem(add(M, pid(N))) cnt(N + 1) C } .
+        { k(KK) env(envW(EV, Q, bv(idC(pid(N), nil)))) mem(addM(M, pid(N))) cnt(N + 1) C } .
 
     *** ---- compound assignment / inc / dec: honest desugaring --------------------
     *** sound because expressions are side-effect-free (the duplicated LV
@@ -144,23 +157,23 @@ fmod SOL-STMT{Field :: TRIV} is
     eq { k((Q = -- LV ;) KK) C } = { k((LV = _-_(LV, 1) ;) (Q = LV ;) KK) C } .
 
     *** ---- delete -----------------------------------------------------------------
-    *** storage: the lazy mapping-preserving del of ../Storage.maude (incl.
+    *** storage: the lazy mapping-preserving delAt of ../Storage.maude (incl.
     *** whole-array length reset). memory: primitive slot → 0, reference
     *** slot → fresh empty object (SolKey's memoryRootDeleteFreshRebind).
     eq { k((delete LV ;) KK) C } = delD(lower(LV, C), KK, C) .
     op delD : Loc? K Cells -> Conf .
-    eq delD(sloc(FXS), KK, sto(ST) C) = { k(KK) sto(del(ST, FXS)) C } .
+    eq delD(sloc(FXS), KK, sto(ST) C) = { k(KK) sto(delAt(ST, FXS)) C } .
     eq delD(mloc(ID, FXS), KK, C) = delM(mloc(ID, FXS), readLoc(mloc(ID, FXS), C), KK, C) .
     eq delD(vloc(Q), KK, C) = delV(Q, readLoc(vloc(Q), C), KK, C) .
     eq delD(revL, KK, C) = doRevert(k(nilK) C) .
     op delM : Loc Value? K Cells -> Conf .
     eq delM(mloc(ID, FXS), I, KK, mem(M) C) = { k(KK) mem(mwrite(M, ID, FXS, 0)) C } .
     eq delM(mloc(ID, FXS), ID2, KK, mem(M) cnt(N) C) =
-        { k(KK) mem(mwrite(add(M, pid(N)), ID, FXS, idC(pid(N), nil))) cnt(N + 1) C } .
+        { k(KK) mem(mwrite(addM(M, pid(N)), ID, FXS, idC(pid(N), nil))) cnt(N + 1) C } .
     op delV : Qid Value? K Cells -> Conf .
     eq delV(Q, I, KK, env(EV) C) = { k(KK) env(envW(EV, Q, bv(0))) C } .
     eq delV(Q, ID, KK, env(EV) mem(M) cnt(N) C) =
-        { k(KK) env(envW(EV, Q, bv(idC(pid(N), nil)))) mem(add(M, pid(N))) cnt(N + 1) C } .
+        { k(KK) env(envW(EV, Q, bv(idC(pid(N), nil)))) mem(addM(M, pid(N))) cnt(N + 1) C } .
 
     *** ---- push / pop (storage dynamic arrays) ---------------------------------------
     *** Own array primitives instead of ../Storage.maude's push/pop: the base
@@ -168,7 +181,7 @@ fmod SOL-STMT{Field :: TRIV} is
     *** and is stuck on empty arrays (its own tests preseed the length slot;
     *** SolKey states the same as a per-example precondition). Flagged for
     *** the Agda/F*/Prolog twins. popA keeps the base pop's semantics:
-    *** mapping-preserving del of the last slot, then shrink.
+    *** mapping-preserving delAt of the last slot, then shrink.
     op pushV : Struct NeList{Field} Value -> Struct .
     op pushL : Struct NeList{Field} -> Struct .
     op popA : Struct NeList{Field} -> Struct .
@@ -177,7 +190,7 @@ fmod SOL-STMT{Field :: TRIV} is
         if L0 := find(ST, FXS length) .
     ceq pushL(ST, FXS) = save(ST, FXS length, L0 + 1)
         if L0 := find(ST, FXS length) .
-    ceq popA(ST, FXS) = save(del(ST, FXS NI), FXS length, NI)
+    ceq popA(ST, FXS) = save(delAt(ST, FXS NI), FXS length, NI)
         if s NI := find(ST, FXS length) .
 
     eq { k((LV .push(E) ;) KK) C } = pushD(lower(LV, C), eval(E, C), KK, C) .
@@ -210,15 +223,15 @@ endfm
 fmod SOL-STMT-TEST{Field :: TRIV} is
     pr SOL-STMT{Field} .
 
-    ops $alice $bob $carol $account $arr $arr2 : -> IdField .
+    ops $alice $bob $carol $account $arr $arr2 : -> RefField .
     ops $balance $nonce $flag : -> PrimField .
     op $m : -> MapField .
 
-    eq default($balance) = 0 .    eq default($nonce) = 0 .
-    eq default($flag) = 0 .       eq default(length) = 0 .
-    eq default($alice) = mtSt .   eq default($bob) = mtSt .
-    eq default($carol) = mtSt .   eq default($account) = mtSt .
-    eq default($arr) = mtSt .     eq default($arr2) = mtSt .
+    eq defaultValue($balance) = 0 .    eq defaultValue($nonce) = 0 .
+    eq defaultValue($flag) = 0 .       eq defaultValue(length) = 0 .
+    eq defaultValue($alice) = mtSt .   eq defaultValue($bob) = mtSt .
+    eq defaultValue($carol) = mtSt .   eq defaultValue($account) = mtSt .
+    eq defaultValue($arr) = mtSt .     eq defaultValue($arr2) = mtSt .
 
     op run : K -> Conf .
     var KK : K .

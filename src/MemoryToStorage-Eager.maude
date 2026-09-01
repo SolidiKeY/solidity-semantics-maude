@@ -9,8 +9,8 @@ fmod MemoryToStorage{Field :: TRIV} is
     var v : Value .
     var pF : PrimField .
     var fld : Field$Elt .
-    var idF : IdField .
-    var pId : PrimIdentity .
+    var idF : RefField .
+    var pId : IdentityPrim .
     vars id id2 : Identity .
     vars allMem mem : Memory .
     vars fxs fxs2 fxs3 : List{Field} .
@@ -22,7 +22,7 @@ fmod MemoryToStorage{Field :: TRIV} is
     eq copyMem(st, mem, id) = copyMemAux(st, id, mem, mem) .
 
     eq copyMemAux(st, id, mtMem, allMem) = st .
-    eq copyMemAux(st, idC(pId, fxs) , add(mem, pId) , allMem) = st .
+    eq copyMemAux(st, idC(pId, fxs) , addM(mem, pId) , allMem) = st .
 
     ceq copyMemAux(st, id, write(mem, id2, fld, v), allMem) =
         copyMemAux(st, id, mem, allMem)
@@ -40,13 +40,13 @@ endfm
 fmod Examples{Field :: TRIV} is
     pr MemoryToStorage{Field} .
 
-    ops $alice $bob $carol $account : -> IdField .
+    ops $alice $bob $carol $account : -> RefField .
     ops $balance : -> PrimField .
     ops st1 stAlice stBal : -> Struct .
-    ops idA idF : -> PrimIdentity .
+    ops idA idF : -> IdentityPrim .
     ops mem nMem memAlice : -> Memory .
 
-    eq nMem = write(add(mem, idA), idC(idA, $account), $balance, 10) .
+    eq nMem = write(addM(mem, idA), idC(idA, $account), $balance, 10) .
     eq stAlice = copyMem(st1, nMem, idC(idA, nil)) .
 endfm
 

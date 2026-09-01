@@ -9,7 +9,7 @@ fmod StorageToMemory{Field :: TRIV} is
 
     var st : Struct .
     var pF : PrimField .
-    var idF : IdField .
+    var idF : RefField .
     var vSt : Struct .
     var vInt : Int .
     var id : Identity .
@@ -18,9 +18,9 @@ fmod StorageToMemory{Field :: TRIV} is
 
 
     eq copy-struct-mem(mem, id, mtSt) = mem .
-    eq copy-struct-mem(mem, id, store(st, pF, vInt)) =
+    eq copy-struct-mem(mem, id, storeSt(st, pF, vInt)) =
         write(copy-struct-mem(mem, id, st), id, pF, vInt) .
-    eq copy-struct-mem(mem, id, store(st, pF, vSt)) =
+    eq copy-struct-mem(mem, id, storeSt(st, pF, vSt)) =
         copy-struct-mem(copy-struct-mem(write(mem, id, pF, id : pF), id : pF, vSt), id, st) .
 endfm
 
@@ -30,10 +30,10 @@ fmod Example{Field :: TRIV} is
     ops $alice $bob $account $balance : -> PrimField .
     ops st1 stAlice stBal : -> Struct .
 
-    eq stBal = store(mtSt, $balance, 10) .
-    eq stAlice = store(mtSt, $account, stBal) .
-    eq st1 = store(store(mtSt, $alice, stAlice),
-                               $bob  , store(mtSt, $account, store(mtSt, $balance, 20))) .
+    eq stBal = storeSt(mtSt, $balance, 10) .
+    eq stAlice = storeSt(mtSt, $account, stBal) .
+    eq st1 = storeSt(storeSt(mtSt, $alice, stAlice),
+                               $bob  , storeSt(mtSt, $account, storeSt(mtSt, $balance, 20))) .
 
     ops idA idF : -> Identity .
     op mem : -> Memory .
@@ -49,7 +49,7 @@ fmod ShallowExample{Field :: TRIV} is
     ops $alice $bob $carol $account $pn $balance : -> PrimField .
     ops st stC : -> Struct .
     ops mem memAlice memBob : -> Memory .
-    ops idB idA : -> PrimIdentity .
+    ops idB idA : -> IdentityPrim .
     ops IDa IDb : -> Identity .
 
     eq stC = v→st(find(st, $carol)) .

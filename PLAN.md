@@ -59,7 +59,7 @@ The guiding correspondence:
 | Sequent + update `{storage := save(...)}` | Configuration term `< stmts \| storage \| memory \| net \| env >` rewritten by rules |
 | Symbolic execution taclet per statement shape | One rewrite rule (or equation) per statement shape |
 | Splitting rules (`if`, `x/0` revert branch) | Rewrite rules explored with `search` (all branches) |
-| Storage logic (`store`/`select`/`find`/`save`, `delNode`) | Already here: `src/Storage.maude` — reuse as-is |
+| Storage logic (`storeSt`/`selectSt`/`find`/`save`, `delNode`) | Already here: `src/Storage.maude` — reuse as-is |
 | Memory heap (`Identity`, aliasing, `copySt`/`copyMem`) | Already here: `src/Memory.maude` + translation files |
 | Proof obligation (paper eq. 4) | `search` / `red` checks; LTL model checking for re-entrancy |
 
@@ -84,9 +84,9 @@ ops, no inheritance. Same tiering as `solkey/docs/taclet-ideas.md`.
    distinguished `reverted` configuration.
 
 3. **Reuse the existing state layer unchanged.** The canonical pair is the
-   nested lazy model: `src/Storage.maude` (`STORAGE`: `store`/`select`/`find`/
+   nested lazy model: `src/Storage.maude` (`STORAGE`: `storeSt`/`selectSt`/`find`/
    `save`/`push`/`pop`, lazy `delete` that skips `MapField`) and
-   `src/Memory.maude` (`BANK`: `add`/`read`/`write`/`delete`/`erase`), with
+   `src/Memory.maude` (`BANK`: `addM`/`read`/`write`/`delete`/`erase`), with
    `StorageToMemoryLazy.maude` / `MemoryToStorage.maude` for cross-location
    copies. The other variants stay as comparison artifacts, per repo
    convention. New semantics files `load` these; they do not fork them.

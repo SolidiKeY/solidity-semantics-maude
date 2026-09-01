@@ -70,7 +70,7 @@ mod SOL-CALLBACK-TEST{Field :: TRIV} is
     pr SOL-CALLBACK{Field} .
 
     op $bals : -> MapField .
-    eq default(length) = 0 .
+    eq defaultValue(length) = 0 .
 
     *** the attacker is address 1, with 100 recorded in $bals
     ops withdrawNaive withdrawSafe : -> K .

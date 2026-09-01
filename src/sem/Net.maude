@@ -59,11 +59,11 @@ fmod SOL-NET-TEST{Field :: TRIV} is
     pr SOL-NET{Field} .
 
     op $bals : -> MapField .
-    ops $alice : -> IdField .
+    ops $alice : -> RefField .
     op $balance : -> PrimField .
 
-    eq default($balance) = 0 .   eq default(length) = 0 .
-    eq default($alice) = mtSt .
+    eq defaultValue($balance) = 0 .   eq defaultValue(length) = 0 .
+    eq defaultValue($alice) = mtSt .
 
     *** a two-transaction bank: deposit then withdraw 30, with the paper's
     *** strong-data-integrity invariant  net(a) = bals[a]  checkable at exit

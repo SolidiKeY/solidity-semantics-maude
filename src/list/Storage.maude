@@ -15,14 +15,14 @@ fmod STORAGE{Field :: FIELD} is
     op _|>_ : Struct List{FieldAsTriv}{Field} -> Value [prec 28] .
     op _|≥_ : Struct List{FieldAsTriv}{Field} -> Struct [prec 28] .
     op redLast : Struct List{FieldAsTriv}{Field} -> Value .
-    op default : -> Value .
+    op defaultValue : -> Value .
 
     var xs : Struct .
     var sStr : SingleStruct .
     vars xsN ysN : NeStruct .
     var flds : List{FieldAsTriv}{Field} .
     var fldsN fldsN2 : NeList{FieldAsTriv}{Field} .
-    var idf : Field$IdField .
+    var idf : Field$RefField .
     var pf : Field$PrimField .
     var v : Value .
 
@@ -40,7 +40,7 @@ fmod STORAGE{Field :: FIELD} is
     mb xs |≥ flds idf : Struct .
 
     eq redLast(none, idf) = none .
-    eq redLast(none, pf) = default .
+    eq redLast(none, pf) = defaultValue .
 
     eq redLast(xs, nil) = xs .
     eq redLast(xs · v, flds pf) = v .

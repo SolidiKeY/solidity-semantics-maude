@@ -2,12 +2,32 @@ fmod FIELDS{Field :: TRIV} is
     pr INT .
     pr LIST{Field} .
 
-    sorts PrimIdentity Identity Value .
-    sorts PrimField IdField MapField .
-    subsort PrimField IdField MapField < Field$Elt .
+    *** SolKey logic-sort hierarchy (solidityDLHeader.key + theory headers):
+    ***   Prim < StValue MemValue < Value ;  Int < Prim ;
+    ***   Identity < MemValue ;  Struct < StValue (declared in Storage.maude).
+    *** StValue = what storage can hold, MemValue = what memory can hold;
+    *** Prim (here: Int) is storable in both. SolKey's `bool \extends Prim`
+    *** has no counterpart: bools are Ints 1/0. The Agda/F*/Prolog twins
+    *** still use the flat Value sort — flagged for the twins.
+    sorts IdentityPrim Identity Value StValue MemValue Prim .
+    sorts PrimField RefField MapField .
+    *** element-kind refinements (the Maude analogue of SolKey's parse-time
+    *** sort stamping, SolJSONParser.fieldSortFor + \hasElementSort):
+    *** a container field whose ELEMENTS are structs/arrays, so an indexed
+    *** read of it is a Struct (see the memberships in sem/Stmt.maude)
+    sorts RefArrField RefMapField .
+
+    subsort PrimField RefField MapField < Field$Elt .
+    subsort RefArrField < RefField .
+    subsort RefMapField < MapField .
     subsort Int < Field$Elt .
-    subsort Int Identity < Value .
+
+    subsort StValue MemValue < Value .
+    subsort Prim < StValue .
+    subsort Prim < MemValue .
+    subsort Int < Prim .
+    subsort Identity < MemValue .
 
     op length : -> PrimField .
-    op default : Field$Elt -> Value .
+    op defaultValue : Field$Elt -> Value .
 endfm

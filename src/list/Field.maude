@@ -1,8 +1,8 @@
 fth FIELD is
     pr INT .
 
-    sorts PrimField IdField MapField Field PrimIdentity .
-    subsort PrimField IdField MapField Int < Field .
+    sorts PrimField RefField MapField Field IdentityPrim .
+    subsort PrimField RefField MapField Int < Field .
 
     op length : -> PrimField [ctor] .
 endfth
@@ -17,22 +17,22 @@ fmod FIELD-FM{Field :: FIELD} is
 
     sorts Identity NeIdentity ValueConc Value .
     subsort ValueConc Int < Value .
-    subsort Field$PrimIdentity NeIdentity < Identity .
+    subsort Field$IdentityPrim NeIdentity < Identity .
 
-    op _:_ : Field$PrimIdentity List{FieldAsTriv}{Field} -> Identity [ctor prec 25] .
+    op _:_ : Field$IdentityPrim List{FieldAsTriv}{Field} -> Identity [ctor prec 25] .
 endfm
 
 fmod FieldExample is
     pr INT .
 
-    sorts PrimField IdField MapField Field PrimIdentity .
-    subsort PrimField IdField MapField Int < Field .
+    sorts PrimField RefField MapField Field IdentityPrim .
+    subsort PrimField RefField MapField Int < Field .
     op length : -> PrimField .
 
-    ops $alice $bob $carol $account : -> IdField .
+    ops $alice $bob $carol $account : -> RefField .
     ops $age $balance : -> PrimField .
     op $m : -> MapField .
-    ops aId bId : -> PrimIdentity .
+    ops aId bId : -> IdentityPrim .
 endfm
 
 view FieldExView from FIELD to FieldExample is endv

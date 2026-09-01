@@ -5,43 +5,43 @@ fmod StorageToMemory{Field :: TRIV} is
     pr BANK-ERASE{Field} .
     pr STORAGE{Field} .
 
-    op copy-struct-mem : Memory PrimIdentity Struct -> Memory .
+    op copy-struct-mem : Memory IdentityPrim Struct -> Memory .
     op copy-struct-mem-aux : Memory Identity Struct -> Memory .
 
     var st : Struct .
     var pF : PrimField .
-    var idF : IdField .
+    var idF : RefField .
     var vSt : Struct .
     var vInt : Int .
     var id : Identity .
-    var idPrim : PrimIdentity .
+    var idPrim : IdentityPrim .
 
     var mem : Memory .
     var v : Value .
 
-    eq copy-struct-mem(mem, idPrim, st) = copy-struct-mem-aux(add(mem, idPrim), idC(idPrim, nil), st) .
+    eq copy-struct-mem(mem, idPrim, st) = copy-struct-mem-aux(addM(mem, idPrim), idC(idPrim, nil), st) .
 
     eq copy-struct-mem-aux(mem, id, mtSt) = mem .
-    eq copy-struct-mem-aux(mem, id, store(st, pF, vInt)) =
+    eq copy-struct-mem-aux(mem, id, storeSt(st, pF, vInt)) =
         write(copy-struct-mem-aux(mem, id, st), id, pF, vInt) .
 
-    eq copy-struct-mem-aux(mem, id, store(st, idF, vSt)) =
+    eq copy-struct-mem-aux(mem, id, storeSt(st, idF, vSt)) =
         copy-struct-mem-aux(copy-struct-mem-aux(mem, id, st), id : idF, vSt) .
 endfm
 
 fmod Example{Field :: TRIV} is
     pr StorageToMemory{Field} .
 
-    ops $alice $bob $carol $account : -> IdField .
+    ops $alice $bob $carol $account : -> RefField .
     ops $balance : -> PrimField .
     ops st1 stAlice stBal : -> Struct .
 
-    eq stBal = store(mtSt, $balance, 10) .
-    eq stAlice = store(mtSt, $account, stBal) .
-    eq st1 = store(store(mtSt, $alice, stAlice),
-                               $bob  , store(mtSt, $account, store(mtSt, $balance, 20))) .
+    eq stBal = storeSt(mtSt, $balance, 10) .
+    eq stAlice = storeSt(mtSt, $account, stBal) .
+    eq st1 = storeSt(storeSt(mtSt, $alice, stAlice),
+                               $bob  , storeSt(mtSt, $account, storeSt(mtSt, $balance, 20))) .
 
-    ops idA idF : -> PrimIdentity .
+    ops idA idF : -> IdentityPrim .
     op mem : -> Memory .
 endfm
 
@@ -52,19 +52,19 @@ red copy-struct-mem(mem, idF, st1) .
 fmod ShallowExample{Field :: TRIV} is
     pr StorageToMemory{Field} .
 
-    ops $alice $bob $carol $account : -> IdField .
+    ops $alice $bob $carol $account : -> RefField .
     ops $pn $balance : -> PrimField .
     ops st stC : -> Struct .
     ops mem memAlice memBob : -> Memory .
-    ops idB idA : -> PrimIdentity .
+    ops idB idA : -> IdentityPrim .
     ops IDa IDb : -> Identity .
 
     eq stC = find(st, $carol) .
     eq IDa = idC(idA, nil) .
     eq IDb = idC(idB, nil) .
 
-    eq memAlice = copy-struct-mem(add(mem, idA), idA, stC) .
-    eq memBob   = copy-struct-mem(add(memAlice, idB), idB, stC) .
+    eq memAlice = copy-struct-mem(addM(mem, idA), idA, stC) .
+    eq memBob   = copy-struct-mem(addM(memAlice, idB), idB, stC) .
 endfm
 
 red memAlice .

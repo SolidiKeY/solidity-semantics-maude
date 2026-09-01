@@ -73,13 +73,13 @@ endfm
 fmod SOL-FLOW-TEST{Field :: TRIV} is
     pr SOL-FLOW{Field} .
 
-    ops $alice $bob : -> IdField .
+    ops $alice $bob : -> RefField .
     ops $balance $nonce : -> PrimField .
     op $m : -> MapField .
 
-    eq default($balance) = 0 .   eq default($nonce) = 0 .
-    eq default(length) = 0 .
-    eq default($alice) = mtSt .  eq default($bob) = mtSt .
+    eq defaultValue($balance) = 0 .   eq defaultValue($nonce) = 0 .
+    eq defaultValue(length) = 0 .
+    eq defaultValue($alice) = mtSt .  eq defaultValue($bob) = mtSt .
 
     op run : K -> Conf .
     var KK : K .

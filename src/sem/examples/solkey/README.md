@@ -1,10 +1,14 @@
 # SolKey cross-check suite
 
-These files re-express the SolKey / SolidiKeY example problems
-(`~/projects/solkey/keyext.solidity.examples`) as Maude Hoare triples, so we
-can check that this executable semantics **agrees with what SolKey proves**.
-Each SolKey `.key` diamond problem `\<{ P }\>(Q)` becomes a `red < P > (Q) .`
-that reduces to `true` exactly when SolKey closes the corresponding proof.
+These files re-express the SolKey / SolidiKeY example corpus as Maude Hoare
+triples, so we can check that this executable semantics **agrees with what
+SolKey proves**. The mirror source is
+`~/projects/solkey/keyext.solidity.examples/TestSuite.sol` (~167 functions,
+each proved by SolKey as `\<{ f()@TestSuite; }\>(true)` with the spec inline
+as `assert`s); the `Net.maude` mirrors come from the hand-written `.key`
+obligations in `keyext.solidity.examples/net/`. Each mirrored function body
+becomes a `red < body > (post) .` that reduces to `true` exactly when SolKey
+closes the corresponding proof.
 
 Run them all (each file is standalone; expected result in a trailing `***`
 comment on every line):
@@ -16,40 +20,74 @@ maude -no-banner Storage.maude     # or one category
 
 ## Files ↔ SolKey categories
 
-| File | Mirrors (SolKey `taclets/` unless noted) | Triples |
+| File | Mirrors (`TestSuite.sol` functions unless noted) | Triples |
 |---|---|---|
-| `Store.maude` | shared PaperStore.sol field vocabulary (no tests) | — |
-| `Arithmetic.maude` | `addition-*`, `multiplication`, `division`, `modulo`, `power`, `less/greater-*`, `not-equal`, `logical-and/or/not` | 22 |
-| `Storage.maude` | `storage-field-*` (read/write/copy/delete/compound/inc-dec), `storage-alias-*`, `storage-index-*` (arrays + mappings) | 28 |
-| `Memory.maude` | `memory-*` (decl/default/deep-field/alias/delete/array-index/to-storage) | 10 |
-| `PushPop.maude` | `storage-push-*`, `storage-pop-*` | 8 |
-| `Net.maude` | `net-*` (msg.value/sender, transfer, capture) | 7 |
-| `MainFeatures.maude` | `mainFeatures/` end-to-end assert programs | 7 |
+| `Store.maude` | shared TestSuite.sol field vocabulary + sorts (no tests) | — |
+| `Arithmetic.maude` | `addition*`, `subtraction*`, `unaryMinus`, `multiplication`, `division`, `modulo`, `power`, `less/greater*`, `notEqual`, `logicalAnd/Or/Not` | 25 |
+| `Storage.maude` | `storageField*` (read/write/copy/delete/compound/inc-dec), `storageAlias*`, `storageIndex*` (arrays + mappings) | 31 |
+| `Memory.maude` | `memory*` (decl/default/deep-field/alias/delete/array-index/to-storage) | 10 |
+| `PushPop.maude` | `storagePush*`, `storagePop*` | 8 |
+| `Net.maude` | `net/*.key` (msg.value/sender, transfer, capture) | 7 |
+| `MainFeatures.maude` | `test*` end-to-end assert programs | 8 |
+| `Bool.maude` | `storageBool*` (root/field/mapping/array reads and copies) | 6 |
+| `Branching.maude` | `if{,Else}{Unfold,Split}`, `ternary*` (desugared), `logical*ShortCircuitRhs` | 8 |
+| `NseIndex.maude` | `*Nse*` non-simple-expression indices (storage + memory) | 7 |
+| `Matrix.maude` | `storageMatrix*`, `storageIndexDecompos*` (uint[][]) | 4 |
+| `ComplexReceiver.maude` | `testStorageComplexReceiver*`, `testStoragePush*Lvalue*`, `*PushReturnAlias` | 9 |
+| `CrossCopy.maude` | `testMemoryToStorageCopy*`, `testStorageToMemoryCopy*`, `testMemoryFieldShallowCopy` | 8 |
 
 ## Translation dictionary
 
-| SolKey `.key` | Maude |
+| SolKey | Maude |
 |---|---|
-| `\<{ P }\>(Q)` | `< P > (Q)` (diamond, from empty storage) |
+| `\<{ f()@TestSuite; }\>(true)` | `< body-of-f > (post)` (diamond, from empty storage) |
+| `/// @custom:key box` + `require(x == v)` pin | `var 'x = v ;` initializer |
+| `require(arr.length == n)` size pin | `n` leading pushes (zero-init ⇒ length 0) |
 | `pre -> \<{ P }\>(Q)` | set `pre` up inside `P`, or `[ storage ]< P > (Q)` |
 | `\[{ P }\](false)` (box blocks) | `< P > reverts` |
 | `alice.age` | `$alice . $age` |
 | `values[1]`, `values.push(x)` | `$values [ 1 ]`, `$values .push(x)` |
 | `TRUE` / `FALSE` | `1` / `0` (bools are EVM ints) |
 | `find<[int]>(storage, cons2(A,B))` | `$A . $B` (read in the postcondition) |
+| `find<[Struct]>` at an Int key | the container field's `RefMapField`/`RefArrField` sort |
 | `selectSt<[int]>(net, at(a))` | `net[a]` |
 
-## Known divergences (found by this cross-check)
+## Field sorts
 
-Two SolKey-provable behaviours are **out of scope** for this untyped model,
-and are documented at the point they arise (`MainFeatures.maude` header):
+`Store.maude` stamps each field constant with the sort SolKey's parser would
+give it (`fieldSortFor` + the mapping/array value sorts): value members are
+`PrimField`, struct/array members `RefField`, mapping members `MapField`, and
+the element-kind refinements `RefArrField < RefField` / `RefMapField <
+MapField` mark containers whose *elements* are structs — the executable
+stand-in for SolKey's `find<[Struct]>` cast, and what makes whole-entry
+copies like `accountMap[2] = accountMap[1]` reduce.
 
-1. **Increment as an expression** (`a[++i] = ++i`, `testStorageEvaluationOrder`):
-   here `++`/`--` are statements, not side-effecting expressions.
-2. **Whole-struct copy from an Int-keyed slot** (`accountMap[2] = accountMap[1]`,
-   `testStorageMapStructCopy`): SolKey disambiguates the read by type
-   (`find<[Struct]>` vs `find<[int]>`); this model has no types, so it cannot
-   tell an Int-keyed struct slot from an Int-keyed primitive slot for a
-   whole-value read. Field-by-field copy works and is shown instead.
+## Known divergences / out of scope (found by this cross-check)
 
-Everything else in the suite agrees with SolKey.
+Documented at the point they arise (file headers):
+
+1. **Increment as an expression** (`a[++i] = ++i`, `testStorageEvaluationOrder`;
+   also `testMemory*Array*{in,de}crement`): here `++`/`--` are statements, not
+   side-effecting expressions, and desugaring would destroy the
+   evaluation-order property under test.
+2. **Genuinely unbounded inputs** (`localArithmeticInRange`,
+   `signedUnaryMinusInRange`: `require(1 <= x && x <= 100)`): the Hoare front
+   end runs one concrete execution, so a *range* cannot be pinned to a single
+   initializer — only `require(x == v)` pins are expressible.
+3. **`push()` as an expression** (`arr.push().value = v`, `arr.push() = x`,
+   `T storage t = arr.push()`): `push` is a statement here; the
+   `ComplexReceiver.maude` mirrors desugar to push-then-index/alias, which is
+   the same slot.
+4. **Uninitialized storage locals** (`storageLocalDeclSkip`: `Person storage p;`):
+   `storage 'q = LV ;` requires an initializer.
+5. **Bounded-int obligations**: ints are unbounded ("Solidity Light"), so
+   width/overflow behaviour is out of scope by design.
+6. **Delete-reset whole-struct read corner**: after `delete a[i]` on a
+   struct-element container, the base model's exact-read equation yields `0`
+   rather than `mtSt` for a *whole-struct* read of that slot (field reads are
+   correct). A specialization would be nonconfluent with the exact-read /
+   passthrough pair in `src/Storage.maude`; no SolKey example exercises it.
+
+Everything else in the suite agrees with SolKey. (The former divergence
+`testStorageMapStructCopy` — whole-struct copy from an Int-keyed slot — is
+now supported via the `RefMapField` element-kind sort; see `MainFeatures.maude`.)

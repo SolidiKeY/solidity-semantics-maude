@@ -48,3 +48,11 @@ red < var 'x = 8 / 2 ; > ('x == 4 && 4 < 5) . *** true
 *** division / modulo by zero revert (SolKey: /,% zero-denominator revert branch)
 red < var 'x = 1 / 0 ; > reverts .            *** true
 red < var 'x = 1 % 0 ; > reverts .            *** true
+
+*** ---- subtraction / unary minus (subtractionSimple, subtractionStorageRead,
+*** unaryMinusSimple — the box pin `require(x == 5)` becomes the initializer).
+*** Surface `-` also parses as a field list (whitelisted advisory, see
+*** run-tests.sh); the reduction takes the arithmetic parse.
+red < var 'r = 7 - 2 ; > ('r == 5) .                          *** true   subtractionSimple
+red < $alice . $age = 10 ; var 'r = $alice . $age - 3 ; > ('r == 7) .   *** true subtractionStorageRead
+red < var 'x = 5 ; var 'r = neg 'x ; > ('r == neg 5) .        *** true   unaryMinusSimple
