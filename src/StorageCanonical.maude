@@ -1,0 +1,338 @@
+*** StorageCanonical.maude — the storage model with well-formedness BY
+*** CONSTRUCTION: a storage is well-typed iff it has a sort.
+***
+*** Motivation (the Lean twin, PreLicenciatePaper/Solidity/Reachability.lean):
+*** its typing predicate SVal.hasTy / wellTypedStorageB is not tight — it
+*** admits three shapes execution never produces, and a second predicate
+*** SVal.canonical had to be bolted on for exactly those:
+***   1. a mapping's default is the type's default   (map [] 7 is "well-typed")
+***   2. mapping keys are unique                      (map [(1,0),(1,0)] ...)
+***   3. a struct carries exactly its declared fields (an Account lacking token)
+*** That is what happens when an untyped datatype is typed by a checker: the
+*** checker can be loose, and every loophole needs one more conjunct. Here
+*** the three facts are properties of the term algebra instead, so there is
+*** no checker to be loose (no membership axioms anywhere in this file):
+***
+***   fact 3  subsorting + arity. Each struct type is a sort with one
+***           fixed-arity constructor, Account : Int Token -> Account, and
+***           Account < Struct. A missing field cannot be written down; an
+***           ill-typed field (Account(0, 3)) is a term of the KIND [StValue]
+***           with no sort. Field updates match typed variables, so an
+***           ill-typed write is stuck at the kind as well.
+***   fact 1  no default slot. mapping(accountT, M) carries its VALUE TYPE as
+***           a sort-level tag; the default comes from the type (a view maps
+***           `default` to a term). Extensionality: an entry holding the
+***           default IS absence (K |-> default = empty), so every mapping
+***           has one normal form — its non-default support.
+***   fact 2  assoc comm id: + idempotency + a kind-level error, the prelude
+***           SET/MAP idiom: (K |-> X), (K |-> X) = K |-> X, and two different
+***           values under one key normalize to conflict(K) : [Map], which
+***           has no sort — the prelude MAP gives a duplicate key the same
+***           treatment (`undefined`).
+***
+*** "well-typed storage" = "has a sort", decided by Maude's sort computation
+*** via the built-in sort test `t :: Struct`, never by an equation we wrote. Tightness (every sorted
+*** term is reachable from the type's default by save/push/pop/delete) is a
+*** statement about constructors, checked by the reductions at the bottom.
+***
+*** Deltas from the Lean model: no default slot in mapping nodes; struct
+*** fields are positional (no "declared order" conjunct); an array's length
+*** is derived (size), not a stored slot. Corner: `empty` is shared by all
+*** mapping types (EmptyMap < Map{V}), so a default-valued entry of ANOTHER
+*** type also collapses — mapping(accountT, (1 |-> 0)) = mapping(accountT,
+*** empty); a non-default foreign entry is kind-level as expected.
+***
+*** Sibling variant of Storage.maude (same find/save/push/pop/delete API);
+*** the src/sem/ semantics still runs on the lazy model. Flagged for the
+*** Agda/F*/Prolog twins (no port here).
+
+*** ---- 1. core sorts and the one-step operations at the kind ---------------
+fmod SVALUE is
+    pr INT .
+    sorts StValue Struct Field Ty IntT .
+    subsort Int Struct < StValue .   *** Prim < StValue, Struct < StValue (as Fields.maude)
+    subsort Int < Field .            *** an Int step indexes an array / keys a mapping
+    subsort IntT < Ty .              *** the type `int` as a singleton sort (see VALTY)
+    op length : -> Field [ctor] .
+    op intT : -> IntT [ctor] .
+
+    *** one path step: read / replace / reset a member. Declared at the kind:
+    *** each schema gives them sorted equations, so on an ill-typed argument
+    *** they simply do not reduce.
+    op sel : StValue Field -> [StValue] .
+    op upd : StValue Field StValue -> [StValue] .
+    op del : StValue -> [StValue] .
+    var I : Int .
+    eq del(I) = 0 .
+endfm
+
+view Field from TRIV to SVALUE is sort Elt to Field . endv
+
+*** ---- 2. the path API (Storage.maude's names), generic over sel/upd ------
+fmod PATHS is
+    pr SVALUE .  pr LIST{Field} .
+    op find   : StValue List{Field} -> [StValue] .
+    op save   : StValue List{Field} StValue -> [StValue] .
+    op delete : StValue NeList{Field} -> [StValue] .
+    op push   : StValue NeList{Field} StValue -> [StValue] .
+    op push   : StValue NeList{Field} -> [StValue] .
+    op pop    : StValue NeList{Field} -> [StValue] .
+    op pushA  : StValue StValue -> [StValue] .   *** defined by SOL-ARRAY
+    op pushA  : StValue -> [StValue] .
+    op popA   : StValue -> [StValue] .
+
+    vars V X : StValue .  var F : Field .  var P : List{Field} .  var NP : NeList{Field} .
+    eq find(V, nil) = V .
+    eq find(V, F P) = find(sel(V, F), P) .
+    *** write-through: sel of an absent mapping entry is the default, so
+    *** `m[k].f = v` materializes the entry
+    eq save(V, nil, X) = X .
+    eq save(V, F P, X) = upd(V, F, save(sel(V, F), P, X)) .
+    eq delete(V, NP) = save(V, NP, del(find(V, NP))) .
+    eq push(V, NP, X) = save(V, NP, pushA(find(V, NP), X)) .
+    eq push(V, NP)    = save(V, NP, pushA(find(V, NP))) .
+    eq pop(V, NP)     = save(V, NP, popA(find(V, NP))) .
+endfm
+
+*** ---- 3. untyped container skeleton (overloaded by the typed instances) --
+*** Kept out of the theory on purpose: Maude rejects a subsort overload of an
+*** operator that reaches a parameterized module through its parameter.
+fmod CONTAINERS is
+    pr PATHS .
+    sorts Entry NeMap Map EmptyMap Elems EmptyElems .
+    subsort Entry < NeMap < Map .   subsort EmptyMap < Map .
+    subsort EmptyElems < Elems .
+
+    op empty : -> EmptyMap [ctor] .
+    op _,_ : Map Map -> Map [ctor assoc comm id: empty prec 121] .
+    op _,_ : NeMap Map -> NeMap [ctor ditto] .
+    op _,_ : EmptyMap EmptyMap -> EmptyMap [ctor ditto] .   *** keeps _,_ preregular
+    op _|->_ : Int StValue -> [Entry] [ctor prec 50] .
+    op mapping : Ty Map -> [Struct] [ctor] .
+    *** the error value for a key bound twice: kind-level, hence sortless
+    op conflict : Int -> [Map] .
+
+    op nilE : -> EmptyElems [ctor] .
+    op _;_ : Elems Elems -> Elems [ctor assoc id: nilE] .
+    op _;_ : EmptyElems EmptyElems -> EmptyElems [ctor ditto] .
+    op array : Ty Elems -> [Struct] [ctor] .
+
+    var K : Int .  var N : NeMap .
+    eq conflict(K), N = conflict(K) .   *** N : NeMap — a Map variable would re-match via the identity
+endfm
+
+*** ---- 4. what a storable value type provides -----------------------------
+fth VALTY is
+    pr SVALUE .
+    sort Elt .  subsort Elt < StValue .
+    sort T .    subsort T < Ty .      *** the type name as a singleton sort: the tag
+    op ty : -> T .                    ***   that keeps mapping(intT, empty) and
+    op default : -> Elt .             ***   mapping(accountT, empty) apart
+endfth
+
+*** ---- 5. mapping(K => V), V-typed by the sort of its entries --------------
+fmod SOL-MAPPING{V :: VALTY} is
+    pr CONTAINERS .
+    sorts Entry{V} NeMap{V} Map{V} Mapping{V} .
+    subsort Entry{V} < Entry .   subsort Entry{V} < NeMap{V} < Map{V} < Map .
+    subsort NeMap{V} < NeMap .   subsort EmptyMap < Map{V} .
+    subsort Mapping{V} < Struct .
+
+    op _|->_ : Int V$Elt -> Entry{V} [ctor ditto] .
+    op _,_ : Map{V} Map{V} -> Map{V} [ctor ditto] .
+    op _,_ : NeMap{V} Map{V} -> NeMap{V} [ctor ditto] .
+    op mapping : V$T Map{V} -> Mapping{V} [ctor ditto] .
+
+    var K : Int .  vars X Y : V$Elt .  var M : Map{V} .  var T : V$T .
+    eq K |-> default = empty .                              *** fact 1: default entries do not exist
+    eq (K |-> X), (K |-> X) = K |-> X .                     *** fact 2: idempotent ...
+    ceq (K |-> X), (K |-> Y) = conflict(K) if X =/= Y .     ***   ... and two values = no sort
+
+    eq sel(mapping(T, (M, K |-> X)), K) = X .
+    eq sel(mapping(T, M), K) = default [owise] .            *** unwritten key: the TYPE's default
+    eq upd(mapping(T, (M, K |-> X)), K, Y) = mapping(T, (M, K |-> Y)) .
+    eq upd(mapping(T, M), K, Y) = mapping(T, (M, K |-> Y)) [owise] .
+    eq del(mapping(T, M)) = mapping(T, M) .                 *** delete skips mappings
+endfm
+
+*** ---- 6. V[] with derived length ------------------------------------------
+fmod SOL-ARRAY{V :: VALTY} is
+    pr CONTAINERS .
+    sorts Elems{V} NeElems{V} Array{V} .
+    subsort V$Elt < NeElems{V} < Elems{V} < Elems .   subsort EmptyElems < Elems{V} .
+    subsort Array{V} < Struct .
+
+    op _;_ : Elems{V} Elems{V} -> Elems{V} [ctor ditto] .
+    op _;_ : NeElems{V} Elems{V} -> NeElems{V} [ctor ditto] .
+    op array : V$T Elems{V} -> Array{V} [ctor ditto] .
+    op size : Elems{V} -> Nat .
+
+    vars X Y : V$Elt .  vars ES ES2 : Elems{V} .  var T : V$T .  var I : Int .
+    eq size(nilE) = 0 .
+    eq size(X ; ES) = 1 + size(ES) .
+    eq sel(array(T, ES), length) = size(ES) .           *** length is not a slot: no invariant to keep
+    eq sel(array(T, X ; ES), 0) = X .
+    ceq sel(array(T, X ; ES), I) = sel(array(T, ES), _-_(I, 1)) if I > 0 .   *** out of range: stuck (revert)
+    eq upd(array(T, X ; ES), 0, Y) = array(T, Y ; ES) .
+    ceq upd(array(T, X ; ES), I, Y) = array(T, X ; ES2)
+        if I > 0 /\ array(T, ES2) := upd(array(T, ES), _-_(I, 1), Y) .
+    eq pushA(array(T, ES), X) = array(T, ES ; X) .
+    eq pushA(array(T, ES))    = array(T, ES ; default) .
+    eq popA(array(T, ES ; X)) = array(T, ES) .          *** pop of an empty array: stuck (revert)
+    eq del(array(T, ES)) = array(T, nilE) .
+endfm
+
+view IntV from VALTY to SVALUE is
+    sort Elt to Int .  sort T to IntT .  op ty to intT .  op default to term 0 .
+endv
+
+*** ---- 7. the schema IS the signature (TestSuite.sol structs, as listed in
+***         sem/examples/solkey/Store.maude) ---------------------------------
+***   Token   { value }            Account { balance, token }
+***   Person  { account, age }     Ledger  { nonce, balances : mapping(int) }
+fmod SOLKEY-STRUCTS is
+    pr SOL-MAPPING{IntV} .
+    sorts Token Account Person Ledger  TokenT AccountT PersonT LedgerT .
+    subsort Token Account Person Ledger < Struct .
+    subsort TokenT AccountT PersonT LedgerT < Ty .
+    op tokenT : -> TokenT [ctor] .    op accountT : -> AccountT [ctor] .
+    op personT : -> PersonT [ctor] .  op ledgerT : -> LedgerT [ctor] .
+    ops $value $balance $token $account $age $nonce $balances : -> Field [ctor] .
+
+    op Token   : Int -> Token [ctor] .
+    op Account : Int Token -> Account [ctor] .
+    op Person  : Account Int -> Person [ctor] .
+    op Ledger  : Int Mapping{IntV} -> Ledger [ctor] .
+
+    vars I J : Int .  vars T T2 : Token .  vars A A2 : Account .  vars M M2 : Mapping{IntV} .
+    *** per field: one sel, one upd (the new value's variable carries the type)
+    eq sel(Token(I), $value) = I .              eq upd(Token(I), $value, J) = Token(J) .
+    eq sel(Account(I, T), $balance) = I .       eq upd(Account(I, T), $balance, J) = Account(J, T) .
+    eq sel(Account(I, T), $token) = T .         eq upd(Account(I, T), $token, T2) = Account(I, T2) .
+    eq sel(Person(A, I), $account) = A .        eq upd(Person(A, I), $account, A2) = Person(A2, I) .
+    eq sel(Person(A, I), $age) = I .            eq upd(Person(A, I), $age, J) = Person(A, J) .
+    eq sel(Ledger(I, M), $nonce) = I .          eq upd(Ledger(I, M), $nonce, J) = Ledger(J, M) .
+    eq sel(Ledger(I, M), $balances) = M .       eq upd(Ledger(I, M), $balances, M2) = Ledger(I, M2) .
+    *** per struct: delete resets members, mappings excepted
+    eq del(Token(I)) = Token(0) .
+    eq del(Account(I, T)) = Account(0, del(T)) .
+    eq del(Person(A, I)) = Person(del(A), 0) .
+    eq del(Ledger(I, M)) = Ledger(0, M) .
+endfm
+
+view TokenD from VALTY to SOLKEY-STRUCTS is
+    sort Elt to Token .  sort T to TokenT .  op ty to tokenT .  op default to term Token(0) .
+endv
+view AccountD from VALTY to SOLKEY-STRUCTS is
+    sort Elt to Account .  sort T to AccountT .  op ty to accountT .
+    op default to term Account(0, Token(0)) .
+endv
+view PersonD from VALTY to SOLKEY-STRUCTS is
+    sort Elt to Person .  sort T to PersonT .  op ty to personT .
+    op default to term Person(Account(0, Token(0)), 0) .
+endv
+
+***   TokenBucket { tokens : Token[] }   and the contract's storage layout:
+***   Storage { acct : Account, balances : mapping(int), people : mapping(Person),
+***             values : int[], ledger : Ledger, bucket : TokenBucket }
+fmod SOLKEY-STORAGE is
+    pr SOLKEY-STRUCTS .
+    pr SOL-MAPPING{AccountD} .  pr SOL-MAPPING{PersonD} .
+    pr SOL-ARRAY{IntV} .  pr SOL-ARRAY{TokenD} .
+    sorts TokenBucket Storage .
+    subsort TokenBucket Storage < Struct .
+    ops $tokens $acct $people $values $ledger $bucket : -> Field [ctor] .
+
+    op TokenBucket : Array{TokenD} -> TokenBucket [ctor] .
+    op Storage : Account Mapping{IntV} Mapping{PersonD} Array{IntV} Ledger TokenBucket -> Storage [ctor] .
+
+    var TA TA2 : Array{TokenD} .  vars A A2 : Account .  vars B B2 : Mapping{IntV} .
+    vars P P2 : Mapping{PersonD} .  vars VS VS2 : Array{IntV} .  vars L L2 : Ledger .  vars K K2 : TokenBucket .
+    eq sel(TokenBucket(TA), $tokens) = TA .   eq upd(TokenBucket(TA), $tokens, TA2) = TokenBucket(TA2) .
+    eq del(TokenBucket(TA)) = TokenBucket(del(TA)) .
+
+    eq sel(Storage(A, B, P, VS, L, K), $acct)     = A .
+    eq sel(Storage(A, B, P, VS, L, K), $balances) = B .
+    eq sel(Storage(A, B, P, VS, L, K), $people)   = P .
+    eq sel(Storage(A, B, P, VS, L, K), $values)   = VS .
+    eq sel(Storage(A, B, P, VS, L, K), $ledger)   = L .
+    eq sel(Storage(A, B, P, VS, L, K), $bucket)   = K .
+    eq upd(Storage(A, B, P, VS, L, K), $acct, A2)      = Storage(A2, B, P, VS, L, K) .
+    eq upd(Storage(A, B, P, VS, L, K), $balances, B2)  = Storage(A, B2, P, VS, L, K) .
+    eq upd(Storage(A, B, P, VS, L, K), $people, P2)    = Storage(A, B, P2, VS, L, K) .
+    eq upd(Storage(A, B, P, VS, L, K), $values, VS2)   = Storage(A, B, P, VS2, L, K) .
+    eq upd(Storage(A, B, P, VS, L, K), $ledger, L2)    = Storage(A, B, P, VS, L2, K) .
+    eq upd(Storage(A, B, P, VS, L, K), $bucket, K2)    = Storage(A, B, P, VS, L, K2) .
+    eq del(Storage(A, B, P, VS, L, K)) = Storage(del(A), B, P, del(VS), del(L), del(K)) .
+
+    *** the contract's initial state = every root at its type's default
+    op st0 : -> Storage .
+    eq st0 = Storage(Account(0, Token(0)), mapping(intT, empty), mapping(personT, empty),
+                     array(intT, nilE), Ledger(0, mapping(intT, empty)),
+                     TokenBucket(array(tokenT, nilE))) .
+    *** a populated storage for the preservation tests
+    op st1 : -> Storage .
+    eq st1 = save(save(save(save(st0, $acct $balance, 5), $balances 9, 42),
+                       $ledger $nonce, 3), $ledger $balances 1, 10) .
+endfm
+
+*** ==== the Lean witnesses (Reachability.lean, `Witness`) ===================
+*** A sortless result prints as `result [Elems,StValue,List{Field}]: …`,
+*** the kind of StValue; abbreviated `[K]` in the expected comments below.
+*** Each is "well-typed by hasTy, rejected by canonical" there; here each is
+*** either unwritable or a term of the KIND [StValue] (no sort).
+red mapping(intT, ((1 |-> 3), (1 |-> 5))) .            *** [K]: mapping(intT, conflict(1))   dup key, two values
+red mapping(intT, ((1 |-> 3), (1 |-> 3))) .            *** Mapping{IntV}: mapping(intT, 1 |-> 3)  dup key, one value: idempotent
+red mapping(intT, ((1 |-> 0), (1 |-> 0))) .            *** Mapping{IntV}: mapping(intT, empty)    Lean's dupKeyStorage: default entries vanish
+red Account(0, 3) .                                    *** [K]: Account(0, 3)               ill-typed field  (Account(0) does not even parse)
+red mapping(intT, (1 |-> Account(3, Token(0)))) .      *** [K]                              ill-typed entry
+red mapping(intT, (1 |-> 0)) == mapping(intT, empty) . *** true    fact 1: no default slot, so "map [] 7" is unwritable ...
+red find(mapping(intT, empty), 5) .                    *** 0                       ... and an unwritten key reads the type's default
+red find(mapping(accountT, empty), 5) .                *** Account(0, Token(0))
+red find(mapping(personT, empty), 5 $account $token $value) .   *** 0
+red mapping(intT, ((1 |-> 3), (1 |-> 5))) :: Struct .  *** false   "well-typed" = "has a sort"
+red Account(0, 3) :: Struct .                          *** false
+red st0 :: Storage .                                   *** true
+red st1 :: Storage .                                   *** true
+
+*** ==== preservation: save/push/pop/delete keep the sort ====================
+red st1 .   *** Storage: Storage(Account(5, Token(0)), mapping(intT, 9 |-> 42), mapping(personT, empty), array(intT, nilE), Ledger(3, mapping(intT, 1 |-> 10)), TokenBucket(array(tokenT, nilE)))
+red find(st1, $acct $balance) .                        *** 5
+red find(st1, $balances 9) .                           *** 42
+red find(st1, $balances 8) .                           *** 0
+red save(st1, $acct $balance, Token(1)) .              *** [K]: upd(...)   ill-typed write: stuck at the kind
+red save(st1, $balances 9, Token(1)) .                 *** [K]             ill-typed mapping write
+red save(st1, $balances 9, 0) .                        *** Storage: ... mapping(intT, empty) ...   writing the default deletes the entry
+red save(save(st1, $balances 9, 0), $balances 9, 42) == st1 .   *** true
+*** delete (skips mappings) — mirrors Storage.maude's delete block
+red find(delete(st1, $acct), $acct $balance) .         *** 0    primitive reset
+red find(delete(st1, $ledger), $ledger $nonce) .       *** 0    nested primitive reset
+red find(delete(st1, $ledger), $ledger $balances 1) .  *** 10   MAP PRESERVED (critical)
+red delete(st1, $ledger $balances) == st1 .            *** true delete m : no-op
+red find(delete(st1, $ledger $balances 1), $ledger $balances 1) .   *** 0   delete m[1] : one entry reset
+red find(delete(st1, $balances 9), $balances 9) .      *** 0
+red delete(st1, $balances 9) :: Storage .              *** true
+*** struct-valued mapping: write-through materializes the entry, delete resets it
+red save(st0, $people 2 $age, 30) .                    *** Storage: ... mapping(personT, 2 |-> Person(Account(0, Token(0)), 30)) ...
+red find(save(st0, $people 2 $age, 30), $people 2 $account $balance) .   *** 0
+red find(save(st0, $people 2 $account $balance, 7), $people 2 $account) . *** Account(7, Token(0))
+red delete(save(st0, $people 2 $age, 30), $people 2) == st0 .   *** true   the reset entry is the default, i.e. absent
+*** arrays: push / pop / index / length — mirrors Storage.maude's push/pop block
+red push(push(st0, $values, 10), $values, 20) .        *** Storage: ... array(intT, 10 ; 20) ...
+red find(push(push(st0, $values, 10), $values, 20), $values length) .   *** 2
+red find(push(push(st0, $values, 10), $values, 20), $values 1) .        *** 20
+red find(pop(push(push(st0, $values, 10), $values, 20), $values), $values length) .   *** 1
+red pop(push(push(st0, $values, 10), $values, 20), $values) == push(st0, $values, 10) .   *** true
+red find(push(st0, $values), $values 0) .              *** 0    push() = push the default
+red pop(st0, $values) .                                *** [K]: ... popA(array(intT, nilE))   pop of an empty array: stuck (revert)
+red find(st0, $values 0) .                             *** [K]: find(sel(array(intT, nilE), 0), nil)   out-of-range read: stuck (revert)
+red push(st0, $values, Token(1)) .                     *** [K]   ill-typed push
+red find(push(st0, $bucket $tokens, Token(7)), $bucket $tokens 0 $value) .   *** 7
+red find(delete(push(st0, $bucket $tokens, Token(7)), $bucket), $bucket $tokens length) .   *** 0
+red push(st0, $bucket $tokens) :: Storage .            *** true
+red save(push(st0, $values, 10), $values 0, 5) .       *** Storage: ... array(intT, 5) ...
+
+*** ==== tightness: every sorted term is a save-image of the default ========
+red save(save(mapping(intT, empty), 1, 3), 2, 4) == mapping(intT, ((2 |-> 4), (1 |-> 3))) .   *** true (comm: order irrelevant)
+red save(save(Account(0, Token(0)), $balance, 5), $token $value, 8) == Account(5, Token(8)) .   *** true
+red pushA(pushA(array(intT, nilE), 1), 2) == array(intT, 1 ; 2) .   *** true

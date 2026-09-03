@@ -79,7 +79,12 @@ Documented at the point they arise (file headers):
    pins are expressible — and a universally quantified storage cannot be
    expressed at all. (Symbolic cells are not an option: a guard that does
    not reduce to a numeral is discharged by `=/= 0` in `Flow.maude`, so a
-   symbolic `assert`/`require`/`if` would pass vacuously.)
+   symbolic `assert`/`require`/`if` would pass vacuously.) The *structural* half of `wellFormed` — the
+   three facts the Lean twin found its `wellTypedStorageB` predicate misses (a
+   mapping default is the type default, keys are unique, a struct has exactly
+   its declared fields) — is instead built into the sorts of
+   `src/StorageCanonical.maude`, where a storage is well-formed iff it has a
+   sort; only the arithmetic (range) half stays out of scope.
 3. **`push()` as an expression** (`arr.push().value = v`, `arr.push() = x`,
    `T storage t = arr.push()`): `push` is a statement here; the
    `ComplexReceiver.maude` mirrors desugar to push-then-index/alias, which is
