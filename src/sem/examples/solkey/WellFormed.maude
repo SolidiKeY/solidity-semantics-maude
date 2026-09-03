@@ -1,0 +1,160 @@
+*** src/sem/examples/solkey/WellFormed.maude
+***
+*** Mirror of the `/// @custom:key wellformed` functions of TestSuite.sol
+*** wellFormedPopAfterPush .. wellFormedMappingValue — and of the layout
+*** expansion their taclet generator emits (WellFormedTacletGenerator.java).
+*** SolKey's new obligation shape is
+***
+***     wellFormed(storage) -> \<{ f()@TestSuite; }\>(true)
+***
+*** — universally quantified over every storage matching the declared
+*** layout, exactly the class of theorem the concrete `< body > post`
+*** triples cannot state (README divergence #2: only require(x == v) pins).
+***
+*** The Maude mirror needs no antecedent predicate: KeY erases `uint` to
+*** `int` and must RECOVER non-negativity through the generated wellFormed
+*** assumption; Maude's order-sorted algebra keeps it in the sort. An
+*** arbitrary well-formed storage is a free constant `stW` whose observed
+*** cells are pinned to fresh constants of prelude sort Nat (Nat < Int) —
+*** declaring the sort IS the wellFormed assumption. Conjunct -> encoding:
+***
+***   0 <= find<[int]>(storage, p)          uint cell     op $xW : -> Nat . eq find(stW, p) = $xW .
+***   0 <= find<[int]>(storage, p·size)     array length  same, for the `p length` slot
+***   \forall int k; 0 <= find(st, p·at(k)) mapping       op balW : Int -> Nat . (a Nat-valued
+***                                                       function symbol is the quantifier)
+***
+*** Array ELEMENTS are not pinned — the generator does not descend into
+*** them either; wellFormedPushReadBack closes by read-over-write against
+*** the initial storage in both systems.
+***
+*** What each theorem needs (beyond its cell pins):
+***   popAfterPush   the Nat length pin + N+1=sN (popA's `s NI :=` match) + NZ>0 (popN's guard)
+***   pushLength     0<NZ (evalP turns `len > 0` into `0 < len`)
+***   pushReadBack   (sN)-1=N for the index; then the exact-path save/find pair yields 42
+***                  without ever reading stW's elements
+***   uintRoot/uintField/mappingValue   just the pin + 0<=N
+***
+*** Soundness caveat (flagged in README divergence #2): the base STORAGE
+*** pass-through `ceq find(save(st,p,v), q) = find(st, q) if p =/= q [owise]`
+*** and eqV? compare NORMAL FORMS. Every comparison below is between a
+*** symbolic Nat index and the `length` field constant — semantically
+*** disjoint, so syntactic =/= is sound. A program comparing a symbolic
+*** index against a CONCRETE numeral index (write values[$lenW], read
+*** values[0]) would unsoundly pass through; none of the six does.
+***
+*** Negative control (kept as a comment — the stuck term would trip
+*** run-tests.sh): with `op $lenI : -> Int .` in place of the Nat pin,
+***   red [ stI ]< $values .push() ; $values .pop() ; > true .
+*** sticks at popN($values, $lenI + 1, ...) — the guard `$lenI + 1 > 0` is
+*** undecidable, precisely SolKey's smallest open goal without wellFormed
+*** — storagePopSave's "empty" branch `!(0 < n+1) -> false`, needing n >= 0.
+
+load Store .
+
+*** Six theorem-lemmas over the prelude, each valid for ALL Nat instances,
+*** so adding them is a conservative extension (the built-in hooks fire
+*** only on numerals and agree with the lemmas on ground overlap). They
+*** unstick the four places a symbolic Nat reaches a hooked op: push's
+*** `L0 + 1` length bump, popA's `s NI :=` match and popN's `I > 0` guard
+*** in Stmt.maude, evalP's lt?/leq? comparisons and sub?'s `length - 1`
+*** in Expr.maude. Standalone — pr INT only — so the lemmas parse without the
+*** Solidity surface syntax's overloaded comparison/list operators.
+fmod NAT-LEMMAS is
+    pr INT .
+    var N : Nat .  var NZ : NzNat .
+    eq N + 1 = s N .        *** successor normal form; makes popA's `s NI :=` match
+    eq 0 <= N = true .      *** THE wellFormed conjunct, once and for all Nats
+    eq N < 0 = false .
+    eq NZ > 0 = true .      *** popN's guard; s N : NzNat by the prelude subsort
+    eq 0 < NZ = true .      *** `length > 0` via evalP's operand swap
+    eq (s N) - 1 = N .      *** `values.length - 1` after a push
+endfm
+
+fmod WELLFORMED-DEMO{Field :: TRIV} is
+    pr PAPER-STORE{Field} .
+    pr NAT-LEMMAS .
+
+    *** an arbitrary well-formed storage: the pins are EXACTLY the
+    *** generator's conjuncts for the cells the six bodies read — no more
+    op stW : -> Struct .
+    ops $lenW $totalW $aliceAgeW : -> Nat .   *** sort Nat = the `0 <=` conjunct
+    op balW : Int -> Nat .                    *** the `\forall int k` conjunct
+    var K : Int .
+    eq find(stW, $values length) = $lenW .
+    eq find(stW, $total)         = $totalW .
+    eq find(stW, $alice $age)    = $aliceAgeW .
+    eq find(stW, $balances K)    = balW(K) .
+
+    *** executable wellformed : Struct -> Bool — the generator's expansion
+    *** for the TestSuite layout fragment Store.maude models. uint roots
+    *** and struct members contribute `0 <=` conjuncts, arrays their length
+    *** slot; bool/address cells contribute nothing (as in the generator).
+    *** Out of Store.maude's vocabulary (no field constants): the roots
+    *** `a`, `valuesMap`, `ledgerUses` and Toggle's `n`. Mapping
+    *** \forall-conjuncts are factored into per-key ops checked at a fresh
+    *** key constant (`people`/`accountMap`/`ledger.balances` would follow
+    *** the same wfBalancesAt pattern). This predicate documents the
+    *** correspondence and serves future [ ST ]< _ > _ triples; the six
+    *** theorems above it need only the sort-based pins.
+    op nn : StValue -> Bool .   var I : Int .  var ST : Struct .
+    eq nn(I) = 0 <= I .
+    op wellformed : Struct -> Bool .
+    eq wellformed(ST) =
+        nn(find(ST, $total)) and nn(find(ST, $age)) and nn(find(ST, $balance)) and
+        nn(find(ST, $values length)) and nn(find(ST, $matrix length)) and
+        nn(find(ST, $boolFlags length)) and nn(find(ST, $persons length)) and
+        nn(find(ST, $tokens length)) and
+        nn(find(ST, $alice $account $balance)) and
+        nn(find(ST, $alice $account $token $value)) and nn(find(ST, $alice $age)) and
+        nn(find(ST, $bob $account $balance)) and
+        nn(find(ST, $bob $account $token $value)) and nn(find(ST, $bob $age)) and
+        nn(find(ST, $ledger $nonce)) and nn(find(ST, $bucket $tokens length)) .
+    op wfBalancesAt : Struct Int -> Bool .    *** body of `\forall int k` over balances
+    eq wfBalancesAt(ST, K) = nn(find(ST, $balances K)) .
+    op k0 : -> Int .                          *** fresh key = the \forall witness
+endfm
+
+*** ---- the six theorems, symbolic form (the faithful mirror) ------------------
+*** [ stW ]< body > true  =  wellFormed(storage) -> \<{ f()@TestSuite; }\>(true)
+
+*** wellFormedPopAfterPush: values.push(); values.pop();
+red [ stW ]< $values .push() ; $values .pop() ; > true .                    *** true
+
+*** wellFormedPushLength: values.push(); assert(values.length > 0);
+red [ stW ]< $values .push() ; assert($values . length > 0) ; > true .      *** true
+
+*** wellFormedPushReadBack: values.push(42); uint r = values[values.length - 1]; assert(r == 42);
+red [ stW ]< $values .push(42) ;
+             var 'r = $values [ $values . length - 1 ] ;
+             assert('r == 42) ; > true .                                    *** true
+
+*** wellFormedUintRoot: uint r = total; assert(r >= 0);
+red [ stW ]< var 'r = $total ; assert('r >= 0) ; > true .                   *** true
+
+*** wellFormedUintField: uint r = alice.age; assert(r >= 0);
+red [ stW ]< var 'r = $alice . $age ; assert('r >= 0) ; > true .            *** true
+
+*** wellFormedMappingValue: uint r = balances[7]; assert(r >= 0);
+red [ stW ]< var 'r = $balances [ 7 ] ; assert('r >= 0) ; > true .          *** true
+
+*** ---- the same bodies from mtSt (wellformed holds by construction) -----------
+*** zero-init makes every generator conjunct trivially true, so the
+*** concrete suite never needed the assumption — these six are the
+*** `< body > post` twins the rest of the mirror suite is made of.
+red < $values .push() ; $values .pop() ; > true .                           *** true
+red < $values .push() ; assert($values . length > 0) ; > true .             *** true
+red < $values .push(42) ;
+      var 'r = $values [ $values . length - 1 ] ;
+      assert('r == 42) ; > true .                                           *** true
+red < var 'r = $total ; assert('r >= 0) ; > true .                          *** true
+red < var 'r = $alice . $age ; assert('r >= 0) ; > true .                   *** true
+red < var 'r = $balances [ 7 ] ; assert('r >= 0) ; > true .                 *** true
+
+*** ---- wellformed is established at mtSt and preserved by execution -----------
+red wellformed(mtSt) .                                                      *** true
+red wfBalancesAt(mtSt, k0) .                                                *** true — the \forall k instance
+red wellformed(stOf(init(($total = 5 ; $values .push(10) ;), mtSt))) .      *** true — after a write and a push
+red wellformed(stOf(init(($values .push(3) ; $values .pop() ;), mtSt))) .   *** true — after push and pop
+*** ...and stW's pins satisfy the conjuncts they encode
+red nn(find(stW, $total)) and nn(find(stW, $values length)) and
+    nn(find(stW, $alice $age)) and wfBalancesAt(stW, k0) .                  *** true

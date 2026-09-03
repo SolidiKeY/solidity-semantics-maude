@@ -38,13 +38,16 @@ roots=(
   "$here/examples/solkey/Matrix.maude"
   "$here/examples/solkey/ComplexReceiver.maude"
   "$here/examples/solkey/CrossCopy.maude"
+  "$here/examples/solkey/WellFormed.maude"
 )
 
 # A result is "stuck" if it still mentions an internal operator that a
 # finished reduction must have rewritten away. (A final Conf like
 # `{k(nilK) …}` from a `rew` command is legitimate, so the k-cell itself
-# is not a stuck marker — only these never-final helper operators are.)
-stuck_re='result[^:]*:.*(eval\(|lower\(|readLoc\(|asg\(|payNet\(|call2?\(|branch\(|reqD\(|retD\()'
+# is not a stuck marker — only these never-final helper operators are.
+# holds( catches a Hoare triple that failed to decide — e.g. a symbolic
+# guard the NAT-LEMMAS equations don't cover.)
+stuck_re='result[^:]*:.*(eval\(|lower\(|readLoc\(|asg\(|payNet\(|call2?\(|branch\(|reqD\(|retD\(|holds\()'
 
 # Known-benign parser advisories to ignore, both structural artifacts of the
 # shared Solidity/field kind (Int is both an Exp and an array/mapping key):
