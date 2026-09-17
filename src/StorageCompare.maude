@@ -1,0 +1,338 @@
+*** src/StorageCompare.maude — the two storage models side by side.
+***
+*** StorageCopy.maude decides "is this member a mapping?" from the FIELD's sort;
+*** StorageFlag.maude decides it from the VALUE at the path. This file runs one
+*** set of test terms through both, in one Maude session, so the answers sit on
+*** adjacent lines.
+***
+*** HOW THE SWAP IS DONE. The repo's usual idiom is module-name identity plus
+*** load: Storage.maude, StorageCopy.maude, StorageSelect.maude and
+*** list/Storage.maude all define STORAGE, and src/sem/Config.maude picks one by
+*** which file it loads. That is a whole-session switch — the variants can never
+*** meet, which is exactly what makes them hard to compare.
+***
+*** Here the switch is a parameter instead. A theory STORAGE-API names the API
+*** both models present; a view per model says how that model realizes it; and
+*** ONE parameterized module SUITE{X :: STORAGE-API} holds the test terms, so
+*** the terms are written once and instantiated twice:
+***
+***     fth STORAGE-API  ---- Sorted  --->  CMP-SORTED   (pr STORAGE{Fld},  StorageCopy.maude)
+***            |         ---- Flagged --->  CMP-FLAGGED  (pr STORAGE-FLAG{Fld})
+***       SUITE{X}       ---- SUITE{Sorted} = SUITE-S,  SUITE{Flagged} = SUITE-F
+***
+*** Adding a third model is a module, a view and a wrapper; the suite is
+*** untouched. Note `red in SUITE{Sorted} :` is rejected by Maude — "module
+*** expressions not supported in commands" — hence the named wrappers.
+***
+*** THE ONE API MISMATCH is `decl`, which declares a mapping slot. It is the
+*** flagged model's whole mechanism and it is meaningless in the sorted model,
+*** where a field's sort is fixed at declaration time. Rather than add a
+*** harness-only operator to CMP-SORTED, the Sorted view maps it away:
+***
+***     op decl(S:Struct, P:NeList{Fld}, V:StValue) to term S:Struct .
+***
+*** so a declaration is literally the identity on a sorted storage. The Flagged
+*** view is the empty view: STORAGE-FLAG already has the theory's signature.
+***
+*** WHAT TO LOOK FOR. The first group is the two models agreeing — it is the
+*** trailing red block of StorageCopy.maude, rebuilt over an mtSt root plus a
+*** layout of decls. The second group is the differences, each with the reason;
+*** they are the real output of this file. Three are limitations of an untyped
+*** store, one is a limitation of field sorts, and two are the field-sorted
+*** model answering a symbolic query that the flagged model leaves stuck.
+
+sload StorageCopy .
+sload StorageFlag .
+
+*** ---- one flat field signature, shared by both models ----------------------
+fmod CMP-FIELDS is
+    pr INT .
+    sort Fld .
+    subsort Int < Fld .
+    ops $alice $bob $ledger $ledger2 $inner $account $a : -> Fld .
+    ops $balance $nonce $m $balances : -> Fld .
+endfm
+
+view Fld from TRIV to CMP-FIELDS is sort Elt to Fld . endv
+
+*** ---- the API both models present -----------------------------------------
+fth STORAGE-API is
+    pr CMP-FIELDS .
+    pr LIST{Fld} .
+
+    sorts Struct StValue .
+    subsort Struct < StValue .
+    subsort Int < StValue .
+
+    *** `length` belongs HERE, not in CMP-FIELDS: both targets already get it
+    *** from Fields.maude at sort PrimField, and a second declaration at Fld
+    *** would arrive with no common ancestor.
+    op length : -> Fld .
+
+    op mtSt : -> Struct .
+    op find : Struct List{Fld} -> StValue .
+    op save : Struct NeList{Fld} StValue -> Struct .
+    op decl : Struct NeList{Fld} StValue -> Struct .
+    op delAt : Struct NeList{Fld} -> Struct .
+    op push : Struct NeList{Fld} StValue -> Struct .
+    op push : Struct NeList{Fld} -> Struct .
+    op pop : Struct NeList{Fld} -> Struct .
+endfth
+
+*** ---- model A: map-ness in the FIELD's sort -------------------------------
+*** Each constant is re-declared at its sorted refinement. That is a subsort
+*** overload of the CMP-FIELDS declaration, so the constant keeps one name and
+*** picks up the least sort — which is the whole input the sorted model has.
+fmod CMP-SORTED is
+    pr STORAGE{Fld} .
+
+    ops $m $balances : -> MapField .
+    ops $balance $nonce : -> PrimField .
+    ops $alice $bob $ledger $ledger2 $inner $account $a : -> RefField .
+
+    var PFd : PrimField .   var IDFd : RefField .
+    var RMFd : RefMapField .   var RAFd : RefArrField .
+    var LFXS : List{Fld} .   var Id : Int .
+
+    eq defaultValue(PFd) = 0 .
+    eq defaultValue(IDFd) = mtSt .
+
+    *** zero-init, copied verbatim from src/sem/Config.maude — the base STORAGE
+    *** model leaves find-on-mtSt stuck, and every term below is mtSt-rooted.
+    eq find(mtSt, LFXS PFd) = defaultValue(PFd) .
+    eq find(mtSt, LFXS IDFd) = defaultValue(IDFd) .
+    eq find(mtSt, LFXS RMFd Id) = mtSt .
+    eq find(mtSt, LFXS RAFd Id) = mtSt .
+    eq find(mtSt, LFXS Id) = 0 [owise] .
+endfm
+
+*** ---- model B: map-ness in the STORE --------------------------------------
+fmod CMP-FLAGGED is
+    pr STORAGE-FLAG{Fld} .
+endfm
+
+view Sorted from STORAGE-API to CMP-SORTED is
+    op decl(S:Struct, P:NeList{Fld}, V:StValue) to term S:Struct .
+endv
+
+view Flagged from STORAGE-API to CMP-FLAGGED is endv
+
+*** ---- the test terms, written once ----------------------------------------
+fmod SUITE{X :: STORAGE-API} is
+    ops layout stEx stEx2 stD stArr stPop stL stCopy : -> X$Struct .
+    ops stU stCopyU stCopyH stArrCopy sym : -> X$Struct .
+
+    *** the storage LAYOUT: where the mappings are. The sorted model discards
+    *** it (decl is the identity there); the flagged model has nothing else.
+    eq layout = decl(decl(decl(decl(decl(decl(mtSt,
+                    $alice $m, 0), $ledger $balances, 0), $ledger $inner $balances, 0),
+                    $ledger2 $balances, 0), $ledger2 $inner $balances, 0), $a 0 $account $m, 0) .
+
+    eq stEx  = save(save(layout, $alice $account length, 10), $alice $account 5, 20) .
+    eq stEx2 = save(layout, $account length, 10) .
+    eq stD   = save(save(save(layout, $alice $balance, 5), $alice $account $balance, 7), $alice $m 9, 42) .
+    eq stArr = save(save(layout, $a length, 3), $a 1, 100) .
+    eq stPop = save(save(save(layout, $a length, 1), $a 0 $account $m 1, 10), $a 0 $account $balance, 5) .
+
+    *** two sibling structs, each with a primitive, a nested struct and a
+    *** mapping at both levels — the copyKeepsMapping fixture
+    eq stL = save(save(save(save(save(save(save(layout,
+                 $ledger $nonce, 5), $ledger $inner $nonce, 6),
+                 $ledger $balances 1, 11), $ledger $inner $balances 1, 12),
+                 $ledger2 $nonce, 1), $ledger2 $balances 1, 21), $ledger2 $inner $balances 1, 22) .
+    eq stCopy = save(stL, $ledger2, find(stL, $ledger)) .
+
+    *** a copy where NOTHING is declared: $balances is a mapping only by its sort
+    eq stU = save(save(mtSt, $bob $balances 1, 11), $bob $nonce, 5) .
+    eq stCopyU = save(stU, $account, find(stU, $bob)) .
+    *** a copy where the SOURCE is declared and the target was never written
+    eq stCopyH = save(stL, $bob, find(stL, $ledger)) .
+    *** a copy of an array of structs whose element carries a mapping
+    eq stArrCopy = save(stPop, $bob, find(stPop, $a)) .
+
+    *** sym has no equation: the symbolic root
+endfm
+
+fmod SUITE-S is pr SUITE{Sorted} . endfm
+fmod SUITE-F is pr SUITE{Flagged} . endfm
+
+*** ===========================================================================
+*** GROUP 1 — the two models agree.
+*** This is the trailing red block of StorageCopy.maude, rebuilt over an mtSt
+*** root plus the layout of decls. Each pair must print the same value.
+*** ===========================================================================
+
+red in SUITE-S : find(stEx, $alice $account length) .   *** 10
+red in SUITE-F : find(stEx, $alice $account length) .   *** 10
+
+red in SUITE-S : find(stEx, $alice $account 5) .        *** 20
+red in SUITE-F : find(stEx, $alice $account 5) .        *** 20
+
+*** a struct read: same shape both sides, except that the flagged term still
+*** carries its decls — save(mtSt, $m, mapOf(0)) — inside the extracted subtree
+red in SUITE-S : find(stEx, $alice) .   *** save(save(mtSt, $account length, 10), $account 5, 20)
+red in SUITE-F : find(stEx, $alice) .   *** ditto, over save(mtSt, $m, mapOf(0))
+
+red in SUITE-S : find(pop(stEx, $alice $account), $alice $account length) .   *** 9
+red in SUITE-F : find(pop(stEx, $alice $account), $alice $account length) .   *** 9
+
+red in SUITE-S : find(push(stEx2, $account, 20), $account length) .   *** 11
+red in SUITE-F : find(push(stEx2, $account, 20), $account length) .   *** 11
+
+red in SUITE-S : find(push(stEx2, $account), $account length) .   *** 11
+red in SUITE-F : find(push(stEx2, $account), $account length) .   *** 11
+
+*** delete resets the primitive and the nested struct's primitive ...
+red in SUITE-S : find(delAt(stD, $alice), $alice $balance) .   *** 0
+red in SUITE-F : find(delAt(stD, $alice), $alice $balance) .   *** 0
+
+red in SUITE-S : find(delAt(stD, $alice), $alice $account $balance) .   *** 0
+red in SUITE-F : find(delAt(stD, $alice), $alice $account $balance) .   *** 0
+
+*** ... and PRESERVES the mapping. This is the pair the whole exercise is about:
+*** the sorted model knows $m is a mapping from its sort, the flagged model from
+*** the decl in `layout`. Same answer, two different places to look.
+red in SUITE-S : find(delAt(stD, $alice), $alice $m 9) .   *** 42
+red in SUITE-F : find(delAt(stD, $alice), $alice $m 9) .   *** 42
+
+red in SUITE-S : find(delAt(stD, $alice $m), $alice $m 9) .   *** 42 — deleting a whole mapping is a no-op
+red in SUITE-F : find(delAt(stD, $alice $m), $alice $m 9) .   *** 42
+
+red in SUITE-S : find(delAt(stD, $alice $m 9), $alice $m 9) .   *** 0 — one entry IS deletable
+red in SUITE-F : find(delAt(stD, $alice $m 9), $alice $m 9) .   *** 0
+
+red in SUITE-S : find(delAt(stD, $alice $m 9), $alice $m 3) .   *** 0 — a sibling entry was untouched anyway
+red in SUITE-F : find(delAt(stD, $alice $m 9), $alice $m 3) .   *** 0
+
+red in SUITE-S : find(delAt(stD, $alice $balance), $alice $account $balance) .   *** 7 — disjoint path
+red in SUITE-F : find(delAt(stD, $alice $balance), $alice $account $balance) .   *** 7
+
+red in SUITE-S : find(delAt(stArr, $a 1), $a length) .   *** 3
+red in SUITE-F : find(delAt(stArr, $a 1), $a length) .   *** 3
+
+red in SUITE-S : find(delAt(stArr, $a 1), $a 1) .   *** 0
+red in SUITE-F : find(delAt(stArr, $a 1), $a 1) .   *** 0
+
+*** the exact read of a deleted struct is a delete-MARKED struct, not a default
+red in SUITE-S : find(delAt(stD, $alice), $alice) .   *** delNode(save(save(save(mtSt, $balance, 5), …), $m 9, 42))
+red in SUITE-F : find(delAt(stD, $alice), $alice) .   *** ditto, over the decl root
+
+red in SUITE-S : find(pop(stPop, $a), $a length) .   *** 0
+red in SUITE-F : find(pop(stPop, $a), $a length) .   *** 0
+
+red in SUITE-S : find(push(pop(stPop, $a), $a), $a length) .   *** 1
+red in SUITE-F : find(push(pop(stPop, $a), $a), $a length) .   *** 1
+
+*** pop then push: the re-appended slot is cleared, but its mapping survives
+red in SUITE-S : find(push(pop(stPop, $a), $a), $a 0 $account $m 1) .   *** 10
+red in SUITE-F : find(push(pop(stPop, $a), $a), $a 0 $account $m 1) .   *** 10
+
+red in SUITE-S : find(push(pop(stPop, $a), $a), $a 0 $account $balance) .   *** 0
+red in SUITE-F : find(push(pop(stPop, $a), $a), $a 0 $account $balance) .   *** 0
+
+*** ---- the struct copy: primitives from the SOURCE, mappings from the TARGET
+red in SUITE-S : find(stCopy, $ledger2 $nonce) .   *** 5  — source
+red in SUITE-F : find(stCopy, $ledger2 $nonce) .   *** 5
+
+red in SUITE-S : find(stCopy, $ledger2 $inner $nonce) .   *** 6  — source, one level down
+red in SUITE-F : find(stCopy, $ledger2 $inner $nonce) .   *** 6
+
+red in SUITE-S : find(stCopy, $ledger2 $balances 1) .   *** 21 — TARGET's own mapping, not the source's 11
+red in SUITE-F : find(stCopy, $ledger2 $balances 1) .   *** 21
+
+red in SUITE-S : find(stCopy, $ledger2 $inner $balances 1) .   *** 22 — target's, one level down, not 12
+red in SUITE-F : find(stCopy, $ledger2 $inner $balances 1) .   *** 22
+
+*** the same read split in two: guards the one-level-down rule against
+*** collapsing the extracted subtree to the source's
+red in SUITE-S : find(find(stCopy, $ledger2 $inner), $balances 1) .   *** 22
+red in SUITE-F : find(find(stCopy, $ledger2 $inner), $balances 1) .   *** 22
+
+red in SUITE-S : find(stCopy, $ledger2) .   *** ovr(…)  the leaf is irreducible
+red in SUITE-F : find(stCopy, $ledger2) .   *** ovr(…)  ditto, over the decl roots
+
+*** ===========================================================================
+*** GROUP 2 — the two models disagree. This is the output of the file.
+*** ===========================================================================
+
+*** 2a. ZERO-INIT. The sorted model takes the default from the field's sort, so
+*** an untouched reference slot reads as an empty struct. The flagged store has
+*** no sorts to consult and reads 0; v→st casts that back to mtSt when a path
+*** continues through it, so nothing downstream breaks — but the bare read
+*** differs, and every "was this slot ever written" test would have to change.
+red in SUITE-S : find(mtSt, $bob) .   *** mtSt
+red in SUITE-F : find(mtSt, $bob) .   *** 0
+
+*** 2b. A MAPPING IS A VALUE, or it is not. In the flagged model a declared
+*** mapping is a first-class term, so reading one is meaningful. In the sorted
+*** model mappings exist only as path prefixes: this read is STUCK BY DESIGN,
+*** there being no equation for a bare MapField on mtSt — and none is missing,
+*** since Solidity has no expression that reads a whole mapping either.
+red in SUITE-S : find(layout, $alice $m) .   *** find(mtSt, $alice $m)  — stuck, see above
+red in SUITE-F : find(layout, $alice $m) .   *** mapOf(0)
+
+*** 2c. Consequence of 2a: deleting a never-written reference slot. The sorted
+*** model marks an empty struct, the flagged one has only a primitive 0 to
+*** delete. Nothing observable downstream differs — both read 0 through it —
+*** but the intermediate term does.
+red in SUITE-S : find(delAt(layout, $bob), $bob) .   *** delNode(mtSt)
+red in SUITE-F : find(delAt(layout, $bob), $bob) .   *** 0
+
+*** 2d. THE COST OF AN UNTYPED STORE. stCopyU copies a struct whose mapping
+*** member NEITHER side declared. The sorted model still knows $balances is a
+*** mapping and keeps the target's 0; the flagged model has no evidence at all
+*** and copies the source's entry. This is the failure mode of "types in state":
+*** an undeclared mapping is indistinguishable from an array.
+red in SUITE-S : find(stCopyU, $account $balances 1) .   *** 0  — mapping not copied
+red in SUITE-F : find(stCopyU, $account $balances 1) .   *** 11 — copied, WRONG for Solidity
+
+red in SUITE-S : find(stCopyU, $account $nonce) .   *** 5  — the primitive is copied either way
+red in SUITE-F : find(stCopyU, $account $nonce) .   *** 5
+
+*** 2e. ... but one-sided evidence is enough. In stCopyH the SOURCE is declared
+*** and the target was never written. The flagged model agrees here only because
+*** its copy leaf tests isMap on either side; a target-only test would print 11.
+red in SUITE-S : find(stCopyH, $bob $balances 1) .   *** 0
+red in SUITE-F : find(stCopyH, $bob $balances 1) .   *** 0
+
+red in SUITE-S : find(stCopyH, $bob $nonce) .   *** 5
+red in SUITE-F : find(stCopyH, $bob $nonce) .   *** 5
+
+*** 2f. THE COST OF FIELD SORTS, the other way round. stArrCopy copies an ARRAY
+*** whose elements are structs carrying a mapping. The sorted model's leaf rule
+*** for an Int step, find(ovr(st,str), i flds) = find(str, i flds), reads the
+*** whole element out of the SOURCE — mapping included — because the RefArrField
+*** stamp sits on the container $a, not on the element, so by the time the path
+*** reaches $m the sort evidence is gone. 10 is wrong for Solidity. The flagged
+*** model has the decl at $a 0 $account $m and keeps the target's 0.
+*** This is the strongest case for the value-directed model.
+red in SUITE-S : find(stArrCopy, $bob 0 $account $m 1) .   *** 10 — copied, WRONG for Solidity
+red in SUITE-F : find(stArrCopy, $bob 0 $account $m 1) .   *** 0  — mapping not copied
+
+red in SUITE-S : find(stArrCopy, $bob 0 $account $balance) .   *** 5 — the primitive is copied either way
+red in SUITE-F : find(stArrCopy, $bob 0 $account $balance) .   *** 5
+
+*** 2g. PUSH is off by one in the sorted model: `s nl := old_length` makes
+*** push(v) write the appended element at old_length - 1, while push() clears
+*** old_length. src/sem/ is unaffected — Stmt.maude has its own pushV — so this
+*** is a defect of StorageCopy.maude / Storage.maude alone, surfaced here rather
+*** than fixed, since fixing it changes those files' own trailing reds.
+red in SUITE-S : find(push(stEx2, $account, 20), $account 10) .   *** 0  — WRONG: nothing was appended at the end
+red in SUITE-F : find(push(stEx2, $account, 20), $account 10) .   *** 20
+
+red in SUITE-S : find(push(stEx2, $account, 20), $account 9) .   *** 20 — the element landed one slot early
+red in SUITE-F : find(push(stEx2, $account, 20), $account 9) .   *** 0
+
+*** 2h. SYMBOLIC ROOTS. `sym` is a free constant: nothing is known about what it
+*** holds. The sorted model still answers, because the membership
+*** `mb find(st, flds rf) : Struct` stamps the copied value as a struct from the
+*** field's sort alone. The flagged model cannot have that membership — the
+*** stamp would have to come from the store, which is symbolic — so its guards
+*** do not decide and the term stays put. Stuck, not wrong: had the copy leaf
+*** used [owise] for its negative branch, it would have fired on the undecided
+*** condition and silently dropped the write.
+red in SUITE-S : find(save(sym, $ledger2, find(sym, $ledger)), $ledger2 $nonce) .   *** find(sym, $ledger $nonce)
+red in SUITE-F : find(save(sym, $ledger2, find(sym, $ledger)), $ledger2 $nonce) .   *** the term itself, unreduced
+
+red in SUITE-S : find(delAt(sym, $alice), $alice $balance) .   *** 0
+red in SUITE-F : find(delAt(sym, $alice), $alice $balance) .   *** the term itself, unreduced

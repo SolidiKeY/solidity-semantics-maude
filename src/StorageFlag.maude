@@ -1,0 +1,235 @@
+*** src/StorageFlag.maude — storage variant: map-ness is carried by the STORE,
+*** not by the FIELD's sort.
+***
+*** Sibling of ../src/StorageCopy.maude. That model answers "is this member a
+*** mapping?" — the question Solidity's copy and delete both turn on — from the
+*** sort of the field constant (MapField / PrimField / RefField / Int, see
+*** Fields.maude). This one answers it from the VALUE sitting at the path, so
+*** the field signature can stay a bare TRIV element. The two are compared
+*** term-by-term in StorageCompare.maude; the module is named STORAGE-FLAG, not
+*** STORAGE, precisely so that both CAN be loaded into one session.
+***
+*** TYPES IN STATE. A mapping slot is DECLARED by storing a distinguished
+*** value at its path:
+***
+***     decl(st, p, tmpl)  =  save(st, p, mapOf(tmpl))
+***
+*** where tmpl is the slot's entry TEMPLATE — 0 for an int-valued mapping, a
+*** struct carrying its own decls for a struct-valued one. A contract's storage
+*** layout is thus an initial storage term, not a signature. The declaration is
+*** a value sort, not a boolean argument on save: with a Bool the exact read of
+*** a declared slot would go through the generic struct leaf and come back as
+*** ovr(mtSt, mapOf(0)), whose map-ness the leaf would then have to re-derive.
+*** As a sort it simply survives:
+***
+***     sorts Node Map < Struct      Map = a declared mapping, Node = everything else
+***     save : Map  NeList{Field} StValue -> Map      writing INTO a mapping keeps it one
+***     save : Node NeList{Field} StValue -> Node
+***
+*** so save(mapOf(0), 9, 42) has sort Map by construction and isMap is three
+*** one-line equations instead of a propagation rule per constructor. This is
+*** the same "invariants in the term algebra, not in checker predicates" move
+*** as StorageCanonical.maude, applied to one bit instead of to whole types.
+***
+*** DISPATCH. Every equation below quantifies path elements at Field$Elt and
+*** Int only — PrimField / RefField / MapField never appear. The splits are on
+*** the VALUE's sort instead: Map / Prim / Node, three disjoint cases, which is
+*** exactly the shape of StorageCopy's mapf / pf-and-i / rf split.
+***
+***     StorageCopy (field-sorted)            StorageFlag (value-sorted)
+***     find(ovr(st,str), mapf flds)          isMap(find(st,f)) or isMap(find(nd,f))
+***     find(ovr(st,str), pf flds)            prm := find(nd, f)
+***     find(ovr(st,str), rf flds)            nd2 := find(nd, f)
+***     delAt(st, pre mapf) = st              isMap(find(st, dp))
+***
+*** NO OWISE. StorageCopy's two [owise] equations are replaced by an explicit
+*** `prefix` predicate and by `isMap(…) = false` guards. The reason is that the
+*** flagged model has no membership axioms: StorageCopy can stamp a symbolic
+*** read as a Struct via `mb find(st, flds rf) : Struct`, keyed on the field's
+*** sort, and this model by construction cannot. On a symbolic root its guards
+*** therefore do not decide — and an [owise] fires on an UNDECIDED condition
+*** just as happily as on a false one, which would silently drop the write or
+*** the delete. With explicit guards a symbolic root is stuck, i.e. visibly
+*** unanswered, rather than answered wrongly. See the last two pairs of
+*** StorageCompare.maude.
+***
+*** TERMINATION. StorageCopy's measure, unchanged: lexicographic on
+*** <remaining query-path length, write-chain depth, find-nesting depth>. The
+*** delAt collapse guard recurses only into a strictly smaller store.
+
+sload Fields .
+
+fmod STORAGE-FLAG{Field :: TRIV} is
+    pr FIELDS{Field} .
+    pr LIST{Field} .
+
+    *** ---- the two struct sorts ------------------------------------------
+    sorts Struct Node Map .
+    subsorts Node Map < Struct .
+    subsort Struct < StValue .
+
+    op mtSt : -> Node .
+    op mapOf : StValue -> Map .        *** a DECLARED mapping slot, carrying its entry template
+
+    op find : Struct List{Field} -> StValue .
+    op save : Struct NeList{Field} StValue -> Struct .
+    op save : Node NeList{Field} StValue -> Node .     *** map-ness survives a write ...
+    op save : Map NeList{Field} StValue -> Map .
+    op decl : Struct NeList{Field} StValue -> Struct . *** declare a mapping slot
+    op delAt : Struct NeList{Field} -> Struct .
+    op delAt : Node NeList{Field} -> Node .            *** ... and a pending delete
+    op delAt : Map NeList{Field} -> Map .
+    op push : Struct NeList{Field} StValue -> Struct .
+    op push : Struct NeList{Field} -> Struct .
+    op pop : Struct NeList{Field} -> Struct .
+
+    op ovr : Struct Struct -> Node .   *** the copy leaf: ovr(target-old, source-new)
+    op delNode : Node -> Node .        *** SolKey delNode: the delete marker
+    op delValue : StValue -> StValue . *** SolKey delValue<[alpha]>
+    op v→st : Value -> Struct .        *** SolKey cast<[Struct]>
+    op isMap : StValue -> Bool .
+    op prefix : List{Field} List{Field} -> Bool .
+
+    vars st st2 : Struct .   vars nd nd2 : Node .   var mp : Map .
+    var prm : Prim .   vars val tm : StValue .
+    vars f f2 : Field$Elt .   var k : Int .
+    vars flds flds2 qp : List{Field} .
+    vars fldsN fldsN2 dp : NeList{Field} .
+    vars nl old_length : Int .
+
+    *** ---- path prefix: what the two [owise] equations used to decide -----
+    eq prefix(nil, flds) = true .
+    eq prefix(f flds, nil) = false .
+    eq prefix(f flds, f flds2) = prefix(flds, flds2) .
+    ceq prefix(f flds, f2 flds2) = false if f =/= f2 .
+
+    *** ---- map-ness IS the value's sort ----------------------------------
+    eq isMap(mp) = true .
+    eq isMap(nd) = false .
+    eq isMap(prm) = false .
+
+    eq v→st(st) = st .
+    eq v→st(prm) = mtSt .
+
+    eq decl(st, fldsN, tm) = save(st, fldsN, mapOf(tm)) .
+
+    *** ---- reads -----------------------------------------------------------
+    eq find(st, nil) = st .
+    eq find(find(st, fldsN), fldsN2) = find(st, fldsN fldsN2) .
+    *** untyped zero-init: there are no field sorts here to take a default from,
+    *** so every unwritten slot reads 0 and v→st casts it onward. Safe as a
+    *** non-owise equation because every other find rule has a non-variable
+    *** constructor — mapOf / save / delAt / delNode / ovr / find — in argument 1.
+    eq find(mtSt, fldsN) = 0 .
+    eq find(mapOf(tm), k) = tm .                    *** a fresh entry is the template
+    eq find(mapOf(tm), k fldsN) = find(v→st(tm), fldsN) .
+
+    *** ---- write: split on the written VALUE's sort, pairwise disjoint -----
+    eq find(save(st, fldsN, prm), fldsN) = prm .
+    eq find(save(st, fldsN, mp), fldsN flds) = find(mp, flds) .     *** a decl: read the mapping itself
+    eq find(save(st, fldsN, nd), fldsN flds) =
+        find(ovr(v→st(find(st, fldsN)), nd), flds) .                *** a struct: suspend the copy leaf
+    *** prefix read: the query stops short of the written path, so the write is
+    *** re-suspended one level in (StorageCopy's selectOnSave prefix rule).
+    eq find(save(st, fldsN fldsN2, val), fldsN) = save(v→st(find(st, fldsN)), fldsN2, val) .
+    ceq find(save(st, fldsN, val), fldsN2) = find(st, fldsN2)
+        if prefix(fldsN, fldsN2) = false /\ prefix(fldsN2, fldsN) = false .
+
+    *** ---- the copy leaf, value-directed ----------------------------------
+    *** A member declared a mapping on EITHER side stays the target's: Solidity
+    *** never copies a mapping, and in an untyped store the source's decl is the
+    *** only evidence available when the target has not been written yet.
+    ceq find(ovr(st, nd), f flds) = find(st, f flds) if isMap(find(st, f)) .
+    ceq find(ovr(st, nd), f flds) = find(st, f flds) if isMap(find(nd, f)) .
+    ceq find(ovr(st, nd), f flds) = find(nd, f flds)
+        if isMap(find(st, f)) = false /\ prm := find(nd, f) .       *** primitive member: the SOURCE's
+    ceq find(ovr(st, nd), f flds) = find(ovr(v→st(find(st, f)), nd2), flds)
+        if isMap(find(st, f)) = false /\ nd2 := find(nd, f) .       *** struct member: leaf one level down
+
+    *** ---- delete ----------------------------------------------------------
+    eq delValue(nd) = delNode(nd) .
+    eq delValue(mp) = mp .
+    eq delValue(prm) = 0 .
+
+    *** delete m : deleting a whole mapping is a no-op (StorageCopy: delAt(st, pre mapf) = st)
+    ceq delAt(st, dp) = st if isMap(find(st, dp)) .
+
+    eq find(delAt(st, dp), dp) = delValue(find(st, dp)) .           *** exact read of the deleted node
+    ceq find(delAt(st, dp), dp f flds) = find(st, dp f flds)
+        if isMap(find(st, dp f)) .                                  *** PRESERVE mapping: read the original
+    ceq find(delAt(st, dp), dp f flds) = find(delAt(st, dp f), dp f flds)
+        if isMap(find(st, dp)) = false /\ isMap(find(st, dp f)) = false .   *** push the delete down
+    *** ANCESTOR read: the query stops short of the deleted path, so the delete
+    *** is re-suspended on the extracted subtree — otherwise it would be LOST.
+    eq find(delAt(st, qp dp), qp) = delAt(v→st(find(st, qp)), dp) .
+    ceq find(delAt(st, dp), qp) = find(st, qp)
+        if prefix(dp, qp) = false /\ prefix(qp, dp) = false .       *** disjoint path
+
+    *** ---- the delete marker: read through by the member's VALUE sort ------
+    ceq find(delNode(nd), f flds) = find(nd, f flds) if isMap(find(nd, f)) .   *** mapping preserved
+    ceq find(delNode(nd), f flds) = 0 if prm := find(nd, f) .                  *** primitive reset
+    ceq find(delNode(nd), f flds) = find(delNode(nd2), flds) if nd2 := find(nd, f) .
+
+    *** ---- push / pop ------------------------------------------------------
+    *** push(v) appends AT old_length; push() appends a cleared slot, using the
+    *** mapping-preserving delAt (SolKey storagePushLengthSave).
+    ceq push(st, fldsN, val) = save(save(st, fldsN old_length, val), fldsN length, old_length + 1)
+        if old_length := find(st, fldsN length) .
+    ceq push(st, fldsN) = save(delAt(st, fldsN old_length), fldsN length, old_length + 1)
+        if old_length := find(st, fldsN length) .
+    ceq pop(st, fldsN) = save(delAt(st, fldsN nl), fldsN length, nl)
+        if old_length := find(st, fldsN length) /\ s nl := old_length .
+endfm
+
+*** ---------------------------------------------------------------------------
+*** Standalone check. Field constants are plain Field$Elt — the whole point —
+*** so the layout of declarations is what tells the model where the mappings
+*** are. Compare StorageCopy.maude's Example, whose constants carry their sorts.
+
+fmod ExampleFlag{Field :: TRIV} is
+    pr STORAGE-FLAG{Field} .
+
+    ops $alice $bob $ledger $ledger2 $inner $account $a : -> Field$Elt .
+    ops $balance $nonce $m $balances : -> Field$Elt .
+    ops layout stEx stD stArr stPop stCopy : -> Struct .
+
+    *** the storage LAYOUT: every mapping slot, with its entry template
+    eq layout = decl(decl(decl(decl(mtSt, $alice $m, 0), $ledger $balances, 0),
+                          $ledger2 $balances, 0), $a 0 $account $m, 0) .
+
+    eq stEx = save(save(layout, $alice $account length, 10), $alice $account 5, 20) .
+    eq stD  = save(save(save(layout, $alice $balance, 5), $alice $account $balance, 7), $alice $m 9, 42) .
+    eq stArr = save(save(layout, $a length, 3), $a 1, 100) .
+    eq stPop = save(save(save(layout, $a length, 1), $a 0 $account $m 1, 10), $a 0 $account $balance, 5) .
+    eq stCopy = save(save(save(layout, $ledger $balances 1, 11), $ledger2 $balances 1, 21),
+                     $ledger2, find(save(save(layout, $ledger $balances 1, 11), $ledger2 $balances 1, 21), $ledger)) .
+endfm
+
+red in ExampleFlag : find(stEx, $alice $account length) .       *** 10
+red in ExampleFlag : find(stEx, $alice $account 5) .            *** 20
+red in ExampleFlag : find(stEx, $alice $account 4) .            *** 0   — untyped zero-init
+
+red in ExampleFlag : find(layout, $alice $m) .                  *** mapOf(0)   — the decl IS the value
+red in ExampleFlag : isMap(find(layout, $alice $m)) .           *** true
+red in ExampleFlag : isMap(find(layout, $alice $account)) .     *** false
+red in ExampleFlag : find(layout, $alice $m 3) .                *** 0   — a fresh entry is the template
+
+red in ExampleFlag : find(delAt(stD, $alice), $alice $balance) .            *** 0
+red in ExampleFlag : find(delAt(stD, $alice), $alice $account $balance) .   *** 0
+red in ExampleFlag : find(delAt(stD, $alice), $alice $m 9) .                *** 42  — MAPPING PRESERVED (critical)
+red in ExampleFlag : find(delAt(stD, $alice $m), $alice $m 9) .             *** 42  — delete of a whole mapping is a no-op
+red in ExampleFlag : find(delAt(stD, $alice $m 9), $alice $m 9) .           *** 0   — one entry IS deletable
+red in ExampleFlag : find(delAt(stD, $alice $balance), $alice $account $balance) .   *** 7  — disjoint path
+
+red in ExampleFlag : find(delAt(stArr, $a 1), $a length) .      *** 3
+red in ExampleFlag : find(delAt(stArr, $a 1), $a 1) .           *** 0
+
+red in ExampleFlag : find(push(stArr, $a, 42), $a 3) .          *** 42  — appends AT old_length
+red in ExampleFlag : find(push(stArr, $a, 42), $a length) .     *** 4
+red in ExampleFlag : find(pop(stArr, $a), $a length) .          *** 2
+red in ExampleFlag : find(push(pop(stPop, $a), $a), $a length) .              *** 1
+red in ExampleFlag : find(push(pop(stPop, $a), $a), $a 0 $account $m 1) .     *** 10  — map survives pop-then-push
+red in ExampleFlag : find(push(pop(stPop, $a), $a), $a 0 $account $balance) . *** 0
+
+red in ExampleFlag : find(stCopy, $ledger2 $balances 1) .       *** 21  — the TARGET's mapping, not the source's
+red in ExampleFlag : find(stCopy, $ledger2) .                   *** ovr(…)  the leaf is irreducible

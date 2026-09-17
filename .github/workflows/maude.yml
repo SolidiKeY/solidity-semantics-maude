@@ -13,5 +13,11 @@ jobs:
             apt: maude
         - name: Use Maude
           run: maude full-maude.maude
+        - name: Compare the two storage models
+          run: |
+            out=$(maude -no-banner -batch src/StorageCompare.maude < /dev/null 2>&1)
+            echo "$out"
+            # maude exits 0 on warnings, so fail explicitly on any warning or kinded result
+            ! grep -Eq '^Warning|^result \[' <<< "$out"
         - name: Run sem/ semantics test suite
           run: bash src/sem/run-tests.sh

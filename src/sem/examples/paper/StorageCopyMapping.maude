@@ -1,0 +1,233 @@
+*** src/sem/examples/paper/StorageCopyMapping.maude
+***
+*** No paper section: this is SolKey's copyKeepsMapping.key obligation, replayed
+*** in the paper's derivation notation. `ledger2 = ledger;` is a storage ->
+*** storage struct copy over a location that owns a MAPPING, and Solidity never
+*** copies a mapping -- so the value members come from the SOURCE while the
+*** mapping members stay the TARGET's own. The one-shot Hoare form of this lives
+*** in ../solkey/Copy.maude:113; here every intermediate state is visible.
+***
+*** HOW THE MODEL DOES IT -- see ../../../StorageCopy.maude:115-137.
+***
+*** Nothing is dropped at WRITE time. The right-hand side is evaluated eagerly
+*** to a struct value -- find(S, $ledger) extracts the whole source subtree,
+*** mapping entries included -- and asg writes it with save(S, $ledger2, that).
+*** Block A shows the written value carrying the source's `$balances 1 -> 11`.
+***
+*** The mapping is skipped at READ time. A read that reaches the written path
+*** builds the non-collapsing leaf
+***
+***     find(save(st, p, str), p flds) = find(ovr(v->st(find(st, p)), str), flds)
+***
+*** that is, ovr(TARGET-old, SOURCE-new): SolKey's irreducible save(st, nil, v).
+*** The four ovr equations then dispatch on the sort of the next field --
+*** mapping members read LEFT, everything else reads RIGHT:
+***
+***     find(ovr(st, str), mapf flds) = find(st, mapf flds)    mapping: the TARGET's own
+***     find(ovr(st, str), pf flds)   = find(str, pf flds)     primitive: the SOURCE's
+***     find(ovr(st, str), i flds)    = find(str, i flds)      element:   the SOURCE's
+***     find(ovr(st, str), rf flds)   = find(ovr(v->st(find(st, rf)),
+***                                             find(str, rf)), flds)    ref: leaf one level down
+***
+*** So the copy is not a merge and not a filter: the source struct is written
+*** whole, and the READER decides which side each member comes from.
+***
+*** WHAT EACH BLOCK SHOWS
+***   A  the derivation, one ~> per statement, with the written struct value
+***   B  the same claim written out and CHECKED, plus its negation as false
+***   C  a key the target never wrote: not merged, not copied -- just 0
+***   D  the leaf itself, printed: copying the copy leaves ovr(...) in storage
+***   E  the RefField equation: the same split one level down, via alice = bob
+***
+*** WHAT `base: false` MEANS HERE. It marks a reduction that flips if you point
+*** ../../Config.maude at ../../../Storage.maude instead, as ../solkey/Copy.maude
+*** already marks this obligation. Do not read it as "the base model copies the
+*** mapping": measured, the base model has no struct-copy leaf AT ALL, so a read
+*** through a copied struct never resolves to the source. The block-B program
+*** there gives 'n := 1 -- the target's stale nonce, not the source's 5 -- and
+*** the value-copy check at the bottom reads 0. Mapping preservation does not
+*** even arise; that is the latent gap ../../Config.maude:87 flags.
+***
+*** PAPER-COPY-DOMAIN is the module Steps.maude reflects, so it must NOT import
+*** META-LEVEL, and the constants it steps over must be declared INSIDE it: a
+*** constant added from outside does not exist in the module metaRewrite runs
+*** in. PAPER-STEPS already fixes theModule = 'PAPER-DOMAIN, so the layer below
+*** imports SOL-STEPS directly rather than going through it.
+
+load Domain .
+
+fmod PAPER-COPY-DOMAIN{Field :: TRIV} is
+    pr PAPER-DOMAIN{Field} .
+
+    *** the copy TARGET: the paper's domain has a single Ledger
+    op $ledger2 : -> RefField .
+    eq defaultValue($ledger2) = mtSt .
+
+    op $ledger2 : -> Root .
+    var Clv : Cells .
+    eq lower($ledger2, Clv) = sloc($ledger2) .
+endfm
+
+fmod PAPER-COPY-STEPS{Field :: TRIV} is
+    pr PAPER-COPY-DOMAIN{Field} .
+    pr SOL-STEPS{Field} .
+    eq theModule = 'PAPER-COPY-DOMAIN .
+endfm
+
+*** ---- A  the derivation ---------------------------------------------------
+*** Four setup writes, the copy, then two reads: seven statements, seven ~>.
+*** Below, S4 abbreviates the storage after the four setup writes,
+***
+***     S4 = save(save(save(save(mtSt, $ledger $nonce, 5), $ledger $balances 1,
+***                    11), $ledger2 $nonce, 1), $ledger2 $balances 1, 77)
+***
+*** The fifth goal is the one to look at. The copy writes
+***
+***     save(S4, $ledger2, save(save(mtSt, $nonce, 5), $balances 1, 11))
+***
+*** and that written value DOES carry the source's mapping entry, 11. Two steps
+*** later the read of $ledger2 . $balances[1] still answers 77, the target's
+*** own: the skip happens in find, not in save. A root-to-root assignment
+*** prints as ($ledger2).Root = ($ledger).Root ; -- see Syntax.maude on why a
+*** root lvalue is overloaded at sort Root.
+red steps(< $ledger . $nonce = # 5 ;  $ledger . $balances [ # 1 ] = # 11 ;
+            $ledger2 . $nonce = # 1 ; $ledger2 . $balances [ # 1 ] = # 77 ;
+            $ledger2 = $ledger ;
+            var 'n = $ledger2 . $nonce ;
+            var 'b = $ledger2 . $balances [ # 1 ] ; >) .
+*** < … > ~> {storage := save(mtSt, $ledger $nonce, 5)}< … >
+***        ~> {storage := save(save(mtSt, $ledger $nonce, 5), $ledger $balances 1, 11)}< … >
+***        ~> {storage := save(save(save(mtSt, $ledger $nonce, 5), $ledger
+***                       $balances 1, 11), $ledger2 $nonce, 1)}< … >
+***        ~> {storage := S4}< ($ledger2).Root = ($ledger).Root ; … >
+***        ~> {storage := save(S4, $ledger2, save(save(mtSt, $nonce, 5),
+***                       $balances 1, 11))}< var 'n = … ; var 'b = … ; >
+***        ~> {storage := save(S4, $ledger2, save(save(mtSt, $nonce, 5),
+***                       $balances 1, 11)) || 'n := 5}< var 'b = … ; >
+***        ~> {storage := save(S4, $ledger2, save(save(mtSt, $nonce, 5),
+***                       $balances 1, 11)) || 'b := 77 || 'n := 5}
+
+*** ---- B  the claim, written out and checked -------------------------------
+*** The elision above is informal; this is the exact claim, machine-checked.
+*** ~*> skips the four setup writes, then one ~> per remaining statement.
+red |- < $ledger . $nonce = # 5 ;  $ledger . $balances [ # 1 ] = # 11 ;
+         $ledger2 . $nonce = # 1 ; $ledger2 . $balances [ # 1 ] = # 77 ;
+         $ledger2 = $ledger ;
+         var 'n = $ledger2 . $nonce ;
+         var 'b = $ledger2 . $balances [ # 1 ] ; >
+    ~*> { storage := save(save(save(save(mtSt, $ledger $nonce, 5),
+                    $ledger $balances 1, 11), $ledger2 $nonce, 1),
+                    $ledger2 $balances 1, 77) }
+        < $ledger2 = $ledger ;
+          var 'n = $ledger2 . $nonce ;
+          var 'b = $ledger2 . $balances [ # 1 ] ; >
+    ~>  { storage := save(save(save(save(save(mtSt, $ledger $nonce, 5),
+                    $ledger $balances 1, 11), $ledger2 $nonce, 1),
+                    $ledger2 $balances 1, 77),
+                    $ledger2, save(save(mtSt, $nonce, 5), $balances 1, 11)) }
+        < var 'n = $ledger2 . $nonce ;
+          var 'b = $ledger2 . $balances [ # 1 ] ; >
+    ~>  { storage := save(save(save(save(save(mtSt, $ledger $nonce, 5),
+                    $ledger $balances 1, 11), $ledger2 $nonce, 1),
+                    $ledger2 $balances 1, 77),
+                    $ledger2, save(save(mtSt, $nonce, 5), $balances 1, 11))
+          || 'n := 5 }
+        < var 'b = $ledger2 . $balances [ # 1 ] ; >
+    ~>  { storage := save(save(save(save(save(mtSt, $ledger $nonce, 5),
+                    $ledger $balances 1, 11), $ledger2 $nonce, 1),
+                    $ledger2 $balances 1, 77),
+                    $ledger2, save(save(mtSt, $nonce, 5), $balances 1, 11))
+          || 'n := 5 || 'b := 77 } .                                       *** true
+
+*** the SAME derivation but claiming 'b came from the SOURCE, 11. This is the
+*** reading a COLLAPSING leaf would license -- SolKey deleted its saveOnEmpty
+*** rule, `save(st, nil, v) => v`, for exactly this reason. Not derivable here:
+*** `|-` decides it false rather than getting stuck.
+red |- < $ledger . $nonce = # 5 ;  $ledger . $balances [ # 1 ] = # 11 ;
+         $ledger2 . $nonce = # 1 ; $ledger2 . $balances [ # 1 ] = # 77 ;
+         $ledger2 = $ledger ;
+         var 'b = $ledger2 . $balances [ # 1 ] ; >
+    ~*> { storage := save(save(save(save(save(mtSt, $ledger $nonce, 5),
+                    $ledger $balances 1, 11), $ledger2 $nonce, 1),
+                    $ledger2 $balances 1, 77),
+                    $ledger2, save(save(mtSt, $nonce, 5), $balances 1, 11))
+          || 'b := 11 } .                                                  *** false
+
+*** and the same fact as a one-shot triple, the form ../solkey/Copy.maude uses
+red < $ledger . $nonce = # 5 ;  $ledger . $balances [ # 1 ] = # 11 ;
+      $ledger2 . $nonce = # 1 ; $ledger2 . $balances [ # 1 ] = # 77 ;
+      $ledger2 = $ledger ;
+      var 'n = $ledger2 . $nonce ;
+      var 'b = $ledger2 . $balances [ # 1 ] ; >
+    ('n == # 5 && 'b == # 77) .                            *** true   base: false
+
+*** ---- C  a key the target never wrote -------------------------------------
+*** The target has NOTHING at key 2 and the source has 22. If the copy merged
+*** mappings, or copied them, 'z would be 22. It is 0: the mapping member is
+*** read from the target, and the target's key 2 is unset.
+red run(< $ledger . $nonce = # 5 ;
+          $ledger . $balances [ # 2 ] = # 22 ;
+          $ledger2 = $ledger ;
+          var 'z = $ledger2 . $balances [ # 2 ] ; >) .
+*** {storage := save(save(save(mtSt, $ledger $nonce, 5), $ledger $balances 2,
+*** 22), $ledger2, save(save(mtSt, $nonce, 5), $balances 2, 22)) || 'z := 0}
+red < $ledger . $nonce = # 5 ; $ledger . $balances [ # 2 ] = # 22 ;
+      $ledger2 = $ledger ; >
+    ($ledger2 . $nonce == # 5 && $ledger2 . $balances [ # 2 ] == # 0) .
+                                                           *** true   base: false
+
+*** ---- D  the leaf, printed -------------------------------------------------
+*** Reading $ledger2 WHOLE -- as the right-hand side of a further copy -- hits
+*** the leaf rule with an empty remainder, so the value of $ledger2 is the
+*** irreducible ovr(target-old, source). This is the one place in the sem/
+*** suite where ovr(...) appears inside a rendered goal; everywhere else a
+*** read consumes it. Writing that ovr into $alice . $ledger then keeps
+*** ALICE's mapping, which is empty, so 'b := 0 -- while $ledger2's own entry
+*** is still 77. Two different readers, two different answers, one value.
+red run(< $ledger . $nonce = # 5 ; $ledger . $balances [ # 1 ] = # 11 ;
+          $ledger2 . $balances [ # 1 ] = # 77 ;
+          $ledger2 = $ledger ;
+          $alice . $ledger = $ledger2 ;
+          var 'n = $alice . $ledger . $nonce ;
+          var 'b = $alice . $ledger . $balances [ # 1 ] ; >) .
+*** {storage := save(save(save(save(save(mtSt, $ledger $nonce, 5), $ledger
+*** $balances 1, 11), $ledger2 $balances 1, 77), $ledger2, save(save(mtSt,
+*** $nonce, 5), $balances 1, 11)), $alice $ledger, ovr(save(mtSt, $balances 1,
+*** 77), save(save(mtSt, $nonce, 5), $balances 1, 11))) || 'b := 0 || 'n := 5}
+red < $ledger . $nonce = # 5 ; $ledger . $balances [ # 1 ] = # 11 ;
+      $ledger2 . $balances [ # 1 ] = # 77 ;
+      $ledger2 = $ledger ;
+      $alice . $ledger = $ledger2 ; >
+    ($alice . $ledger . $nonce == # 5
+     && $alice . $ledger . $balances [ # 1 ] == # 0
+     && $ledger2 . $balances [ # 1 ] == # 77) .            *** true   base: false
+
+*** ---- E  one level down: the RefField equation ------------------------------
+*** alice = bob copies a whole Person. $ledger is a RefField inside it, so the
+*** leaf does not answer directly: it rebuilds one level down as
+*** ovr(alice's ledger, bob's ledger), and the split applies again there. The
+*** primitive $age and $nonce come from bob; $balances[1] stays alice's 77.
+red run(< $alice . $ledger . $balances [ # 1 ] = # 77 ;
+          $bob . $ledger . $balances [ # 1 ] = # 11 ;
+          $bob . $ledger . $nonce = # 5 ;
+          $bob . $age = # 4 ;
+          $alice = $bob ;
+          var 'g = $alice . $age ;
+          var 'n = $alice . $ledger . $nonce ;
+          var 'b = $alice . $ledger . $balances [ # 1 ] ; >) .
+*** {storage := save(save(save(save(save(mtSt, $alice $ledger $balances 1, 77),
+*** $bob $ledger $balances 1, 11), $bob $ledger $nonce, 5), $bob $age, 4),
+*** $alice, save(save(save(mtSt, $ledger $balances 1, 11), $ledger $nonce, 5),
+*** $age, 4)) || 'b := 77 || 'g := 4 || 'n := 5}
+red < $alice . $ledger . $balances [ # 1 ] = # 77 ;
+      $bob . $ledger . $balances [ # 1 ] = # 11 ;
+      $bob . $ledger . $nonce = # 5 ; $bob . $age = # 4 ;
+      $alice = $bob ; >
+    ($alice . $age == # 4 && $alice . $ledger . $nonce == # 5
+     && $alice . $ledger . $balances [ # 1 ] == # 77) .    *** true   base: false
+
+*** ---- it is still a value copy ---------------------------------------------
+*** Nothing above makes the target an alias: a later write to the source does
+*** not reach it. Only the MAPPING members are shared-by-not-being-copied.
+red < $ledger . $nonce = # 5 ; $ledger2 = $ledger ; $ledger . $nonce = # 9 ; >
+    ($ledger2 . $nonce == # 5) .                                           *** true

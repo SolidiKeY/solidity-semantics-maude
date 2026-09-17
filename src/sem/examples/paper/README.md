@@ -28,6 +28,7 @@ Each file ends in a block of reductions with the expected value in a trailing
 | `StorageExamples.maude` | `sections/storage-examples.tex` |
 | `StorageArrays.maude` | `sections/storage-examples-arrays.tex` |
 | `StorageDelete.maude` | `sections/storage-examples-delete.tex` |
+| `StorageCopyMapping.maude` | no paper section — SolKey `copyKeepsMapping.key`: the storage→storage copy over a mapping |
 | `Arithmetic.maude` | `sections/arithmetic.tex` (compound storage update) |
 | `MemoryExamples.maude` | `sections/memory-examples.tex` |
 | `MemoryDelete.maude` | `sections/memory-examples-delete.tex` |

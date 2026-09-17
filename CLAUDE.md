@@ -31,7 +31,7 @@ on top of the storage/memory models (see `PLAN.md`): `Syntax` → `Config` →
 `Expr` → `Order` → `Stmt` → `Flow` → `Net` → `Contract` → `NetCallback` (a
 system `mod`), plus `examples/Bank.maude`. Two further roots branch off
 `Contract`: `Hoare.maude`, and `Steps.maude` → `examples/paper/Domain.maude` →
-the eleven `examples/paper/` sections. **Keep that chain linear** —
+the twelve `examples/paper/` files. **Keep that chain linear** —
 Maude's `load` is not idempotent, so a diamond re-executes the whole preamble
 and silently duplicates modules. Run the whole suite (each file green
 when it emits no `Warning:` and leaves no reduction stuck) with:
