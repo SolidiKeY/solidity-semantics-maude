@@ -21,18 +21,38 @@ If Maude reports `unable to locate file: prelude.maude`, its data dir isn't on t
 
 CI (`.github/workflows/maude.yml`) installs `maude` via apt and runs `maude full-maude.maude` — the parameterized modules (`fmod X{Field :: TRIV}`) rely on Full Maude.
 
-**Verifying.** There is no import-all entry point, and there can't be one — sibling variants deliberately reuse module names (`STORAGE` is defined by `Storage.maude`, `StorageSelect.maude`, and `list/Storage.maude`; `BANK` by `Memory.maude` and `bank.maude`; `MemoryToStorage`/`StorageToMemory` by three files each), so loading them into one session clashes. Instead run each spec on its own: its trailing `red`/`rew` block is that file's test suite (loading a file also runs the reductions of everything it `load`s), and expected results are written inline as trailing `*** …` comments — a spec is "green" when no reduction is left stuck and the outputs match those comments. The `load`-graph roots that transitively cover the tree are the six translation files, `random.maude`, and `list-constructor.maude`, plus the `list/` specs (`list/Storage.maude`, `list/Memory.maude`) and `StorageCanonical.maude`. The storage `delete` reductions (per Solidity, `delete` must skip mappings — see the `MapField` sort in `Fields.maude`/`list/Field.maude`) live in `src/Storage.maude` (nested / lazy) and `src/list/Storage.maude` (flat / eager); verify them with `maude -no-banner src/Storage.maude` and `maude -no-banner src/list/Storage.maude`.
+**Verifying.** There is no import-all entry point, and there can't be one — sibling variants deliberately reuse module names (`STORAGE` is defined by `Storage.maude`, `StorageCopy.maude`, `StorageSelect.maude`, and `list/Storage.maude`; `BANK` by `Memory.maude` and `bank.maude`; `MemoryToStorage`/`StorageToMemory` by three files each), so loading them into one session clashes. Instead run each spec on its own: its trailing `red`/`rew` block is that file's test suite (loading a file also runs the reductions of everything it `load`s), and expected results are written inline as trailing `*** …` comments — a spec is "green" when no reduction is left stuck and the outputs match those comments. The `load`-graph roots that transitively cover the tree are the six translation files, `random.maude`, and `list-constructor.maude`, plus the `list/` specs (`list/Storage.maude`, `list/Memory.maude`), `StorageCanonical.maude` and `StorageCopy.maude`. The storage `delete` reductions (per Solidity, `delete` must skip mappings — see the `MapField` sort in `Fields.maude`/`list/Field.maude`) live in `src/Storage.maude` (nested / lazy) and `src/list/Storage.maude` (flat / eager); verify them with `maude -no-banner src/Storage.maude` and `maude -no-banner src/list/Storage.maude`.
+
+**`src/sem/` runs on `StorageCopy.maude`, not `Storage.maude`.** The `load` at `src/sem/Config.maude` is the single switch between them.
 
 **The `src/sem/` executable semantics** is the one part of the tree with a
 proper `load` chain and a runner. It layers a small-step Solidity semantics
 on top of the storage/memory models (see `PLAN.md`): `Syntax` → `Config` →
-`Expr` → `Stmt` → `Flow` → `Net` → `Contract` → `NetCallback` (a system
-`mod`), plus `examples/Bank.maude`. Run the whole suite (each file green
+`Expr` → `Order` → `Stmt` → `Flow` → `Net` → `Contract` → `NetCallback` (a
+system `mod`), plus `examples/Bank.maude`. **Keep that chain linear** —
+Maude's `load` is not idempotent, so a diamond re-executes the whole preamble
+and silently duplicates modules. Run the whole suite (each file green
 when it emits no `Warning:` and leaves no reduction stuck) with:
 
 ```sh
 bash src/sem/run-tests.sh
 ```
+
+The runner only checks for warnings, stuck terms and kind-level results — it
+does **not** compare reductions against their trailing `*** …` expected-value
+comments, so a `true` → `false` flip in a Hoare triple passes it silently.
+`src/sem/golden.sh` is the gate for that: snapshot before a change, diff after.
+
+```sh
+bash src/sem/golden.sh > /tmp/before   # …edit…
+bash src/sem/golden.sh > /tmp/after
+diff /tmp/before /tmp/after
+```
+
+When the change is meant to be behaviour-preserving, that diff should be empty
+(or purely additive if you added a root). Note the base-model files have their
+own trailing `red` blocks, which the `sem/` roots run transitively — filter
+`reduce in Example :` out when only the `sem/` semantics is under test.
 
 Individual files still run standalone (`maude -no-banner src/sem/Stmt.maude`)
 and carry their expected results as trailing `*** …` comments. CI runs the
@@ -52,6 +72,7 @@ Everything is built on an abstract field signature and layered upward. `load` st
 - **`Memory.maude`** — `BANK{Field :: TRIV}`, the memory model: `addM`/`read`/`write`/`delete`/`erase` keyed by `Identity` + field path. Reads/writes are defined equationally (`read(write(m,id,sel,val),id,sel) = val`, with conditional commutation over distinct id/selector pairs). `readR` reads along a `NeList{Field}` path.
 
 - **`Storage.maude`** — `STORAGE{Field :: TRIV}`, the storage model as nested `Struct`s: `storeSt`/`selectSt`/`find`/`save`/`push`/`pop`. `find(st, path)` navigates a `List{Field}` into nested structs. `StorageSelect.maude` is a `selectSt`-based variant.
+  - **`StorageCopy.maude`** — the variant aligned with SolKey's current `structRules.key`, and the one `src/sem/` runs on. Three deltas from `Storage.maude`: (a) `save`'s leaf does **not** collapse — a struct written over a location keeps *that location's* mapping members, because Solidity never copies a mapping, so the leaf becomes an irreducible `ovr(target, source)` read through by the member's sort (`MapField` → the target's, `PrimField`/`Int` → the source's, `RefField` → a leaf one level down); (b) `delete` is sort-directed via `delValue`/`delNode`, so the exact read of a deleted struct slot is a delete-*marked* struct rather than a primitive default, and a delete of a strict descendant survives a copy of its ancestor; (c) `push()` clears the appended slot. Dispatch is entirely by sort — `Prim` vs `Struct`, and the four disjoint subsorts of `Field$Elt` — so no new `owise` is introduced. `v→st` is the Maude spelling of SolKey's `cast<[Struct]>` and is needed wherever a path step can land on a slot whose zero-init is primitive.
   - **`StorageCanonical.maude`** — the typed sibling: well-formedness *by construction*, the Maude answer to the Lean twin finding that its `wellTypedStorageB` predicate is not tight (mapping default ≠ type default, duplicate keys, missing struct fields). Each struct type is a sort with one fixed-arity constructor (`Account : Int Token -> Account`, `Account < Struct`); `SOL-MAPPING{V :: VALTY}` / `SOL-ARRAY{V}` are parameterized over the value type (views `IntV`, `AccountD`, …) and carry it as a sort-level tag; entries are `assoc comm id:` with idempotency, a doubly-bound key normalizes to the sortless `conflict(K)`, and `K |-> default = empty` makes mappings extensional. A storage is well-typed iff it has a sort (`t :: Struct`) — no membership axioms, no checker predicate. Same `find`/`save`/`push`/`pop`/`delete` API; `src/sem/` still runs on the lazy model.
 
 - **Translations** (the core research artifact) — encode Solidity's copy semantics between the two models:
@@ -74,11 +95,34 @@ Everything is built on an abstract field signature and layered upward. `load` st
   — a property checked by one `red`. Syntax reads like Solidity: member
   access `.`, assignment `=`, equality `==`, comparisons `< <= > >=`,
   `&& || !`. Conventions: conditions are a dedicated sort `Prop` (evaluated
-  by `evalP` to the truth value 1/0, so guards stay Int-based); `+ - *` reuse
-  the prelude INT ops, so a surface `a - b` also parses as the field-list
-  `a (neg b)` and internal equations use the prefix `_-_(a,b)` (the two
-  benign parser advisories are whitelisted in `run-tests.sh`); modules are
-  `SOL-`prefixed. Where driving the models from source-level syntax exposed
+  by `evalP` to the truth value 1/0, so guards stay Int-based); modules are
+  `SOL-`prefixed.
+
+  **`Exp` has its own kind.** `Field$Elt` and `Value` are deliberately *not*
+  subsorts of `LValue`/`Exp`. That subsorting put `Int` in `Exp`'s kind, which
+  forced `+ - *` to inherit the prelude INT declarations — `assoc comm` for
+  `+` and `*` — so `'i ++ + 'i` and `'i + 'i ++` were the **same term** and
+  solc's evaluation order was unstatable. Consequences to know: a literal is
+  injected (`'x = # 5 ;`, `$values [ # 1 ]`); a field constant usable as a
+  **root** lvalue is overloaded at the sort `Root` in whichever module
+  declares it, plus one `lower` equation, so program text still reads
+  `$alice . $age` with no injection; `+` is a free constructor, so syntax no
+  longer *computes* — `# 1 + # 2` does not fold and terms keep their source
+  shape rather than an AC normal form; and the two parser advisories this
+  repo used to whitelist are gone, so any warning is now a real failure.
+
+  **`Order.maude`** is the capture pass that imposes solc's legacy-pipeline
+  evaluation order — right operand before left, and RHS → receiver → index —
+  by rewriting an impure statement into `capture q = e ;` bindings over fresh
+  `tq(N)` temps, mirroring SolKey's `_unfold_*` taclets. It hooks in with a
+  single conditional equation on the `k` cell (Maude normalizes `k` bottom-up),
+  so none of the statement equations in `Stmt.maude` know about it.
+
+  **Array indices are bounds-checked** and revert out of range, matching the
+  `inBounds`/`outOfBounds` goal pair on every SolKey array index taclet;
+  mappings are total and carry no such branch. A *postcondition* read is
+  deliberately unchecked — the `nochk` cell — because SolKey's postconditions
+  are plain `find<[int]>` terms. An in-program `assert(…)` stays checked. Where driving the models from source-level syntax exposed
   gaps in the base `STORAGE`/`BANK` specs, the fix lives in `src/sem/` and is
   flagged in-comment for the Agda/F\*/Prolog twins.
 

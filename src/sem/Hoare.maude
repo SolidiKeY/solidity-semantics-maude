@@ -47,7 +47,9 @@ fmod SOL-HOARE{Field :: TRIV} is
     op holds : Conf Prop -> Bool .
     eq holds({ stat(SC) C }, reverts) = (SC == reverted) .
     eq holds({ stat(SC) C }, fails) = (SC == failed) .
-    ceq holds({ stat(SC) C }, P) = (evalP(P, stat(SC) C) == 1)
+    *** nochk: a postcondition is a LOGIC-level read, unbounded, like SolKey's
+    *** find<[int]>(storage, …). In-program assert(…) stays bounds-checked.
+    ceq holds({ stat(SC) C }, P) = (evalP(P, nochk stat(SC) C) == 1)
         if SC == ok /\ P =/= reverts /\ P =/= fails .
     ceq holds({ stat(SC) C }, P) = false
         if SC =/= ok /\ P =/= reverts /\ P =/= fails .
@@ -73,45 +75,56 @@ fmod HOARE-DEMO{Field :: TRIV} is
     eq fbody($set) = $alice . $balance = 'v ; .
     eq fpar($get) = 'a .
     eq fbody($get) = return $alice . $balance ; .
+
+    *** root lvalues: Field$Elt is not a subsort of LValue (see Syntax.maude),
+    *** so each field constant usable as a ROOT is overloaded at Root < LValue.
+    ops $account $accounts $alice $balance $bob $nonce : -> Root .
+    var Clv : Cells .
+    eq lower($account, Clv) = sloc($account) .
+    eq lower($accounts, Clv) = sloc($accounts) .
+    eq lower($alice, Clv) = sloc($alice) .
+    eq lower($balance, Clv) = sloc($balance) .
+    eq lower($bob, Clv) = sloc($bob) .
+    eq lower($nonce, Clv) = sloc($nonce) .
 endfm
 
 *** THE example the request asked for — reads like Solidity, proves by `red`:
-red < $alice . $account . $balance = 10 ;
-      var 'x = $alice . $account . $balance ; > ('x == 10) .     *** true
+red < $alice . $account . $balance = # 10 ;
+      var 'x = $alice . $account . $balance ; > ('x == # 10) .     *** true
 
 *** a false postcondition reduces to false (not a stuck term)
-red < $alice . $account . $balance = 10 ; > ($alice . $account . $balance == 11) .   *** false
+red < $alice . $account . $balance = # 10 ; > ($alice . $account . $balance == # 11) .   *** false
 
 *** storage copy is a value copy: bob keeps 10 after alice changes
-red < $alice . $balance = 10 ;
+red < $alice . $balance = # 10 ;
       $bob = $alice ;
-      $alice . $balance = 99 ; > ($bob . $balance == 10 && $alice . $balance == 99) .   *** true
+      $alice . $balance = # 99 ; > ($bob . $balance == # 10 && $alice . $balance == # 99) .   *** true
 
 *** a mapping write and read
-red < $accounts [ 7 ] . $balance = 500 ; > ($accounts [ 7 ] . $balance == 500) .   *** true
+red < $accounts [ # 7 ] . $balance = # 500 ; > ($accounts [ # 7 ] . $balance == # 500) .   *** true
 
 *** control flow: sum 1..4
-red < var 's = 0 ; var 'i = 1 ;
-      while 'i <= 4 { 's += 'i ; 'i ++ ; } > ('s == 10) .        *** true
+red < var 's = # 0 ; var 'i = # 1 ;
+      while 'i <= # 4 { 's += 'i ; 'i ++ ; } > ('s == # 10) .        *** true
 
 *** a function call and a captured return value
-red < var 'r = 0 ;
-      call $set (42) ;
-      'r = call $get (0) ; > ('r == 42 && $alice . $balance == 42) .    *** true
+red < var 'r = # 0 ;
+      call $set (# 42) ;
+      'r = call $get (# 0) ; > ('r == # 42 && $alice . $balance == # 42) .    *** true
 
 *** require failure makes the program revert (and roll back)
-red < $alice . $balance = 5 ;
-      require($alice . $balance > 9) ;
-      $alice . $nonce = 1 ; > reverts .                          *** true
+red < $alice . $balance = # 5 ;
+      require($alice . $balance > # 9) ;
+      $alice . $nonce = # 1 ; > reverts .                          *** true
 *** ... and a normal postcondition on a reverting run is false (partial correctness)
-red < $alice . $balance = 5 ;
-      require($alice . $balance > 9) ; > ($alice . $balance == 5) .    *** false — the run reverted
+red < $alice . $balance = # 5 ;
+      require($alice . $balance > # 9) ; > ($alice . $balance == # 5) .    *** false — the run reverted
 
 *** assert failure is distinct from a require revert
-red < assert(1 == 2) ; > fails .                                 *** true
+red < assert(# 1 == # 2) ; > fails .                                 *** true
 
 *** division by zero reverts
-red < var 'x = 1 / 0 ; > reverts .                               *** true
+red < var 'x = # 1 / # 0 ; > reverts .                               *** true
 
 *** starting from a non-empty storage
-red [ save(mtSt, $alice $balance, 100) ]< $alice . $balance += 5 ; > ($alice . $balance == 105) .   *** true
+red [ save(mtSt, $alice $balance, 100) ]< $alice . $balance += # 5 ; > ($alice . $balance == # 105) .   *** true

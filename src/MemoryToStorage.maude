@@ -1,3 +1,12 @@
+*** SIBLING NOTE: SolKey's structMemoryRules.key gained selectOnCopyMemRef,
+*** so a memory->storage copy is readable one selector at a time under the new
+*** non-collapsing save leaf:
+***   selectSt<[Struct]>(copyMem(st,mem,id), a) = copyMem(mtSt, mem, read<[Identity]>(mem,id,a))
+*** The Maude analogue is in src/sem/Stmt.maude, next to the copyMem equations
+*** restated there. It is not needed in THIS file: reads here are whole-path,
+*** and find(find(st,p),q) = find(st, p q) re-flattens the stuck subterm so the
+*** primitive rule below fires. Recorded so the two stay comparable.
+
 load Memory .
 load Storage .
 

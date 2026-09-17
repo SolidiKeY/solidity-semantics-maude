@@ -1,3 +1,16 @@
+-- TWIN NOTE (Maude: src/StorageCopy.maude). SolKey and the Maude model now
+-- agree that `save` must NOT collapse at its leaf: a struct written over a
+-- storage location keeps that location's mapping members, because Solidity
+-- never copies a mapping. Here the collapsing leaf is not just an equation but
+-- something PROVED ABOUT -- select-save below depends on it.
+--
+-- Porting the fix needs a prerequisite this file does not have: the field sort
+-- split PrimField / RefField / MapField (see src/Fields.maude, whose header
+-- already flags that these twins use a flat value sort). The four-way
+-- member dispatch that decides "mapping member -> the target's, everything
+-- else -> the source's" is inexpressible over flat ℕ fields. So: prerequisite
+-- first, then the leaf rule.
+
 open import Level
 open import Data.Unit hiding (_≟_)
 open import Data.Empty

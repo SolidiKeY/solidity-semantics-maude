@@ -42,7 +42,7 @@ fmod SOL-NET{Field :: TRIV} is
     *** non-payable entry: msg.value must be zero or the call reverts
     op txNP : K Struct Struct Int Int -> Conf .
     eq txNP(KK, ST, NT, SND, VAL) =
-        tx((require(msg·value == 0) ;) KK, ST, NT, SND, VAL) .
+        tx((require(msg·value == # 0) ;) KK, ST, NT, SND, VAL) .
 
     *** ---- transfer (no-callback semantics) --------------------------------------
     eq { k((E1 .transfer(E2) ;) KK) C } = trD(eval(E1, C), eval(E2, C), KK, C) .
@@ -70,26 +70,34 @@ fmod SOL-NET-TEST{Field :: TRIV} is
     ops depositB withdrawB : -> K .
     eq depositB = $bals [ msg·sender ] += msg·value ; .
     eq withdrawB =
-        require($bals [ msg·sender ] >= 30) ;
-        $bals [ msg·sender ] -= 30 ;
-        msg·sender .transfer(30) ; .
+        require($bals [ msg·sender ] >= # 30) ;
+        $bals [ msg·sender ] -= # 30 ;
+        msg·sender .transfer(# 30) ; .
 
     ops cDep cPay cEcho cRevT cNP cWdr cOver : -> Conf .
 
     eq cDep = tx(depositB, mtSt, mtSt, 7, 100) .              *** deposit 100 from address 7
-    eq cPay = tx((9 .transfer(30) ;), mtSt, mtSt, 7, 0) .     *** contract pays 30 to address 9
+    eq cPay = tx((# 9 .transfer(# 30) ;), mtSt, mtSt, 7, 0) .     *** contract pays 30 to address 9
     eq cEcho = tx((msg·sender .transfer(msg·value) ;),
                   mtSt, mtSt, 7, 100) .                       *** send the money straight back
-    eq cRevT = tx((msg·sender .transfer(50) ;) (revert() ;),
+    eq cRevT = tx((msg·sender .transfer(# 50) ;) (revert() ;),
                   mtSt, mtSt, 7, 0) .                         *** transfer then revert
     eq cNP = txNP(nilK, mtSt, mtSt, 7, 5) .                   *** value sent to a non-payable function
     eq cWdr = tx(withdrawB, stOf(cDep), netOf(cDep), 7, 0) .  *** withdraw after deposit
     eq cOver = tx(withdrawB, mtSt, mtSt, 7, 0) .              *** withdraw with no balance
+
+    *** root lvalues: Field$Elt is not a subsort of LValue (see Syntax.maude),
+    *** so each field constant usable as a ROOT is overloaded at Root < LValue.
+    ops $alice $balance $bals : -> Root .
+    var Clv : Cells .
+    eq lower($alice, Clv) = sloc($alice) .
+    eq lower($balance, Clv) = sloc($balance) .
+    eq lower($bals, Clv) = sloc($bals) .
 endfm
 
 *** entry protocol
 red nread(cDep, 7) .                 *** 100 — msg.value credited to net(sender)
-red eread(cDep, $bals [ 7 ]) .       *** 100 — and booked by the contract
+red eread(cDep, $bals [ # 7 ]) .       *** 100 — and booked by the contract
 red statOf(cDep) .                   *** ok
 
 *** transfer
@@ -105,7 +113,7 @@ red nread(cNP, 7) .                  *** 0 — the value transfer was undone
 
 *** withdrawal pattern, and the paper's invariant net(a) = bals[a]
 red statOf(cWdr) .                   *** ok
-red eread(cWdr, $bals [ 7 ]) .       *** 70
+red eread(cWdr, $bals [ # 7 ]) .       *** 70
 red nread(cWdr, 7) .                 *** 70 — strong data integrity holds at exit
 red statOf(cOver) .                  *** reverted — require caught the overdraw
 red nread(cOver, 7) .                *** 0

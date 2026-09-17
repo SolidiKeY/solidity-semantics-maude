@@ -10,6 +10,8 @@
 ***   \<{ f()@TestSuite; }\>(true)  < body-of-f > (post)   diamond triple, empty storage
 ***   /// @custom:key box + require(x == v)   the pin becomes `var 'x = v ;`
 ***   require(arr.length == n)      n leading pushes (zero-init makes length 0)
+***                                 MANDATORY: array indices are bounds-checked
+***   postcondition read            unbounded (SolKey's find<[int]> is too)
 ***   alice.age                     $alice . $age
 ***   values[1]                     $values [ 1 ]
 ***   result = e; ... (result=v)    folded into the postcondition, or `var 'result = e ;`
@@ -30,6 +32,7 @@
 ***   Account { balance, token }    $balance:Prim  $token:Ref
 ***   Person  { account, age }      $account:Ref   $age:Prim
 ***   Ledger  { nonce, balances }   $nonce:Prim    $balances:Map
+***                                 $inner:Ref  (a nested Ledger, for copy tests)
 ***   Toggle  { on, n }             $on:Prim
 ***   TokenBucket { tokens }        $tokens:RefArr
 *** `age`/`balance` double as top-level slots and struct members — the same
@@ -42,6 +45,10 @@ fmod PAPER-STORE{Field :: TRIV} is
 
     *** reference-valued selectors (structs, and arrays of primitives)
     ops $alice $bob $account $token $values $boolFlags $toggle $bucket $ledger : -> RefField .
+    *** ledger2 is the COPY TARGET in the copyKeepsMapping obligation; inner is a
+    *** struct member that itself carries a mapping, so the copy rules can be
+    *** exercised one level down as well as at the top.
+    ops $ledger2 $inner : -> RefField .
     *** arrays of structs/arrays: an indexed read is a Struct
     ops $matrix $persons $tokens : -> RefArrField .
     *** primitive selectors
@@ -60,4 +67,37 @@ fmod PAPER-STORE{Field :: TRIV} is
     eq defaultValue($token) = mtSt .   eq defaultValue($values) = mtSt .  eq defaultValue($matrix) = mtSt .
     eq defaultValue($persons) = mtSt . eq defaultValue($tokens) = mtSt .  eq defaultValue($boolFlags) = mtSt .
     eq defaultValue($toggle) = mtSt .  eq defaultValue($bucket) = mtSt .  eq defaultValue($ledger) = mtSt .
+    eq defaultValue($ledger2) = mtSt . eq defaultValue($inner) = mtSt .
+
+    *** root lvalues: Field$Elt is not a subsort of LValue (see Syntax.maude),
+    *** so each field constant usable as a ROOT is overloaded at Root < LValue.
+    ops $account $accountMap $age $alice $balance $balances $bob $boolFlags $bucket $flag $flag2 $flags $inner $ledger $ledger2 $matrix $nonce $on $owner $people $persons $toggle $token $tokens $total $value $values : -> Root .
+    var Clv : Cells .
+    eq lower($account, Clv) = sloc($account) .
+    eq lower($accountMap, Clv) = sloc($accountMap) .
+    eq lower($age, Clv) = sloc($age) .
+    eq lower($alice, Clv) = sloc($alice) .
+    eq lower($balance, Clv) = sloc($balance) .
+    eq lower($balances, Clv) = sloc($balances) .
+    eq lower($bob, Clv) = sloc($bob) .
+    eq lower($boolFlags, Clv) = sloc($boolFlags) .
+    eq lower($bucket, Clv) = sloc($bucket) .
+    eq lower($flag, Clv) = sloc($flag) .
+    eq lower($flag2, Clv) = sloc($flag2) .
+    eq lower($flags, Clv) = sloc($flags) .
+    eq lower($inner, Clv) = sloc($inner) .
+    eq lower($ledger, Clv) = sloc($ledger) .
+    eq lower($ledger2, Clv) = sloc($ledger2) .
+    eq lower($matrix, Clv) = sloc($matrix) .
+    eq lower($nonce, Clv) = sloc($nonce) .
+    eq lower($on, Clv) = sloc($on) .
+    eq lower($owner, Clv) = sloc($owner) .
+    eq lower($people, Clv) = sloc($people) .
+    eq lower($persons, Clv) = sloc($persons) .
+    eq lower($toggle, Clv) = sloc($toggle) .
+    eq lower($token, Clv) = sloc($token) .
+    eq lower($tokens, Clv) = sloc($tokens) .
+    eq lower($total, Clv) = sloc($total) .
+    eq lower($value, Clv) = sloc($value) .
+    eq lower($values, Clv) = sloc($values) .
 endfm

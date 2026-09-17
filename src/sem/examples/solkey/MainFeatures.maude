@@ -8,13 +8,13 @@
 ***   testMemoryAliasing, testStorageMapReadWriteAndDelete,
 ***   testStorageStructDeleteSkipsMappingMember, testStorageMapStructCopy.
 ***
-*** KNOWN DIVERGENCE from SolKey (found by this cross-check):
+*** Two former divergences, both now RESOLVED:
 ***  - testStorageEvaluationOrder uses `a[++i] = ++i`, i.e. increment as an
-***    EXPRESSION with a side effect. Here ++/-- are statements, so
-***    expression-embedded increments are out of scope.
-*** Note: testStorageMapStructCopy's whole-entry copy used to be a second
-*** divergence; the RefMapField element-kind sort — the analogue of SolKey's
-*** find<[Struct]> cast — now supports it, see below.
+***    EXPRESSION with a side effect. ++/-- are now Exp constructors and
+***    ../../Order.maude imposes solc's order -- see EvalOrder.maude.
+***  - testStorageMapStructCopy's whole-entry copy: the RefMapField
+***    element-kind sort, the analogue of SolKey's find<[Struct]> cast, now
+***    supports it, see below.
 
 load Store .
 
@@ -23,81 +23,87 @@ fmod MAINFEATURES-DEMO{Field :: TRIV} is
 
     *** extra vocabulary beyond Store's ($ledger/$nonce/$accountMap moved there)
     op $valuesMap : -> MapField .       *** mapping(uint => uint)
+
+    *** root lvalues: Field$Elt is not a subsort of LValue (see Syntax.maude),
+    *** so each field constant usable as a ROOT is overloaded at Root < LValue.
+    ops $valuesMap : -> Root .
+    var Clv : Cells .
+    eq lower($valuesMap, Clv) = sloc($valuesMap) .
 endfm
 
 *** ---- testStorageRootDeepCopy: root-to-root copy is a deep VALUE copy ----
-red < $bob . $age = 21 ;
-      $bob . $account . $balance = 11 ;
+red < $bob . $age = # 21 ;
+      $bob . $account . $balance = # 11 ;
       $alice = $bob ;
-      $bob . $age = 30 ;
-      $bob . $account . $balance = 12 ;
-      assert($alice . $age == 21) ;
-      assert($alice . $account . $balance == 11) ; > true .        *** true
+      $bob . $age = # 30 ;
+      $bob . $account . $balance = # 12 ;
+      assert($alice . $age == # 21) ;
+      assert($alice . $account . $balance == # 11) ; > true .        *** true
 
 *** ---- testNestedStorageWrites: deep writes then reads into locals ----
-red < $alice . $account . $balance = 10 ;
-      $alice . $account . $token . $value = 5 ;
+red < $alice . $account . $balance = # 10 ;
+      $alice . $account . $token . $value = # 5 ;
       var 'b = $alice . $account . $balance ;
       var 'v = $alice . $account . $token . $value ;
-      assert('b == 10) ;
-      assert('v == 5) ; > true .                                   *** true
+      assert('b == # 10) ;
+      assert('v == # 5) ; > true .                                   *** true
 
 *** ---- testStorageAliases: aliases write through to the aliased path ----
 red < storage 'p = $alice ;
       storage 'acc = 'p . $account ;
-      'acc . $balance = 100 ;
-      'p . $account . $token . $value = 3 ;
-      assert($alice . $account . $balance == 100) ;
-      assert($alice . $account . $token . $value == 3) ; > true .  *** true
+      'acc . $balance = # 100 ;
+      'p . $account . $token . $value = # 3 ;
+      assert($alice . $account . $balance == # 100) ;
+      assert($alice . $account . $token . $value == # 3) ; > true .  *** true
 
 *** ---- testMemoryAliasing: a memory field handle shares the object ----
 red < memory 'carol = new ;
       memory 'carolAcc = 'carol . $account ;
-      'carolAcc . $balance = 100 ;
-      assert('carol . $account . $balance == 100) ; > true .       *** true
+      'carolAcc . $balance = # 100 ;
+      assert('carol . $account . $balance == # 100) ; > true .       *** true
 
 *** ---- testStorageMapReadWriteAndDelete: mapping read/write, delete one key ----
-red < $valuesMap [ 1 ] = 10 ;
-      $valuesMap [ 2 ] = 20 ;
-      var 'v = $valuesMap [ 1 ] ;
-      var 'kept = $valuesMap [ 2 ] ;
-      delete $valuesMap [ 1 ] ;
-      assert('v == 10) ;
-      assert('kept == 20) ;
-      assert($valuesMap [ 1 ] == 0) ;
-      assert($valuesMap [ 2 ] == 20) ; > true .                    *** true
+red < $valuesMap [ # 1 ] = # 10 ;
+      $valuesMap [ # 2 ] = # 20 ;
+      var 'v = $valuesMap [ # 1 ] ;
+      var 'kept = $valuesMap [ # 2 ] ;
+      delete $valuesMap [ # 1 ] ;
+      assert('v == # 10) ;
+      assert('kept == # 20) ;
+      assert($valuesMap [ # 1 ] == # 0) ;
+      assert($valuesMap [ # 2 ] == # 20) ; > true .                    *** true
 
 *** ---- testStorageStructDeleteSkipsMappingMember: delete a struct, keep its mapping ----
-red < $ledger . $nonce = 5 ;
-      $ledger . $balances [ 1 ] = 10 ;
-      $ledger . $balances [ 2 ] = 20 ;
+red < $ledger . $nonce = # 5 ;
+      $ledger . $balances [ # 1 ] = # 10 ;
+      $ledger . $balances [ # 2 ] = # 20 ;
       delete $ledger ;
-      assert($ledger . $nonce == 0) ;
-      assert($ledger . $balances [ 1 ] == 10) ;
-      assert($ledger . $balances [ 2 ] == 20) ;
-      delete $ledger . $balances [ 1 ] ;
-      assert($ledger . $balances [ 1 ] == 0) ;
-      assert($ledger . $balances [ 2 ] == 20) ; > true .           *** true
+      assert($ledger . $nonce == # 0) ;
+      assert($ledger . $balances [ # 1 ] == # 10) ;
+      assert($ledger . $balances [ # 2 ] == # 20) ;
+      delete $ledger . $balances [ # 1 ] ;
+      assert($ledger . $balances [ # 1 ] == # 0) ;
+      assert($ledger . $balances [ # 2 ] == # 20) ; > true .           *** true
 
 *** ---- testStorageMapStructCopy: whole-entry copy from a mapping ----
 *** `$accountMap [ 2 ] = $accountMap [ 1 ] ;` copies the WHOLE struct entry.
 *** $accountMap : RefMapField marks the Int-keyed slot as struct-valued (the
 *** analogue of SolKey's find<[Struct]> vs find<[int]> disambiguation), so
 *** the read is a Struct and assignment's deep-value-copy case fires.
-red < $accountMap [ 1 ] . $balance = 10 ;
-      $accountMap [ 1 ] . $token . $value = 7 ;
-      $accountMap [ 2 ] = $accountMap [ 1 ] ;
-      $accountMap [ 1 ] . $balance = 20 ;
-      $accountMap [ 1 ] . $token . $value = 9 ;
-      assert($accountMap [ 2 ] . $balance == 10) ;
-      assert($accountMap [ 2 ] . $token . $value == 7) ; > true .  *** true
+red < $accountMap [ # 1 ] . $balance = # 10 ;
+      $accountMap [ # 1 ] . $token . $value = # 7 ;
+      $accountMap [ # 2 ] = $accountMap [ # 1 ] ;
+      $accountMap [ # 1 ] . $balance = # 20 ;
+      $accountMap [ # 1 ] . $token . $value = # 9 ;
+      assert($accountMap [ # 2 ] . $balance == # 10) ;
+      assert($accountMap [ # 2 ] . $token . $value == # 7) ; > true .  *** true
 
 *** ... and the field-by-field form agrees, as before:
-red < $accountMap [ 1 ] . $balance = 10 ;
-      $accountMap [ 1 ] . $token . $value = 7 ;
-      $accountMap [ 2 ] . $balance = $accountMap [ 1 ] . $balance ;
-      $accountMap [ 2 ] . $token . $value = $accountMap [ 1 ] . $token . $value ;
-      $accountMap [ 1 ] . $balance = 20 ;
-      $accountMap [ 1 ] . $token . $value = 9 ;
-      assert($accountMap [ 2 ] . $balance == 10) ;
-      assert($accountMap [ 2 ] . $token . $value == 7) ; > true .  *** true
+red < $accountMap [ # 1 ] . $balance = # 10 ;
+      $accountMap [ # 1 ] . $token . $value = # 7 ;
+      $accountMap [ # 2 ] . $balance = $accountMap [ # 1 ] . $balance ;
+      $accountMap [ # 2 ] . $token . $value = $accountMap [ # 1 ] . $token . $value ;
+      $accountMap [ # 1 ] . $balance = # 20 ;
+      $accountMap [ # 1 ] . $token . $value = # 9 ;
+      assert($accountMap [ # 2 ] . $balance == # 10) ;
+      assert($accountMap [ # 2 ] . $token . $value == # 7) ; > true .  *** true

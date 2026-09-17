@@ -15,8 +15,10 @@
 ***   mloc(id, path)  — memory, base Identity + field path
 ***   vloc(q)         — a value local in the environment
 *** A storage-alias local lowers straight to sloc of its bound path; index
-*** expressions are evaluated to Int fields during lowering, so SolKey's
-*** complex-receiver unfold rules have no counterpart here.
+*** expressions are evaluated to Int fields during lowering. SolKey's
+*** complex-receiver unfold rules are mirrored one level up, in Order.maude:
+*** by the time lower runs, that pass has already pinned every impure index
+*** into a temp, so what reaches here is always side-effect-free.
 
 load Config .
 
@@ -36,7 +38,7 @@ fmod SOL-EVAL{Field :: TRIV} is
     var V : Value .    vars W W1 W2 : Value? .
     vars I I1 I2 : Int .                  var ID : Identity .
     var PF : PrimField .  var IDF : RefField .  var MF : MapField .
-    var F0 : Field$Elt .  var FXS : NeList{Field} .
+    var F0 : Field$Elt .  var FXS : NeList{Field} .  var LFXS : List{Field} .
     var L? : Loc? .       vars SND VAL : Int .
 
     *** ---- lvalue lowering --------------------------------------------------
@@ -46,9 +48,6 @@ fmod SOL-EVAL{Field :: TRIV} is
     op extB : Binding Field$Elt -> Loc? .
     op extI : Loc? Value? Cells -> Loc? .
 
-    eq lower(PF, C) = sloc(PF) .
-    eq lower(IDF, C) = sloc(IDF) .
-    eq lower(MF, C) = sloc(MF) .
     eq lower(Q, env(EV) C) = lowB(Q, envR(EV, Q)) .
     eq lowB(Q, bv(V)) = vloc(Q) .
     eq lowB(Q, bp(FXS)) = sloc(FXS) .
@@ -62,7 +61,71 @@ fmod SOL-EVAL{Field :: TRIV} is
     eq ext(revL, F0, C) = revL .
     eq extB(bv(ID), F0) = mloc(ID, F0) .   *** member access on a memory reference
 
-    eq extI(L?, I, C) = ext(L?, I, C) .    *** an Int is a Field (array/mapping key)
+    *** ---- array bounds ----------------------------------------------------
+    *** SolKey carries a two-goal split on every storage array index rule:
+    ***   0 <= ie & ie < find<[int]>(storage, sp·size)  -- else  revert();
+    *** Mapping index rules carry no such branch. extI is the one place an
+    *** index becomes a path component, so guarding here covers reads, writes,
+    *** delete, and push/pop/alias receivers alike.
+    ***
+    *** ARRAY vs MAPPING is decided from the declared sort of the container
+    *** field -- SolKey stamps the same distinction at parse time. The
+    *** element-kind refinements come for free: RefArrField < RefField and
+    *** RefMapField < MapField. An Int-keyed step inherits its container's
+    *** kind, so matrix[i][j] checks both levels.
+    *** Known imprecision: a mapping(uint => uint[]) is stamped RefMapField, so
+    *** its INNER array index goes unchecked. No SolKey example has that shape.
+    op bounded : List{Field} -> Bool .
+    eq bounded(LFXS IDF) = true .
+    eq bounded(LFXS MF)  = false .
+    eq bounded(LFXS PF)  = false .
+    eq bounded(LFXS I)   = bounded(LFXS) .
+    eq bounded(nil)      = false .
+
+    op chkB : List{Field} Cells -> Bool .
+    eq chkB(LFXS, nochk C) = false .
+    eq chkB(LFXS, C) = bounded(LFXS) [owise] .
+
+    *** Two complementary conditions, no owise. The `:=` on an Int variable
+    *** also means a non-numeral length simply does not match, leaving the
+    *** term visibly stuck rather than silently passing the guard.
+    op idxS : Bool NeList{Field} Int Cells -> Loc? .
+    eq  idxS(false, FXS, I, C) = sloc(FXS I) .
+    ceq idxS(true, FXS, I, sto(ST) C) = sloc(FXS I)
+        if I1 := find(ST, FXS length) /\ 0 <= I /\ I < I1 .
+    ceq idxS(true, FXS, I, sto(ST) C) = revL
+        if I1 := find(ST, FXS length) /\ (I < 0 or I >= I1) .
+
+    eq extI(sloc(FXS), I, C) = idxS(chkB(FXS, C), FXS, I, C) .
+    *** memory arrays: SolKey bounds these too, against
+    *** read<[int]>(memory, mp, size). The length is written once, at
+    *** allocation (`memory q = new(n) ;`), since memory arrays never grow.
+    *** An unsized memory object -- a struct -- has no length slot, so the
+    *** guard must not fire for it; boundedM reads the declared kind the same
+    *** way bounded does, and a struct FIELD path is never Int-keyed.
+    op idxM : Bool Identity NeList{Field} Int Cells -> Loc? .
+    eq  idxM(false, ID, FXS, I, C) = mloc(ID, FXS I) .
+    ceq idxM(true, ID, FXS, I, mem(M) C) = mloc(ID, FXS I)
+        if I1 := mread(M, ID, FXS length) /\ 0 <= I /\ I < I1 .
+    ceq idxM(true, ID, FXS, I, mem(M) C) = revL
+        if I1 := mread(M, ID, FXS length) /\ (I < 0 or I >= I1) .
+    eq extI(mloc(ID, FXS), I, C) = idxM(chkB(FXS, C), ID, FXS, I, C) .
+    *** a bare memory local holding an ARRAY identity: the array IS the root
+    *** object, so there is no field prefix and the length lives at the root.
+    *** Routing this through ext/extB (the plain member-access path) would skip
+    *** the guard entirely, so indexing re-dispatches on the binding here.
+    eq extI(vloc(Q), I, env(EV) C) = extIB(envR(EV, Q), I, env(EV) C) .
+    op extIB : Binding Value? Cells -> Loc? .
+    eq extIB(bv(ID), I, C) = idxM0(ID, I, C) .
+    eq extIB(bp(FXS), I, C) = idxS(chkB(FXS, C), FXS, I, C) .
+    eq extIB(bv(I2), I, C) = revL .   *** indexing a primitive local
+
+    op idxM0 : Identity Int Cells -> Loc? .
+    ceq idxM0(ID, I, mem(M) C) = mloc(ID, I)
+        if I1 := read(M, ID, length) /\ 0 <= I /\ I < I1 .
+    ceq idxM0(ID, I, mem(M) C) = revL
+        if I1 := read(M, ID, length) /\ (I < 0 or I >= I1) .
+    eq extI(revL, I, C) = revL .
     eq extI(L?, rev, C) = revL .           *** index expression reverted
 
     *** ---- location read ------------------------------------------------------
@@ -75,7 +138,7 @@ fmod SOL-EVAL{Field :: TRIV} is
     *** ---- evaluation ---------------------------------------------------------
     op eval : Exp Cells -> Value? .
 
-    eq eval(V, C) = V .
+    eq eval(# V, C) = V .
     eq eval(LV, C) = readLoc(lower(LV, C), C) .
     eq eval(msg·sender, msg(SND, VAL) C) = SND .
     eq eval(msg·value, msg(SND, VAL) C) = VAL .
@@ -86,7 +149,7 @@ fmod SOL-EVAL{Field :: TRIV} is
     eq readNet(rev, C) = rev .
 
     eq eval(E1 + E2, C) = add?(eval(E1, C), eval(E2, C)) .
-    eq eval(_-_(E1, E2), C) = sub?(eval(E1, C), eval(E2, C)) .   *** prefix: `E1 - E2` with Int operands also parses as the field-list `E1 (-E2)`
+    eq eval(E1 - E2, C) = sub?(eval(E1, C), eval(E2, C)) .
     eq eval(E1 * E2, C) = mul?(eval(E1, C), eval(E2, C)) .
     eq eval(E1 / E2, C) = div?(eval(E1, C), eval(E2, C)) .
     eq eval(E1 % E2, C) = mod?(eval(E1, C), eval(E2, C)) .
@@ -170,9 +233,9 @@ fmod SOL-EVAL{Field :: TRIV} is
     *** pread evaluates a proposition (returns 1/0/rev). Both let the trailing
     *** test blocks read storage, memory and locals through the semantics.
     op eread : Conf Exp -> Value? .
-    eq eread({ C }, E1) = eval(E1, C) .
+    eq eread({ C }, E1) = eval(E1, nochk C) .
     op pread : Conf Prop -> Value? .
-    eq pread({ C }, P1) = evalP(P1, C) .
+    eq pread({ C }, P1) = evalP(P1, nochk C) .
 endfm
 
 *** ---- tests: the Tier-1 matrix ------------------------------------------------
@@ -198,45 +261,55 @@ fmod SOL-EVAL-TEST{Field :: TRIV} is
                         'a, bp($alice $account)),
                    'p, bv(idC(pid(0), nil))) .
     eq tc = sto(stT) mem(memT) env(envT) msg(77, 5) .
+
+    *** root lvalues: Field$Elt is not a subsort of LValue (see Syntax.maude),
+    *** so each field constant usable as a ROOT is overloaded at Root < LValue.
+    ops $account $alice $balance $m $nonce : -> Root .
+    var Clv : Cells .
+    eq lower($account, Clv) = sloc($account) .
+    eq lower($alice, Clv) = sloc($alice) .
+    eq lower($balance, Clv) = sloc($balance) .
+    eq lower($m, Clv) = sloc($m) .
+    eq lower($nonce, Clv) = sloc($nonce) .
 endfm
 
 *** arithmetic
-red eval('x + 1, tc) .             *** 5
-red eval('x - 10, tc) .            *** -6
+red eval('x + # 1, tc) .             *** 5
+red eval('x - # 10, tc) .            *** -6
 red eval('x * 'x, tc) .            *** 16
-red eval(9 / 'x, tc) .             *** 2   (truncating)
-red eval(neg 9 / 'x, tc) .         *** -2  (toward zero, like Solidity)
-red eval('x / 0, tc) .             *** rev — the revert branch
-red eval(7 % 'x, tc) .             *** 3
-red eval('x % 0, tc) .             *** rev
-red eval(2 ** 'x, tc) .            *** 16
+red eval(# 9 / 'x, tc) .             *** 2   (truncating)
+red eval(neg # 9 / 'x, tc) .         *** -2  (toward zero, like Solidity)
+red eval('x / # 0, tc) .             *** rev — the revert branch
+red eval(# 7 % 'x, tc) .             *** 3
+red eval('x % # 0, tc) .             *** rev
+red eval(# 2 ** 'x, tc) .            *** 16
 red eval(neg 'x, tc) .             *** -4
-red eval(1 + 'x / 0, tc) .         *** rev — strict propagation
+red eval(# 1 + 'x / # 0, tc) .         *** rev — strict propagation
 
 *** relational / equality (conditions — evalP)
-red evalP('x < 4, tc) .            *** 0
-red evalP('x <= 4, tc) .           *** 1
-red evalP('x > 3, tc) .            *** 1
-red evalP('x >= 5, tc) .           *** 0
-red evalP('x == 4, tc) .           *** 1
-red evalP('x != 4, tc) .           *** 0
+red evalP('x < # 4, tc) .            *** 0
+red evalP('x <= # 4, tc) .           *** 1
+red evalP('x > # 3, tc) .            *** 1
+red evalP('x >= # 5, tc) .           *** 0
+red evalP('x == # 4, tc) .           *** 1
+red evalP('x != # 4, tc) .           *** 0
 
 *** logical, incl. genuine short-circuit
-red evalP(true && 'x < 9, tc) .        *** 1
-red evalP(false && 1 / 0 == 0, tc) .   *** 0 — RHS never evaluated
-red evalP(true || 1 / 0 == 0, tc) .    *** 1 — RHS never evaluated
-red evalP(false || 'x == 4, tc) .      *** 1
-red evalP(! ('x == 4), tc) .           *** 0
-red evalP(1 / 0 == 0 && true, tc) .    *** rev — LHS revert wins
+red evalP(true && 'x < # 9, tc) .        *** 1
+red evalP(false && # 1 / # 0 == # 0, tc) .   *** 0 — RHS never evaluated
+red evalP(true || # 1 / # 0 == # 0, tc) .    *** 1 — RHS never evaluated
+red evalP(false || 'x == # 4, tc) .      *** 1
+red evalP(! ('x == # 4), tc) .           *** 0
+red evalP(# 1 / # 0 == # 0 && true, tc) .    *** rev — LHS revert wins
 
 *** lvalue reads: storage root/field/index, alias, memory reference
 red eval($alice . $balance, tc) .        *** 10
-red eval($alice . $m [ 3 ], tc) .        *** 42
-red eval($alice . $m [ 'x - 1 ], tc) .   *** 42 — computed index
+red eval($alice . $m [ # 3 ], tc) .        *** 42
+red eval($alice . $m [ 'x - # 1 ], tc) .   *** 42 — computed index
 red eval('a . $nonce, tc) .              *** 8 — through the storage alias path
 red eval('p . $account . $balance, tc) . *** 9 — deep memory read
 red eval('x, tc) .                       *** 4 — value local
-red eval($alice . $m [ 1 / 0 ], tc) .    *** rev — index expression reverted
+red eval($alice . $m [ # 1 / # 0 ], tc) .    *** rev — index expression reverted
 
 *** environment
 red eval(msg·sender, tc) .           *** 77

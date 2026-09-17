@@ -88,60 +88,70 @@ fmod SOL-FLOW-TEST{Field :: TRIV} is
     ops cIfT cIfF cSum cEvens cReq cAsr cRet cGrd cDrain : -> Conf .
 
     eq cIfT = run(
-        var 'x = 4 ;
-        if 'x < 5 { $alice . $balance = 1 ; } else { $alice . $balance = 2 ; } ) .
+        var 'x = # 4 ;
+        if 'x < # 5 { $alice . $balance = # 1 ; } else { $alice . $balance = # 2 ; } ) .
 
     eq cIfF = run(
-        var 'x = 7 ;
-        if 'x < 5 { $alice . $balance = 1 ; } else { $alice . $balance = 2 ; } ) .
+        var 'x = # 7 ;
+        if 'x < # 5 { $alice . $balance = # 1 ; } else { $alice . $balance = # 2 ; } ) .
 
     *** sum 0..4 in a while loop
     eq cSum = run(
-        var 'i = 0 ;
-        var 's = 0 ;
-        while 'i < 5 {
+        var 'i = # 0 ;
+        var 's = # 0 ;
+        while 'i < # 5 {
             's = 's + 'i ;
             'i ++ ;
         } ) .
 
     *** nested if inside while: count the even numbers below 7
     eq cEvens = run(
-        var 'i = 0 ;
-        var 'n = 0 ;
-        while 'i < 7 {
-            if 'i % 2 == 0 { 'n ++ ; }
+        var 'i = # 0 ;
+        var 'n = # 0 ;
+        while 'i < # 7 {
+            if 'i % # 2 == # 0 { 'n ++ ; }
             'i ++ ;
         } ) .
 
     *** require(false) rolls the earlier write back
     eq cReq = run(
-        $alice . $balance = 5 ;
-        require($alice . $balance > 9) ;
-        $alice . $nonce = 1 ; ) .
+        $alice . $balance = # 5 ;
+        require($alice . $balance > # 9) ;
+        $alice . $nonce = # 1 ; ) .
 
     *** assert violation: rolled back but FAILED
     eq cAsr = run(
-        $alice . $balance = 5 ;
-        assert($alice . $balance > 9) ; ) .
+        $alice . $balance = # 5 ;
+        assert($alice . $balance > # 9) ; ) .
 
     *** return: binds out, skips the rest
     eq cRet = run(
-        var 'x = 3 ;
-        return 'x + 1 ;
-        'x = 99 ; ) .
+        var 'x = # 3 ;
+        return 'x + # 1 ;
+        'x = # 99 ; ) .
 
     *** a reverting loop guard reverts the transaction
     eq cGrd = run(
-        $alice . $balance = 5 ;
-        while 1 / 0 > 0 { $alice . $nonce = 1 ; } ) .
+        $alice . $balance = # 5 ;
+        while # 1 / # 0 > # 0 { $alice . $nonce = # 1 ; } ) .
 
     *** storage-driven loop: drain alice into bob one unit at a time
     eq cDrain = run(
-        $alice . $balance = 3 ;
-        while $alice . $balance > 0 {
+        $alice . $balance = # 3 ;
+        while $alice . $balance > # 0 {
             $alice . $balance -- ;
             $bob . $balance ++ ;
         } ) .
+
+    *** root lvalues: Field$Elt is not a subsort of LValue (see Syntax.maude),
+    *** so each field constant usable as a ROOT is overloaded at Root < LValue.
+    ops $alice $balance $bob $m $nonce : -> Root .
+    var Clv : Cells .
+    eq lower($alice, Clv) = sloc($alice) .
+    eq lower($balance, Clv) = sloc($balance) .
+    eq lower($bob, Clv) = sloc($bob) .
+    eq lower($m, Clv) = sloc($m) .
+    eq lower($nonce, Clv) = sloc($nonce) .
 endfm
 
 red eread(cIfT, $alice . $balance) .    *** 1 — then branch

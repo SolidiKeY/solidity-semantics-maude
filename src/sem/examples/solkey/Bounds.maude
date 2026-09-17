@@ -1,0 +1,62 @@
+*** src/sem/examples/solkey/Bounds.maude
+***
+*** Storage array bounds. SolKey carries a two-goal split on every storage
+*** array index taclet -- storageIndexWriteArraySave, ...ReadArrayFind,
+*** ...CopySource, and the array forms of delete and the push/pop receivers:
+***
+***    "inBounds":    0 <= ie & ie < find<[int]>(storage, sp·size) -> {…}
+***    "outOfBounds": !(0 <= ie & ie < …)                          -> <revert();>
+***
+*** Mapping index rules carry NO such branch: a mapping is total, every key
+*** reads its value type's default. That split is mirrored here by the sort of
+*** the container field -- RefField/RefArrField is an array, MapField/
+*** RefMapField is a mapping -- which is the same information SolKey stamps at
+*** parse time from the declared type.
+***
+*** Reads in a POSTCONDITION are deliberately unbounded: SolKey's postconditions
+*** are plain find<[int]>(storage, …) terms with no bounds branch, which is what
+*** lets storage-pop-nonempty assert that the popped slot reads 0. The `nochk`
+*** cell in ../../Config.maude marks that logic-level context. An in-program
+*** assert(…) stays checked, as in Solidity.
+
+load Store .
+
+fmod BOUNDS-DEMO{Field :: TRIV} is
+    pr PAPER-STORE{Field} .
+endfm
+
+*** ---- in bounds: ordinary write and read -------------------------------
+red < $values .push(# 0) ; $values [ # 0 ] = # 7 ; > ($values [ # 0 ] == # 7) .      *** true
+red < $values .push(# 9) ; var 'r = $values [ # 0 ] ; > ('r == # 9) .            *** true
+
+*** ---- out of bounds: every access shape reverts ------------------------
+red < $values .push(# 0) ; $values [ # 1 ] = # 7 ; > reverts .                   *** true   write past the end
+red < $values .push(# 0) ; var 'r = $values [ # 1 ] ; > reverts .              *** true   read past the end
+red < $values [ # 0 ] = # 7 ; > reverts .                                      *** true   empty array, length 0
+red < $values .push(# 0) ; delete $values [ # 1 ] ; > reverts .                *** true   delete past the end
+red < $matrix .push() ; $matrix [ # 1 ] .push(# 0) ; > reverts .               *** true   push RECEIVER past the end
+red < $values .push(# 0) ; $values [ neg # 1 ] = # 7 ; > reverts .               *** true   negative index
+
+*** ---- mappings are total: no bounds branch -----------------------------
+red < $balances [ # 99 ] = # 5 ; > ($balances [ # 99 ] == # 5) .                   *** true   primitive-valued mapping
+red < $people [ # 99 ] . $age = # 5 ; > ($people [ # 99 ] . $age == # 5) .         *** true   struct-valued mapping
+red < $balances [ neg # 7 ] = # 5 ; > ($balances [ neg # 7 ] == # 5) .             *** true   a negative KEY is just a key
+
+*** ---- length is a member, not an index ---------------------------------
+red < $values .push(# 0) ; var 'r = $values . length ; > ('r == # 1) .         *** true
+
+*** ---- the guard follows a storage ALIAS --------------------------------
+red < $values .push(# 0) ; storage 'a = $values ; 'a [ # 1 ] = # 7 ; > reverts . *** true
+red < $values .push(# 0) ; storage 'a = $values ; 'a [ # 0 ] = # 7 ; >
+    ($values [ # 0 ] == # 7) .                                                 *** true
+
+*** ---- a postcondition read is NOT bounds-checked -----------------------
+*** this is the SolKey convention: storage-pop-nonempty asserts the popped
+*** slot reads 0, which a bounds-checked read could not do
+red < $values .push(# 10) ; $values .push(# 20) ; $values .pop() ; >
+    ($values . length == # 1 && $values [ # 1 ] == # 0) .                        *** true
+
+*** ... whereas an in-program assert IS checked, so reading the popped slot
+*** inside the program reverts
+red < $values .push(# 10) ; $values .push(# 20) ; $values .pop() ;
+      assert($values [ # 1 ] == # 0) ; > reverts .                             *** true

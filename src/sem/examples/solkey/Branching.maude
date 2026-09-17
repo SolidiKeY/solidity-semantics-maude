@@ -16,31 +16,31 @@ fmod BRANCHING-DEMO{Field :: TRIV} is
 endfm
 
 *** ---- ifUnfold: false guard skips the branch ----
-red < var 'x = 5 ; var 'r = 0 ;
-      if 'x == 4 { 'r = 1 ; } > ('r == 0) .                               *** true
+red < var 'x = # 5 ; var 'r = # 0 ;
+      if 'x == # 4 { 'r = # 1 ; } > ('r == # 0) .                               *** true
 
 *** ---- ifElseUnfold: true guard takes the then-branch ----
-red < var 'x = 5 ; var 'r = 0 ;
-      if 'x == 5 { 'r = 1 ; } else { 'r = 2 ; } > ('r == 1) .             *** true
+red < var 'x = # 5 ; var 'r = # 0 ;
+      if 'x == # 5 { 'r = # 1 ; } else { 'r = # 2 ; } > ('r == # 1) .             *** true
 
 *** ---- ifSplit: guard on a stored bool (b = true) ----
-red < var 'b = true ; var 'r = 0 ;
-      if 'b != 0 { 'r = 1 ; } > ('r == 1) .                               *** true
+red < var 'b = true ; var 'r = # 0 ;
+      if 'b != # 0 { 'r = # 1 ; } > ('r == # 1) .                               *** true
 
 *** ---- ifElseSplit: false bool takes the else-branch ----
-red < var 'b = false ; var 'r = 0 ;
-      if 'b != 0 { 'r = 1 ; } else { 'r = 2 ; } > ('r == 2) .             *** true
+red < var 'b = false ; var 'r = # 0 ;
+      if 'b != # 0 { 'r = # 1 ; } else { 'r = # 2 ; } > ('r == # 2) .             *** true
 
 *** ---- ternaryToIf: r = b ? 1 : 2, desugared ----
-red < var 'b = true ; var 'r = 0 ;
-      if 'b != 0 { 'r = 1 ; } else { 'r = 2 ; } > ('r == 1) .             *** true
+red < var 'b = true ; var 'r = # 0 ;
+      if 'b != # 0 { 'r = # 1 ; } else { 'r = # 2 ; } > ('r == # 1) .             *** true
 
 *** ---- ternaryCaptureCond: r = (x == 5) ? x + 1 : 0, desugared ----
-red < var 'x = 5 ; var 'r = 0 ;
-      if 'x == 5 { 'r = 'x + 1 ; } else { 'r = 0 ; } > ('r == 6) .        *** true
+red < var 'x = # 5 ; var 'r = # 0 ;
+      if 'x == # 5 { 'r = 'x + # 1 ; } else { 'r = # 0 ; } > ('r == # 6) .        *** true
 
 *** ---- logicalAndShortCircuitRhs: RHS conjunct reads the local ----
-red < var 'x = 5 ; var 'r = 'x == 5 && 'x + 1 == 6 ; > ('r == 1) .        *** true
+red < var 'x = # 5 ; var 'r = 'x == # 5 && 'x + # 1 == # 6 ; > ('r == # 1) .        *** true
 
 *** ---- logicalOrShortCircuitRhs: LHS false, RHS decides ----
-red < var 'x = 5 ; var 'r = 'x == 4 || 'x + 1 == 6 ; > ('r == 1) .        *** true
+red < var 'x = # 5 ; var 'r = 'x == # 4 || 'x + # 1 == # 6 ; > ('r == # 1) .        *** true

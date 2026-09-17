@@ -15,21 +15,21 @@ fmod BOOL-DEMO{Field :: TRIV} is
 endfm
 
 *** ---- storageBoolRootReadWrite: flag = true; bool r = flag; assert(r) ----
-red < $flag = true ; var 'r = $flag ; > ('r == 1) .                       *** true
+red < $flag = true ; var 'r = $flag ; > ('r == # 1) .                       *** true
 
 *** ---- storageBoolRootCopy: flag2 = flag copies the stored bool ----
-red < $flag = true ; $flag2 = $flag ; var 'r = $flag2 ; > ('r == 1) .     *** true
+red < $flag = true ; $flag2 = $flag ; var 'r = $flag2 ; > ('r == # 1) .     *** true
 
 *** ---- storageBoolFieldRead: toggle.on = true; assert(toggle.on) ----
-red < $toggle . $on = true ; var 'r = $toggle . $on ; > ('r == 1) .       *** true
+red < $toggle . $on = true ; var 'r = $toggle . $on ; > ('r == # 1) .       *** true
 
 *** ---- storageBoolMappingRead: flags[2] = true ----
-red < $flags [ 2 ] = true ; var 'r = $flags [ 2 ] ; > ('r == 1) .         *** true
+red < $flags [ # 2 ] = true ; var 'r = $flags [ # 2 ] ; > ('r == # 1) .         *** true
 
 *** ---- storageBoolArrayRead (box): require(length == 1) -> one push ----
-red < $boolFlags .push(0) ;
-      $boolFlags [ 0 ] = true ;
-      var 'r = $boolFlags [ 0 ] ; > ('r == 1) .                           *** true
+red < $boolFlags .push(# 0) ;
+      $boolFlags [ # 0 ] = true ;
+      var 'r = $boolFlags [ # 0 ] ; > ('r == # 1) .                           *** true
 
 *** ---- storageBoolFieldStoreRoot: flag = toggle.on ----
-red < $toggle . $on = true ; $flag = $toggle . $on ; var 'r = $flag ; > ('r == 1) .   *** true
+red < $toggle . $on = true ; $flag = $toggle . $on ; var 'r = $flag ; > ('r == # 1) .   *** true

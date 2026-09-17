@@ -16,41 +16,46 @@ fmod NSEINDEX-DEMO{Field :: TRIV} is
 endfm
 
 *** ---- storageIndexReadNseIndex: r = values[i+1], i = 1 ----
-red < $values .push(0) ; $values .push(0) ; $values .push(0) ;
-      var 'i = 1 ;
-      $values [ 2 ] = 9 ;
-      var 'r = $values [ 'i + 1 ] ; > ('r == 9) .                         *** true
+red < $values .push(# 0) ; $values .push(# 0) ; $values .push(# 0) ;
+      var 'i = # 1 ;
+      $values [ # 2 ] = # 9 ;
+      var 'r = $values [ 'i + # 1 ] ; > ('r == # 9) .                         *** true
 
 *** ---- storageIndexDeleteNseIndex: delete balances[k+1], k = 2 ----
-red < var 'k = 2 ;
-      $balances [ 3 ] = 7 ;
-      delete $balances [ 'k + 1 ] ;
-      var 'r = $balances [ 3 ] ; > ('r == 0) .                            *** true
+red < var 'k = # 2 ;
+      $balances [ # 3 ] = # 7 ;
+      delete $balances [ 'k + # 1 ] ;
+      var 'r = $balances [ # 3 ] ; > ('r == # 0) .                            *** true
 
 *** ---- storageIndexWriteNseChain: balances[i+1] = x*y + 3 ----
-red < var 'i = 2 ; var 'x = 3 ; var 'y = 4 ;
-      $balances [ 'i + 1 ] = 'x * 'y + 3 ;
-      var 'r = $balances [ 3 ] ; > ('r == 15) .                           *** true
+red < var 'i = # 2 ; var 'x = # 3 ; var 'y = # 4 ;
+      $balances [ 'i + # 1 ] = 'x * 'y + # 3 ;
+      var 'r = $balances [ # 3 ] ; > ('r == # 15) .                           *** true
 
 *** ---- memoryIndexWriteNse: xs[i+1] = lhs + rhs in memory ----
-red < memory 'xs = new ;
-      var 'i = 1 ;
-      'xs [ 'i + 1 ] = 4 + 5 ;
-      var 'r = 'xs [ 'i + 1 ] ; > ('r == 9) .                             *** true
+red < memory 'xs = new( # 3 ) ;
+      var 'i = # 1 ;
+      'xs [ 'i + # 1 ] = # 4 + # 5 ;
+      var 'r = 'xs [ 'i + # 1 ] ; > ('r == # 9) .                             *** true
 
 *** ---- storageIndexCopyValue: balances[i] = values[j], i = 5, j = 1 ----
-red < $values .push(0) ; $values .push(0) ;
-      var 'i = 5 ; var 'j = 1 ;
-      $values [ 1 ] = 8 ;
+red < $values .push(# 0) ; $values .push(# 0) ;
+      var 'i = # 5 ; var 'j = # 1 ;
+      $values [ # 1 ] = # 8 ;
       $balances [ 'i ] = $values [ 'j ] ;
-      var 'r = $balances [ 5 ] ; > ('r == 8) .                            *** true
+      var 'r = $balances [ # 5 ] ; > ('r == # 8) .                            *** true
 
 *** ---- storageIndexReadMappingStoreRoot: total = balances[k], k = 1 ----
-red < var 'k = 1 ;
-      $balances [ 1 ] = 42 ;
+red < var 'k = # 1 ;
+      $balances [ # 1 ] = # 42 ;
       $total = $balances [ 'k ] ;
-      var 'r = $total ; > ('r == 42) .                                    *** true
+      var 'r = $total ; > ('r == # 42) .                                    *** true
 
 *** ---- storageMatrixNseIndex: matrix[i+1][j+1] = x + y ----
-red < var 'i = 1 ; var 'j = 2 ; var 'x = 5 ; var 'y = 6 ;
-      $matrix [ 'i + 1 ] [ 'j + 1 ] = 'x + 'y ; > ($matrix [ 2 ] [ 3 ] == 11) .   *** true
+*** the leading pushes stand in for SolKey's require(…< matrix.length) box
+*** preconditions; storage array indices are bounds-checked (Bounds.maude)
+red < var 'i = # 1 ; var 'j = # 2 ; var 'x = # 5 ; var 'y = # 6 ;
+      $matrix .push() ; $matrix .push() ; $matrix .push() ;
+      $matrix [ # 2 ] .push(# 0) ; $matrix [ # 2 ] .push(# 0) ;
+      $matrix [ # 2 ] .push(# 0) ; $matrix [ # 2 ] .push(# 0) ;
+      $matrix [ 'i + # 1 ] [ 'j + # 1 ] = 'x + 'y ; > ($matrix [ # 2 ] [ # 3 ] == # 11) .   *** true

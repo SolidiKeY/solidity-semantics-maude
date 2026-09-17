@@ -5,9 +5,11 @@
 ***   storageIndexDecomposeAfterPush, storageIndexCopysourceAfterPush.
 *** $matrix : RefArrField — its elements are arrays, i.e. Structs, so an
 *** indexed read of an element is struct-valued (the analogue of SolKey's
-*** per-instantiation `uint[][]` ArraySort). The `require(i < matrix.length)`
-*** box preconditions carry no bounds check here (same policy as the rest of
-*** the suite: this model indexes unbounded arrays; SolKey pins sizes).
+*** per-instantiation `uint[][]` ArraySort). Storage array indices ARE
+*** bounds-checked (see Bounds.maude), so SolKey's
+*** `require(2 < matrix.length); require(3 < matrix[2].length);` box
+*** preconditions have to be met: per the suite's translation dictionary a size
+*** pin becomes leading pushes, which is what the growth prefixes below do.
 
 load Store .
 
@@ -16,25 +18,32 @@ fmod MATRIX-DEMO{Field :: TRIV} is
 endfm
 
 *** ---- storageMatrixWriteRead: matrix[2][3] = 99 ----
-red < $matrix [ 2 ] [ 3 ] = 99 ;
-      var 'r = $matrix [ 2 ] [ 3 ] ; > ('r == 99) .                       *** true
+*** require(2 < matrix.length) / require(3 < matrix[2].length)
+red < $matrix .push() ; $matrix .push() ; $matrix .push() ;
+      $matrix [ # 2 ] .push(# 0) ; $matrix [ # 2 ] .push(# 0) ;
+      $matrix [ # 2 ] .push(# 0) ; $matrix [ # 2 ] .push(# 0) ;
+      $matrix [ # 2 ] [ # 3 ] = # 99 ;
+      var 'r = $matrix [ # 2 ] [ # 3 ] ; > ('r == # 99) .                       *** true
 
 *** ---- storageIndexDecomposition: write once, read twice ----
-red < $matrix [ 2 ] [ 3 ] = 34 ;
-      assert($matrix [ 2 ] [ 3 ] == 34) ;
-      var 'r = $matrix [ 2 ] [ 3 ] ; > ('r == 34) .                       *** true
+red < $matrix .push() ; $matrix .push() ; $matrix .push() ;
+      $matrix [ # 2 ] .push(# 0) ; $matrix [ # 2 ] .push(# 0) ;
+      $matrix [ # 2 ] .push(# 0) ; $matrix [ # 2 ] .push(# 0) ;
+      $matrix [ # 2 ] [ # 3 ] = # 34 ;
+      assert($matrix [ # 2 ] [ # 3 ] == # 34) ;
+      var 'r = $matrix [ # 2 ] [ # 3 ] ; > ('r == # 34) .                       *** true
 
 *** ---- storageIndexDecomposeAfterPush: grow the outer, then the inner ----
 red < $matrix .push() ;
-      $matrix [ 0 ] .push(100) ;
-      $matrix [ 0 ] [ 0 ] = 7 ;
-      var 'r = $matrix [ 0 ] [ 0 ] ; > ('r == 7) .                        *** true
+      $matrix [ # 0 ] .push(# 100) ;
+      $matrix [ # 0 ] [ # 0 ] = # 7 ;
+      var 'r = $matrix [ # 0 ] [ # 0 ] ; > ('r == # 7) .                        *** true
 
 *** ---- storageIndexCopysourceAfterPush: m[0] = values, a whole-array copy
 *** through a storage alias. SolKey's own .key could not compare the copied
 *** subtree (TestSuite.sol comment) — here the postcondition CAN read into it.
-red < $values .push(5) ;
+red < $values .push(# 5) ;
       storage 'm = $matrix ;
       'm .push() ;
-      'm [ 0 ] = $values ; >
-      ($matrix . length == 1 && $matrix [ 0 ] [ 0 ] == 5 && $matrix [ 0 ] . length == 1) .   *** true
+      'm [ # 0 ] = $values ; >
+      ($matrix . length == # 1 && $matrix [ # 0 ] [ # 0 ] == # 5 && $matrix [ # 0 ] . length == # 1) .   *** true

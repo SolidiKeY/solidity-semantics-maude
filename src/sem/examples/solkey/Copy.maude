@@ -1,0 +1,169 @@
+*** src/sem/examples/solkey/Copy.maude
+***
+*** Mirror of SolKey's storage-copy group: the `testCopy*` functions in
+*** TestSuite.sol under the banner "Storage copy: mapping members stay the
+*** target's own", the `storage*DeleteThenCopy*` trio, and the hand-written
+*** obligation keyext.solidity.examples/storage/copyKeepsMapping.key.
+***
+*** These exercise ../../StorageCopy.maude, the variant in which a struct
+*** written over a storage location keeps THAT LOCATION's mapping members --
+*** Solidity never copies a mapping -- while value members, elements and
+*** nested references come from the source.
+***
+*** Two kinds of test live here, and the difference matters.
+*** Of the 22 triples, 15 hold on BOTH storage models and 7 discriminate; the
+*** split was measured by running this same file against ../../Storage.maude.
+***
+***   REGRESSION (15). Most of the testCopy* mirrors already passed on the old
+***   collapsing model, because its delete returned defaultValue(idf) = mtSt,
+***   which reads through to 0 where SolKey returned an untyped 0. They are
+***   kept so the sort-directed delete cannot break them, but they do not
+***   discriminate between the two models.
+***
+***   DISCRIMINATING (7). The triples marked `base: false` below are the ones
+***   that earn the variant: each reduces to false on ../../Storage.maude and
+***   true here. They are the mapping-preservation, delete-marker,
+***   push()-clears and ancestor-delete cases.
+***
+*** A mapping cannot be copied in real Solidity source -- solc >= 0.7 rejects
+*** the assignment -- which is why SolKey states this half as a hand-written
+*** .key obligation rather than a .sol test. Here the same statement is just
+*** a program, so the property is directly executable.
+
+load Store .
+
+fmod COPY-DEMO{Field :: TRIV} is
+    pr PAPER-STORE{Field} .
+
+    *** extra copy TARGETS, declared here rather than in Store.maude because
+    *** only this file needs them: a second Person root, a second TokenBucket
+    *** root, and a bare Account root to copy a field into.
+    ops $carolPerson $bucket2 $accountRoot : -> RefField .
+    eq defaultValue($carolPerson) = mtSt .
+    eq defaultValue($bucket2) = mtSt .
+    eq defaultValue($accountRoot) = mtSt .
+
+    *** root lvalues: Field$Elt is not a subsort of LValue (see Syntax.maude),
+    *** so each field constant usable as a ROOT is overloaded at Root < LValue.
+    ops $accountRoot $bucket2 $carolPerson : -> Root .
+    var Clv : Cells .
+    eq lower($accountRoot, Clv) = sloc($accountRoot) .
+    eq lower($bucket2, Clv) = sloc($bucket2) .
+    eq lower($carolPerson, Clv) = sloc($carolPerson) .
+endfm
+
+*** ---- testCopyRootKeepsValueMembers ------------------------------------
+*** a whole-struct copy takes every VALUE member from the source, and the
+*** source is unaffected by later writes to the target
+red < $bob . $age = # 7 ; $bob . $account . $balance = # 3 ;
+      $alice = $bob ;
+      $bob . $age = # 8 ; >
+    ($alice . $age == # 7 && $alice . $account . $balance == # 3) .        *** true
+
+*** ---- testCopyFieldNested ----------------------------------------------
+red < $bob . $account . $token . $value = # 5 ;
+      $alice . $account = $bob . $account ; >
+    ($alice . $account . $token . $value == # 5) .                       *** true
+
+*** ---- testCopyOfCopy ---------------------------------------------------
+red < $bob . $age = # 4 ; $alice = $bob ; $carolPerson = $alice ; >
+    ($carolPerson . $age == # 4) .                                       *** true
+
+*** ---- testCopyIntoMappingEntry -----------------------------------------
+*** people[k] = alice : the entry is a struct-valued mapping slot
+red < $alice . $age = # 9 ; $people [ # 3 ] = $alice ; >
+    ($people [ # 3 ] . $age == # 9) .                                      *** true
+
+*** ---- testCopyArrayMemberElements --------------------------------------
+red < $bucket . $tokens .push(# 0) ; $bucket . $tokens [ # 0 ] . $value = # 6 ;
+      $bucket2 = $bucket ; >
+    ($bucket2 . $tokens [ # 0 ] . $value == # 6) .                         *** true
+
+*** ---- testCopyPrimitiveRoot --------------------------------------------
+red < $total = # 12 ; $owner = $total ; > ($owner == # 12) .               *** true
+
+*** ---- testCopyStoreRootFromField / testCopyStoreRootFromIndex ----------
+red < $bob . $account . $balance = # 21 ; $accountRoot = $bob . $account ; >
+    ($accountRoot . $balance == # 21) .                                  *** true
+red < $persons .push() ; $persons [ # 0 ] . $age = # 15 ; $alice = $persons [ # 0 ] ; >
+    ($alice . $age == # 15) .                                            *** true
+
+*** ---- testPushCopyThenDeleteTarget -------------------------------------
+*** deleting the target after a copy must not reach back into the source
+red < $bob . $age = # 5 ; $alice = $bob ; delete $alice ; >
+    ($bob . $age == # 5 && $alice . $age == # 0) .                         *** true
+
+*** ---- storageFieldDeleteThenCopy / ...Deep / storageRootDeleteThenCopy --
+*** SolKey needed delValueStValueCast for these: a sort-free copy reading a
+*** CLEARED location has to resolve the reset at the reader's sort. Here the
+*** same job is done by delValue dispatching on Prim vs Struct.
+red < $bob . $age = # 5 ; delete $bob ; $alice = $bob ; >
+    ($alice . $age == # 0) .                                             *** true
+red < $bob . $account . $balance = # 5 ; delete $bob . $account ;
+      $alice . $account = $bob . $account ; >
+    ($alice . $account . $balance == # 0) .                              *** true
+red < $bob . $account . $token . $value = # 5 ; delete $bob ;
+      $alice = $bob ; >
+    ($alice . $account . $token . $value == # 0) .                       *** true
+
+*** ======================================================================
+*** DISCRIMINATING CASES -- false on ../../Storage.maude, true here
+*** ======================================================================
+
+*** copyKeepsMapping.key, top level: ledger2 = ledger. The value member comes
+*** from the SOURCE; the mapping member stays the TARGET's own.
+red < $ledger . $nonce = # 5 ; $ledger . $balances [ # 1 ] = # 11 ;
+      $ledger2 . $nonce = # 1 ; $ledger2 . $balances [ # 1 ] = # 77 ;
+      $ledger2 = $ledger ; >
+    ($ledger2 . $nonce == # 5 && $ledger2 . $balances [ # 1 ] == # 77) .     *** true   base: false
+
+*** copyKeepsMapping.key, one level down: the same split has to hold THROUGH
+*** a reference member, which is what makes the leaf recurse rather than
+*** collapse.
+red < $alice . $ledger . $balances [ # 1 ] = # 77 ;
+      $bob . $ledger . $balances [ # 1 ] = # 11 ; $bob . $age = # 4 ;
+      $alice = $bob ; >
+    ($alice . $age == # 4 && $alice . $ledger . $balances [ # 1 ] == # 77) . *** true   base: false
+
+*** a memory -> storage copy keeps the target's mapping too: copyMem is read
+*** through the very same leaf
+red < $ledger2 . $balances [ # 1 ] = # 77 ;
+      memory 'p = new ; 'p . $nonce = # 5 ;
+      $ledger2 = 'p ; >
+    ($ledger2 . $nonce == # 5 && $ledger2 . $balances [ # 1 ] == # 77) .     *** true   base: false
+
+*** the exact read of a DELETED struct slot is a delete-marked struct, not a
+*** primitive 0 -- this is README gap #6, now closed
+red < $persons .push() ; $persons [ # 0 ] . $age = # 5 ;
+      delete $persons [ # 0 ] ;
+      $alice = $persons [ # 0 ] ; > ($alice . $age == # 0) .               *** true   base: false
+
+*** push() CLEARS the appended slot (SolKey storagePushLengthSave), so stale
+*** data at that index cannot resurface. NB the slot is written BEFORE the
+*** push: routing this through pop() would not discriminate, since pop
+*** already clears the slot it removes on both models.
+red < $tokens [ # 0 ] . $value = # 5 ; $tokens .push() ; >
+    ($tokens . length == # 1 && $tokens [ # 0 ] . $value == # 0) .           *** true   base: false
+
+*** ... while push(v) still writes the value (storagePushValueCopySource)
+red < $values .push(# 7) ; > ($values . length == # 1 && $values [ # 0 ] == # 7) .  *** true
+
+*** memory -> storage, read TWO levels below the copy: SolKey
+*** selectOnCopyMemRef follows the reference and re-wraps at mtSt
+red < memory 'p = new ; 'p . $account . $balance = # 9 ;
+      $alice = 'p ; > ($alice . $account . $balance == # 9) .            *** true
+
+*** deleting a struct ELEMENT still keeps its mapping members: SolKey moved
+*** storageIndexDelete from save(..., defVal) onto delAt for exactly this
+red < $persons .push() ; $persons [ # 0 ] . $ledger . $balances [ # 1 ] = # 9 ;
+      $persons [ # 0 ] . $age = # 5 ; delete $persons [ # 0 ] ; >
+    ($persons [ # 0 ] . $age == # 0 && $persons [ # 0 ] . $ledger . $balances [ # 1 ] == # 9) .  *** true
+
+*** a delete of a strict DESCENDANT survives a copy of the ancestor. SolKey
+*** gets this from selectOnDelAtCons, which peels one selector at a time; a
+*** whole-path find had to be taught to re-suspend the delete on the extracted
+*** subtree, or `a = b` would copy the pre-delete b.
+red < $bucket . $tokens .push() ; delete $bucket . $tokens ; $bucket2 = $bucket ; >
+    ($bucket2 . $tokens . length == # 0) .                               *** true   base: false
+red < $bob . $age = # 5 ; delete $bob . $age ; $alice = $bob ; >
+    ($alice . $age == # 0) .                                             *** true   base: false

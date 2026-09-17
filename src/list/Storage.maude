@@ -84,7 +84,10 @@ fmod STORAGE{Field :: FIELD} is
     eq getLen(xs · sStr, fldsN) = getLen(xs, fldsN) [owise] .
     eq getLen(none, fldsN) = 0 .
 
-    eq push(xs, fldsN) = xs · [ fldsN length = s getLen(xs, fldsN) ] .   *** grow length; reuse (do not clear) the slot
+    *** grow length, CLEARING the appended slot via the mapping-preserving
+    *** delete (SolKey storagePushLengthSave, mirrored in ../StorageCopy.maude):
+    *** stale data at that index must not resurface.
+    eq push(xs, fldsN) = delete(xs, fldsN getLen(xs, fldsN)) · [ fldsN length = s getLen(xs, fldsN) ] .
     ceq pop(xs, fldsN) = delete(xs, fldsN nl) · [ fldsN length = nl ]     *** delete last element (skips mappings), shrink length
         if s nl := getLen(xs, fldsN) .
 endfm
@@ -125,3 +128,12 @@ red pop(stPop, $alice) .                               *** [$alice length = 1] �
 red getLen(pop(stPop, $alice), $alice) .               *** 0
 red push(pop(stPop, $alice), $alice) .                 *** ... · [$alice 0 $account $m 1 = 10] · ... · [$alice length = 1]   map binding survives pop+push
 red getLen(push(pop(stPop, $alice), $alice), $alice) . *** 1
+
+*** push() CLEARS the appended slot, matching ../StorageCopy.maude and SolKey's
+*** storagePushLengthSave. stPop already holds a binding at index 0, so pushing
+*** onto the EMPTY array must drop the map-free primitive there and keep the
+*** mapping binding -- the same map-skip split as pop.
+red push([ $alice length = 0 ] · [ $alice 0 $account $balance = 5 ]
+          · [ $alice 0 $account $m 1 = 10 ], $alice) .
+    *** [$alice length = 0] · [$alice 0 $account $m 1 = 10] · [$alice length = 1]
+    *** the map-free primitive at index 0 is gone, the mapping binding stays

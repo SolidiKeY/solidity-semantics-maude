@@ -1,3 +1,11 @@
+*** SIBLING NOTE: ../src/StorageCopy.maude carries SolKey's current copy and
+*** delete semantics -- a struct copy keeps the TARGET's mapping members, and
+*** delete is sort-directed. This file is a pure selectSt/find READ model with
+*** no save and no delete, so neither delta applies to it as written. It is,
+*** though, the natural home for a literal transcription of SolKey's
+*** selectOnSaveEmpty* rules, which are stated selector-at-a-time exactly as
+*** this model reads. Not done here.
+
 load Fields .
 
 fmod STORAGE{Field :: TRIV} is

@@ -35,18 +35,34 @@ fmod SOL-SYNTAX{Field :: TRIV} is
     *** ---- lvalues ---------------------------------------------------------
     *** a root is a state variable (a storage field constant) or a local Qid;
     *** a local may hold a value, a memory reference, or a storage-alias path.
-    subsort PrimField RefField MapField < LValue .
+    *** Field$Elt is deliberately NOT a subsort of LValue. That subsort put Int
+    *** into Exp's kind (Int < Field$Elt < PrimField < LValue < Exp), which
+    *** forced + - * to inherit the prelude INT declarations -- assoc comm for
+    *** + and * -- so `'i ++ + 'i` and `'i + 'i ++` were the SAME term and
+    *** solc's right-operand-first order was unstatable. Root field constants
+    *** are instead overloaded at LValue in each module that declares them, so
+    *** program text still reads `$alice . $age` with no injection.
     subsort Qid < LValue .
+    *** Root: a storage field constant in ROOT lvalue position. It is its own
+    *** sort so the statement rules can tell a root apart from a local Qid --
+    *** assigning to a bare Qid may REBIND a storage alias, assigning to a root
+    *** never does. Each module declaring field constants overloads them here.
+    sort Root .
+    subsort Root < LValue .
     op _._ : LValue Field$Elt -> LValue [ctor prec 15 gather (E e)] .   *** member access; `lv . length` is the array-length slot
     op _[_] : LValue Exp -> LValue [ctor prec 15] .                     *** index (arrays and mappings)
 
     *** ---- integer / reference expressions ---------------------------------
     subsort LValue < Exp .
-    subsort Value < Exp .      *** Int / Struct / Identity literals and symbolic state reads embed directly
+    *** ... and Value is not a subsort of Exp either, for the same reason: it
+    *** carries Int. A literal is injected with `#`, so `'x = # 5 ;`.
+    op #_ : Value -> Exp [ctor prec 0] .
 
-    op _+_ : Exp Exp -> Exp [ditto] .
-    op _-_ : Exp Exp -> Exp [ditto] .
-    op _*_ : Exp Exp -> Exp [ditto] .
+    *** genuinely non-AC now that Exp's kind excludes Int, so the two operands
+    *** of + and * are distinguishable and solc's evaluation order is statable
+    op _+_ : Exp Exp -> Exp [ctor prec 33 gather (E e)] .
+    op _-_ : Exp Exp -> Exp [ctor prec 33 gather (E e)] .
+    op _*_ : Exp Exp -> Exp [ctor prec 31 gather (E e)] .
     op _/_ : Exp Exp -> Exp [ctor prec 31 gather (E e)] .    *** reverts on a zero denominator
     op _%_ : Exp Exp -> Exp [ctor prec 31 gather (E e)] .    *** reverts on a zero denominator
     op _**_ : Exp Exp -> Exp [ctor prec 29 gather (e E)] .
@@ -81,6 +97,10 @@ fmod SOL-SYNTAX{Field :: TRIV} is
     op storage_=_; : Qid LValue -> Stmt [ctor prec 70] . *** storage alias: binds the PATH
     op memory_=_; : Qid Exp -> Stmt [ctor prec 70] .     *** memory reference local
     op memory_= new ; : Qid -> Stmt [ctor prec 70] .     *** fresh empty memory object
+    *** sized allocation, SolKey memoryArrayFreshAlloc (`mv = new T(se);`): a
+    *** memory ARRAY has a fixed length, fixed at allocation, which is what the
+    *** memory index bounds check reads. Structs use the unsized form above.
+    op memory_= new(_) ; : Qid Exp -> Stmt [ctor prec 70] .
 
     *** compound assignment
     op _+=_; : LValue Exp -> Stmt [ctor prec 70] .
@@ -89,15 +109,30 @@ fmod SOL-SYNTAX{Field :: TRIV} is
     op _/=_; : LValue Exp -> Stmt [ctor prec 70] .
     op _%=_; : LValue Exp -> Stmt [ctor prec 70] .
 
-    *** increment / decrement, plain and value-capturing (SolKey's `…Assignment` twins)
+    *** increment / decrement as STATEMENTS
     op _++ ; : LValue -> Stmt [ctor prec 70] .
     op _-- ; : LValue -> Stmt [ctor prec 70] .
     op ++_ ; : LValue -> Stmt [ctor prec 70] .
     op --_ ; : LValue -> Stmt [ctor prec 70] .
-    op _=_++ ; : Qid LValue -> Stmt [ctor prec 70] .
-    op _=_-- ; : Qid LValue -> Stmt [ctor prec 70] .
-    op _= ++_ ; : Qid LValue -> Stmt [ctor prec 70] .
-    op _= --_ ; : Qid LValue -> Stmt [ctor prec 70] .
+
+    *** ... and as EXPRESSIONS, so solc's evaluation order is statable at all
+    *** -- `x = i++ + i` is 2, not 3; see Order.maude. The value-capturing
+    *** statement forms `q = lv ++ ;` that used to live here are gone: with an
+    *** Exp-level `++` they would make `'x = 'i ++ ;` ambiguous, and they are
+    *** redundant -- that text now parses via `_=_;`(LValue, Exp) unchanged.
+    *** Prefix must be prec 20, ABOVE `_._`'s 15: at 15 Maude silently picks
+    *** the ill-sorted `(++ $alice) . $age`.
+    op _++ : LValue -> Exp [ctor prec 15] .
+    op _-- : LValue -> Exp [ctor prec 15] .
+    op ++_ : LValue -> Exp [ctor prec 20] .
+    op --_ : LValue -> Exp [ctor prec 20] .
+
+    *** internal: the temp binding Order.maude emits. It dispatches on the
+    *** captured value's SORT at execution time -- value snapshot, storage-path
+    *** alias, or memory reference -- which is SolKey's `T rv = e;` /
+    *** `T storage rv = src;` / `T memory rv = src;` table.
+    op capture_=_; : Qid Exp -> Stmt [ctor prec 70] .
+    op capture_=_; : Qid Prop -> Stmt [ctor prec 70] .
 
     *** delete
     op delete_; : LValue -> Stmt [ctor prec 70] .
@@ -144,27 +179,36 @@ fmod SOL-SYNTAX-TEST{Field :: TRIV} is
     ops prog1 prog2 prog3 : -> K .
 
     eq prog1 =
-        $alice . $balance = 5 ;
-        var 'x = $alice . $balance + 1 ;
+        $alice . $balance = # 5 ;
+        var 'x = $alice . $balance + # 1 ;
         'x ++ ;
-        $alice . $m [ 'x ] = 'x * 2 ; .
+        $alice . $m [ 'x ] = 'x * # 2 ; .
 
     eq prog2 =
         storage 'a = $alice ;
-        'a . $account . $nonce += 3 ;
+        'a . $account . $nonce += # 3 ;
         delete 'a . $account ;
         $alice . $m .push('x) ;
         $alice . $m .pop() ; .
 
     eq prog3 =
-        require(msg·value >= 1) ;
-        if 'x < 5 { 'x = 'x + 1 ; } else { while 'x > 0 { 'x -- ; } }
-        msg·sender .transfer(2) ;
+        require(msg·value >= # 1) ;
+        if 'x < # 5 { 'x = 'x + # 1 ; } else { while 'x > # 0 { 'x -- ; } }
+        msg·sender .transfer(# 2) ;
         return 'x ; .
+
+    *** root lvalues: Field$Elt is not a subsort of LValue (see Syntax.maude),
+    *** so each field constant usable as a ROOT is overloaded at Root < LValue.
+    ops $account $alice $balance $m $nonce : -> Root .
 endfm
 
 red prog1 .              *** the term itself (constructor normal form)
 red prog2 .              *** the term itself
 red prog3 .              *** the term itself
-red ('x = 1 + 2 ;) .     *** 'x = 3 ; — literal `+` folds via the prelude
+red ('x = # 1 + # 2 ;) .     *** 'x = # 1 + # 2 ;  -- syntax does NOT compute
+*** `+` used to be the prelude's assoc comm Int operator, so a literal sum
+*** folded at PARSE time and operands were reordered into AC normal form.
+*** It is now a free Exp constructor: a term keeps its source shape and the
+*** arithmetic happens in eval. That is what makes solc's right-operand-first
+*** order observable at all.
 red (prog1 prog2) .      *** the two programs sequenced

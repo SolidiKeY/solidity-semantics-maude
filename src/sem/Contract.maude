@@ -84,7 +84,12 @@ endfm
 fmod SOL-CONTRACT-TEST{Field :: TRIV} is
     pr SOL-CONTRACT{Field} .
 
-    ops $alice $arr : -> RefField .
+    op $alice : -> RefField .
+    *** $arr's ELEMENTS are structs (the struct-literal pushes below), so it is
+    *** a RefArrField -- SolKey stamps the same sort from the declared array
+    *** value type. As a plain RefField the whole-struct read of an element
+    *** relied on v→st's primitive cast to stay well-sorted.
+    op $arr : -> RefArrField .
     ops $balance $nonce : -> PrimField .
     op $bals : -> MapField .
 
@@ -98,19 +103,19 @@ fmod SOL-CONTRACT-TEST{Field :: TRIV} is
     eq fbody($setB) = $alice . $balance = 'v ; .
 
     eq fpar($twice) = 'v .
-    eq fbody($twice) = return 'v * 2 ; .
+    eq fbody($twice) = return 'v * # 2 ; .
 
     eq fpar($fact) = 'n .
     eq fbody($fact) =
-        if 'n <= 1 { return 1 ; }
-        var 'r = 0 ;
-        'r = call $fact ('n - 1) ;
+        if 'n <= # 1 { return # 1 ; }
+        var 'r = # 0 ;
+        'r = call $fact ('n - # 1) ;
         return 'n * 'r ; .
 
     eq fpar($guard) = 'v .
     eq fbody($guard) =
-        if 'v == 0 { return 0 ; }
-        $alice . $nonce = 9 ; .
+        if 'v == # 0 { return # 0 ; }
+        $alice . $nonce = # 9 ; .
 
     eq fpar1($pay) = 'to .   eq fpar2($pay) = 'amt .
     eq fbody($pay) = $bals [ 'to ] += 'amt ; .
@@ -121,30 +126,40 @@ fmod SOL-CONTRACT-TEST{Field :: TRIV} is
 
     ops cSet cTwice cFact cScope cGrd0 cGrd1 cPay2 cEmit cEmitRev cLit cLitPush : -> Conf .
 
-    eq cSet = run(call $setB (42) ;) .
-    eq cTwice = run(var 'r = 0 ; 'r = call $twice (21) ;) .
-    eq cFact = run(var 'x = 0 ; 'x = call $fact (5) ;) .
+    eq cSet = run(call $setB (# 42) ;) .
+    eq cTwice = run(var 'r = # 0 ; 'r = call $twice (# 21) ;) .
+    eq cFact = run(var 'x = # 0 ; 'x = call $fact (# 5) ;) .
 
     *** the callee binds its own 'v; the caller's survives the call
-    eq cScope = run(var 'v = 7 ; call $setB (1) ;) .
+    eq cScope = run(var 'v = # 7 ; call $setB (# 1) ;) .
 
-    eq cGrd0 = run(call $guard (0) ;) .
-    eq cGrd1 = run(call $guard (1) ;) .
+    eq cGrd0 = run(call $guard (# 0) ;) .
+    eq cGrd1 = run(call $guard (# 1) ;) .
 
-    eq cPay2 = run(call $pay (3, 40) ;) .
+    eq cPay2 = run(call $pay (# 3, # 40) ;) .
 
-    eq cEmit = run(emit 'Paid (2 + 3) ; $alice . $nonce = 1 ;) .
-    eq cEmitRev = run($alice . $nonce = 1 ; emit 'Bad (1 / 0) ;) .
+    eq cEmit = run(emit 'Paid (# 2 + # 3) ; $alice . $nonce = # 1 ;) .
+    eq cEmitRev = run($alice . $nonce = # 1 ; emit 'Bad (# 1 / # 0) ;) .
 
     *** whole-struct write from a struct VALUE, and a struct-literal push —
     *** SolKey's open `alice = pVal;` refinement and its disabled
     *** testStorageArrayPushPop, `tokens.push(Token(42));`. Literals are
     *** save-built: the base model's find cannot read past a non-matching
     *** outermost storeSt, so storeSt-built literals only reduce field-by-field.
-    eq cLit = run($alice = save(save(mtSt, $balance, 3), $nonce, 4) ;) .
+    eq cLit = run($alice = # save(save(mtSt, $balance, 3), $nonce, 4) ;) .
     eq cLitPush = run(
-        $arr .push(save(mtSt, $balance, 42)) ;
-        $arr .push(save(mtSt, $balance, 43)) ; ) .
+        $arr .push(# save(mtSt, $balance, 42)) ;
+        $arr .push(# save(mtSt, $balance, 43)) ; ) .
+
+    *** root lvalues: Field$Elt is not a subsort of LValue (see Syntax.maude),
+    *** so each field constant usable as a ROOT is overloaded at Root < LValue.
+    ops $alice $arr $balance $bals $nonce : -> Root .
+    var Clv : Cells .
+    eq lower($alice, Clv) = sloc($alice) .
+    eq lower($arr, Clv) = sloc($arr) .
+    eq lower($balance, Clv) = sloc($balance) .
+    eq lower($bals, Clv) = sloc($bals) .
+    eq lower($nonce, Clv) = sloc($nonce) .
 endfm
 
 red eread(cSet, $alice . $balance) .      *** 42
@@ -155,11 +170,11 @@ red eread(cScope, $alice . $balance) .    *** 1
 red eread(cGrd0, $alice . $nonce) .       *** 0 — early return skipped the write
 red eread(cGrd1, $alice . $nonce) .       *** 9
 red statOf(cGrd0) .                       *** ok
-red eread(cPay2, $bals [ 3 ]) .           *** 40 — two-parameter call
+red eread(cPay2, $bals [ # 3 ]) .           *** 40 — two-parameter call
 red eread(cEmit, $alice . $nonce) .       *** 1 — emit is a skip
 red statOf(cEmitRev) .                    *** reverted — but its argument still evaluates
 red eread(cEmitRev, $alice . $nonce) .    *** 0
 red eread(cLit, $alice . $balance) .      *** 3
 red eread(cLit, $alice . $nonce) .        *** 4
 red eread(cLitPush, $arr . length) .      *** 2
-red eread(cLitPush, $arr [ 1 ] . $balance) .   *** 43 — struct literal pushed and read back
+red eread(cLitPush, $arr [ # 1 ] . $balance) .   *** 43 — struct literal pushed and read back

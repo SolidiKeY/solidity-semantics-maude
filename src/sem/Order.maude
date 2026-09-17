@@ -1,0 +1,278 @@
+*** src/sem/Order.maude
+***
+*** solc's EVALUATION ORDER, as a capture pass over statements.
+***
+*** Expressions may now have side effects: `_++` / `_--` / `++_` / `--_` are
+*** Exp constructors, not just statements. Solidity's order is not
+*** left-to-right, and SolKey pins the legacy-pipeline order that solc
+*** actually compiles:
+***
+***   BINARY OPERATORS -- the RIGHT operand is compiled before the left. With
+***     uint i = 1,  x = i++ + i  is 2, not 3: the right operand reads i before
+***     the left one bumps it. && || and ?: are EXCLUDED -- those are
+***     left/condition-first by language semantics, not by codegen.
+***   INDEX WRITES -- right-hand side, then receiver, then index.
+***
+*** The pass mirrors SolKey's `_unfold_*` / `…Capture*` taclets one-for-one
+*** rather than making eval itself effectful: SolKey IS a capture calculus, so
+*** transcribing it is both smaller and more defensible as a cross-check, and
+*** it keeps every deterministic step an EQUATION -- which is what lets one
+*** `red` discharge a Hoare triple.
+***
+*** `lin` rewrites an impure statement into a sequence of `capture q = e ;`
+*** bindings in solc's order plus a residual statement over the temps. Temps
+*** are tq(0), tq(1), ... and the counter restarts per statement, which is
+*** safe because every temp is consumed inside its own expansion.
+***
+*** `capture q = e ;` decides at EXECUTION time, from the captured value's
+*** SORT, whether it is a value snapshot, a storage-path alias or a memory
+*** reference -- SolKey's `T rv = e;` / `T storage rv = src;` /
+*** `T memory rv = src;` table. That is also why the struct-source asymmetry
+*** needs no special rule: capturing a REFERENCE binds it rather than reading
+*** it, so a struct source is still read at copy time.
+***
+*** THE HOOK is one equation on the k cell. Maude normalizes k bottom-up, so a
+*** conditional equation on k(_) fires before any { k(…) C } configuration
+*** equation is tried -- which is why none of the ~35 statement equations in
+*** Stmt.maude needed to change. `KS =/= St` guarantees termination: a shape
+*** `lin` does not cover stays put instead of looping.
+***
+*** SAFETY NET: eval/evalP have NO equations for the four increment
+*** constructors. Any shape `lin` fails to linearize therefore leaves a stuck
+*** `eval(…)` term, which run-tests.sh catches. The failure mode is loud.
+***
+*** NOT COVERED (documented in examples/solkey/README.md):
+***   - an impure RIGHT operand of && or || -- short-circuiting means it must
+***     not be hoisted, and evaluating it in place would need an effectful eval
+***   - an impure `while` guard: the guard is re-evaluated per iteration, so
+***     hoisting it would change the loop. pureS(while …) is true BY DESIGN.
+***   - SolKey's receiver SNAPSHOT for a simple receiver whose index
+***     reassigns it (`testIndexWriteReceiverReadsMutatedVar`). Nested index
+***     writes are handled -- linL pins each index into a temp as it goes --
+***     but a receiver that is a storage-alias LOCAL mutated by the index is
+***     not re-read.
+
+load Expr .
+
+fmod SOL-ORDER{Field :: TRIV} is
+    pr SOL-EVAL{Field} .
+
+    *** fresh temporaries. tq(N), not qid("$t" + string(N,10)): `pr CONVERSION`
+    *** inside the syntax module clashes on _/_ and makes it unusable.
+    op tq : Int -> Qid [ctor] .
+
+    vars E E1 E2 : Exp .   vars P P1 P2 : Prop .
+    var LV : LValue .      var Q : Qid .    var F0 : Field$Elt .
+    var V : Value .        var RT : Root .
+    vars N N1 N2 N3 : Int .
+    vars KK S1 S2 SR SI : K .
+    var St : Stmt .
+
+    *** ---- purity ---------------------------------------------------------
+    op pure  : Exp -> Bool .
+    op pureL : LValue -> Bool .
+    op pureP : Prop -> Bool .
+    op pureS : Stmt -> Bool .
+
+    eq pure(# V) = true .
+    eq pure(LV) = pureL(LV) .
+    eq pure(E1 + E2) = pure(E1) and pure(E2) .
+    eq pure(E1 - E2) = pure(E1) and pure(E2) .
+    eq pure(E1 * E2) = pure(E1) and pure(E2) .
+    eq pure(E1 / E2) = pure(E1) and pure(E2) .
+    eq pure(E1 % E2) = pure(E1) and pure(E2) .
+    eq pure(E1 ** E2) = pure(E1) and pure(E2) .
+    eq pure(neg E1) = pure(E1) .
+    eq pure(LV ++) = false .   eq pure(LV --) = false .
+    eq pure(++ LV) = false .   eq pure(-- LV) = false .
+    eq pure(E) = true [owise] .           *** msg·sender, msg·value, net[_]
+
+    eq pureL(Q) = true .
+    eq pureL(RT) = true .
+    eq pureL(LV . F0) = pureL(LV) .
+    eq pureL(LV [ E ]) = pureL(LV) and pure(E) .
+    eq pureL(LV) = true [owise] .
+
+    eq pureP(true) = true .   eq pureP(false) = true .
+    eq pureP(E1 < E2) = pure(E1) and pure(E2) .
+    eq pureP(E1 <= E2) = pure(E1) and pure(E2) .
+    eq pureP(E1 > E2) = pure(E1) and pure(E2) .
+    eq pureP(E1 >= E2) = pure(E1) and pure(E2) .
+    eq pureP(E1 == E2) = pure(E1) and pure(E2) .
+    eq pureP(E1 != E2) = pure(E1) and pure(E2) .
+    eq pureP(P1 && P2) = pureP(P1) and pureP(P2) .
+    eq pureP(P1 || P2) = pureP(P1) and pureP(P2) .
+    eq pureP(! P1) = pureP(P1) .
+    eq pureP(P) = true [owise] .
+
+    *** ---- lift tuples: (prelude statements, residual, next counter) -------
+    sorts Lft LftL LftP .
+    op lft  : K Exp Int -> Lft [ctor] .
+    op lftL : K LValue Int -> LftL [ctor] .
+    op lftP : K Prop Int -> LftP [ctor] .
+
+    op linE : Exp Int -> Lft .
+    op linL : LValue Int -> LftL .
+    op linP : Prop Int -> LftP .
+    op bin  : Exp Exp Int -> Lft .     *** shared right-then-left combinator
+    op mk   : K Exp Int -> Lft .
+
+    *** ---- expressions ----------------------------------------------------
+    eq linE(# V, N) = lft(nilK, # V, N) .
+    ceq linE(LV, N) = lft(S1, LV2, N1) if lftL(S1, LV2, N1) := linL(LV, N) .
+
+    *** post-increment: capture the OLD value, then bump
+    ceq linE(LV ++, N) = lft(S1 (capture tq(N1) = LV2 ;) (LV2 = LV2 + # 1 ;), tq(N1), N1 + 1)
+        if lftL(S1, LV2, N1) := linL(LV, N) .
+    ceq linE(LV --, N) = lft(S1 (capture tq(N1) = LV2 ;) (LV2 = LV2 - # 1 ;), tq(N1), N1 + 1)
+        if lftL(S1, LV2, N1) := linL(LV, N) .
+    *** pre-increment: bump, then capture the NEW value
+    ceq linE(++ LV, N) = lft(S1 (LV2 = LV2 + # 1 ;) (capture tq(N1) = LV2 ;), tq(N1), N1 + 1)
+        if lftL(S1, LV2, N1) := linL(LV, N) .
+    ceq linE(-- LV, N) = lft(S1 (LV2 = LV2 - # 1 ;) (capture tq(N1) = LV2 ;), tq(N1), N1 + 1)
+        if lftL(S1, LV2, N1) := linL(LV, N) .
+
+    ceq linE(E1 + E2, N)  = mk(S1, R1 + R2, N1)  if lft(S1, R1 + R2, N1) := bin(E1, E2, N) .
+    ceq linE(E1 - E2, N)  = mk(S1, R1 - R2, N1)  if lft(S1, R1 + R2, N1) := bin(E1, E2, N) .
+    ceq linE(E1 * E2, N)  = mk(S1, R1 * R2, N1)  if lft(S1, R1 + R2, N1) := bin(E1, E2, N) .
+    ceq linE(E1 / E2, N)  = mk(S1, R1 / R2, N1)  if lft(S1, R1 + R2, N1) := bin(E1, E2, N) .
+    ceq linE(E1 % E2, N)  = mk(S1, R1 % R2, N1)  if lft(S1, R1 + R2, N1) := bin(E1, E2, N) .
+    ceq linE(E1 ** E2, N) = mk(S1, R1 ** R2, N1) if lft(S1, R1 + R2, N1) := bin(E1, E2, N) .
+    ceq linE(neg E1, N)   = lft(S1, neg R1, N1)  if lft(S1, R1, N1) := linE(E1, N) .
+    eq  linE(E, N) = lft(nilK, E, N) [owise] .
+    eq  mk(S1, E, N) = lft(S1, E, N) .
+
+    *** bin packs the two residuals as R1 + R2; the caller re-applies its own
+    *** operator. The RIGHT operand is lifted first; when the left is impure
+    *** the right residue is SNAPSHOT into a temp before the left runs, which
+    *** is exactly SolKey's `_unfold_left` two-variable capture.
+    ceq bin(E1, E2, N) = lft(S2 S1, R1 + R2, N2)
+        if lft(S2, R2, N1) := linE(E2, N) /\ pure(E1) /\ lft(S1, R1, N2) := linE(E1, N1) .
+    ceq bin(E1, E2, N) = lft(S2 (capture tq(N1) = R2 ;) S1, R1 + tq(N1), N2)
+        if lft(S2, R2, N1) := linE(E2, N) /\ pure(E1) =/= true
+        /\ lft(S1, R1, N2) := linE(E1, N1 + 1) .
+
+    *** ---- lvalues: receiver first, then index -----------------------------
+    eq linL(Q, N) = lftL(nilK, Q, N) .
+    eq linL(RT, N) = lftL(nilK, RT, N) .
+    ceq linL(LV . F0, N) = lftL(S1, LV2 . F0, N1) if lftL(S1, LV2, N1) := linL(LV, N) .
+    ceq linL(LV [ E ], N) = lftL(SR SI, LV2 [ RI ], N2)
+        if lftL(SR, LV2, N1) := linL(LV, N) /\ lft(SI, RI, N2) := linE(E, N1) .
+    eq  linL(LV, N) = lftL(nilK, LV, N) [owise] .
+
+    var LV2 : LValue .  vars R1 R2 RI : Exp .
+
+    *** ---- propositions ---------------------------------------------------
+    ceq linP(E1 < E2, N)  = lftP(S1, R1 < R2, N1)  if lft(S1, R1 + R2, N1) := bin(E1, E2, N) .
+    ceq linP(E1 <= E2, N) = lftP(S1, R1 <= R2, N1) if lft(S1, R1 + R2, N1) := bin(E1, E2, N) .
+    ceq linP(E1 > E2, N)  = lftP(S1, R1 > R2, N1)  if lft(S1, R1 + R2, N1) := bin(E1, E2, N) .
+    ceq linP(E1 >= E2, N) = lftP(S1, R1 >= R2, N1) if lft(S1, R1 + R2, N1) := bin(E1, E2, N) .
+    ceq linP(E1 == E2, N) = lftP(S1, R1 == R2, N1) if lft(S1, R1 + R2, N1) := bin(E1, E2, N) .
+    ceq linP(E1 != E2, N) = lftP(S1, R1 != R2, N1) if lft(S1, R1 + R2, N1) := bin(E1, E2, N) .
+    ceq linP(! P1, N) = lftP(S1, ! P3, N1) if lftP(S1, P3, N1) := linP(P1, N) .
+    eq  linP(P, N) = lftP(nilK, P, N) [owise] .   *** && and || keep their RHS unevaluated
+
+    var P3 : Prop .
+
+    *** ---- statements ------------------------------------------------------
+    *** RHS -> receiver -> index. When the target is impure the right-hand
+    *** side is snapshot into a temp first, so the target's side effects
+    *** cannot be seen by the value being stored.
+    op lin : Stmt -> K .
+
+    ceq lin(LV = E ;) = SE SL (LV2 = RE ;)
+        if lft(SE, RE, N1) := linE(E, 0) /\ pureL(LV)
+        /\ lftL(SL, LV2, N2) := linL(LV, N1) .
+    ceq lin(LV = E ;) = SE (capture tq(N1) = RE ;) SL (LV2 = tq(N1) ;)
+        if lft(SE, RE, N1) := linE(E, 0) /\ pureL(LV) =/= true
+        /\ lftL(SL, LV2, N2) := linL(LV, N1 + 1) .
+    ceq lin(LV = P ;) = SP SL (LV2 = RP ;)
+        if lftP(SP, RP, N1) := linP(P, 0) /\ lftL(SL, LV2, N2) := linL(LV, N1) .
+
+    ceq lin(var Q = E ;) = SE (var Q = RE ;) if lft(SE, RE, N1) := linE(E, 0) .
+    ceq lin(var Q = P ;) = SP (var Q = RP ;) if lftP(SP, RP, N1) := linP(P, 0) .
+    ceq lin(memory Q = E ;) = SE (memory Q = RE ;) if lft(SE, RE, N1) := linE(E, 0) .
+    ceq lin(memory Q = new( E ) ;) = SE (memory Q = new( RE ) ;) if lft(SE, RE, N1) := linE(E, 0) .
+    ceq lin(storage Q = LV ;) = SL (storage Q = LV2 ;) if lftL(SL, LV2, N1) := linL(LV, 0) .
+
+    *** Compound assignment desugars AFTER linearization, so the duplicated
+    *** target is a pinned temp rather than a re-evaluated impure lvalue.
+    *** Like plain assignment it is RHS-first: when the target is impure the
+    *** right-hand side is SNAPSHOT into a temp, or the target's side effects
+    *** would be visible to it -- `a[i++] += i` must add the OLD i.
+    ceq lin(LV += E ;) = SE SL (LV2 = LV2 + RE ;)
+        if lft(SE, RE, N1) := linE(E, 0) /\ pureL(LV) /\ lftL(SL, LV2, N2) := linL(LV, N1) .
+    ceq lin(LV -= E ;) = SE SL (LV2 = LV2 - RE ;)
+        if lft(SE, RE, N1) := linE(E, 0) /\ pureL(LV) /\ lftL(SL, LV2, N2) := linL(LV, N1) .
+    ceq lin(LV *= E ;) = SE SL (LV2 = LV2 * RE ;)
+        if lft(SE, RE, N1) := linE(E, 0) /\ pureL(LV) /\ lftL(SL, LV2, N2) := linL(LV, N1) .
+    ceq lin(LV /= E ;) = SE SL (LV2 = LV2 / RE ;)
+        if lft(SE, RE, N1) := linE(E, 0) /\ pureL(LV) /\ lftL(SL, LV2, N2) := linL(LV, N1) .
+    ceq lin(LV %= E ;) = SE SL (LV2 = LV2 % RE ;)
+        if lft(SE, RE, N1) := linE(E, 0) /\ pureL(LV) /\ lftL(SL, LV2, N2) := linL(LV, N1) .
+    ceq lin(LV += E ;) = SE (capture tq(N1) = RE ;) SL (LV2 = LV2 + tq(N1) ;)
+        if lft(SE, RE, N1) := linE(E, 0) /\ pureL(LV) =/= true /\ lftL(SL, LV2, N2) := linL(LV, N1 + 1) .
+    ceq lin(LV -= E ;) = SE (capture tq(N1) = RE ;) SL (LV2 = LV2 - tq(N1) ;)
+        if lft(SE, RE, N1) := linE(E, 0) /\ pureL(LV) =/= true /\ lftL(SL, LV2, N2) := linL(LV, N1 + 1) .
+    ceq lin(LV *= E ;) = SE (capture tq(N1) = RE ;) SL (LV2 = LV2 * tq(N1) ;)
+        if lft(SE, RE, N1) := linE(E, 0) /\ pureL(LV) =/= true /\ lftL(SL, LV2, N2) := linL(LV, N1 + 1) .
+    ceq lin(LV /= E ;) = SE (capture tq(N1) = RE ;) SL (LV2 = LV2 / tq(N1) ;)
+        if lft(SE, RE, N1) := linE(E, 0) /\ pureL(LV) =/= true /\ lftL(SL, LV2, N2) := linL(LV, N1 + 1) .
+    ceq lin(LV %= E ;) = SE (capture tq(N1) = RE ;) SL (LV2 = LV2 % tq(N1) ;)
+        if lft(SE, RE, N1) := linE(E, 0) /\ pureL(LV) =/= true /\ lftL(SL, LV2, N2) := linL(LV, N1 + 1) .
+
+    *** statement-level ++/--: receiver only
+    ceq lin(LV ++ ;) = SL (LV2 = LV2 + # 1 ;) if lftL(SL, LV2, N1) := linL(LV, 0) .
+    ceq lin(LV -- ;) = SL (LV2 = LV2 - # 1 ;) if lftL(SL, LV2, N1) := linL(LV, 0) .
+    ceq lin(++ LV ;) = SL (LV2 = LV2 + # 1 ;) if lftL(SL, LV2, N1) := linL(LV, 0) .
+    ceq lin(-- LV ;) = SL (LV2 = LV2 - # 1 ;) if lftL(SL, LV2, N1) := linL(LV, 0) .
+
+    ceq lin(delete LV ;) = SL (delete LV2 ;) if lftL(SL, LV2, N1) := linL(LV, 0) .
+    ceq lin(LV .pop() ;) = SL (LV2 .pop() ;) if lftL(SL, LV2, N1) := linL(LV, 0) .
+    ceq lin(LV .push() ;) = SL (LV2 .push() ;) if lftL(SL, LV2, N1) := linL(LV, 0) .
+    *** push(e) is compiled as a CALL: receiver first, then the argument --
+    *** the opposite of assignment. matrix[i++].push(i) pushes 1.
+    ceq lin(LV .push( E ) ;) = SL SE (LV2 .push( RE ) ;)
+        if lftL(SL, LV2, N1) := linL(LV, 0) /\ lft(SE, RE, N2) := linE(E, N1) .
+
+    ceq lin(require( P ) ;) = SP (require( RP ) ;) if lftP(SP, RP, N1) := linP(P, 0) .
+    ceq lin(assert( P ) ;) = SP (assert( RP ) ;) if lftP(SP, RP, N1) := linP(P, 0) .
+    ceq lin(return E ;) = SE (return RE ;) if lft(SE, RE, N1) := linE(E, 0) .
+    ceq lin(E .transfer( E2 ) ;) = SE S2 (RE .transfer( R2 ) ;)
+        if lft(SE, RE, N1) := linE(E, 0) /\ lft(S2, R2, N2) := linE(E2, N1) .
+    eq  lin(St) = St [owise] .
+
+    var RE : Exp .   var RP : Prop .   var SE SP SL : K .
+
+    *** ---- purity of a statement ------------------------------------------
+    eq pureS(LV = E ;) = pureL(LV) and pure(E) .
+    eq pureS(LV = P ;) = pureL(LV) and pureP(P) .
+    eq pureS(var Q = E ;) = pure(E) .
+    eq pureS(var Q = P ;) = pureP(P) .
+    eq pureS(memory Q = E ;) = pure(E) .
+    eq pureS(memory Q = new( E ) ;) = pure(E) .
+    eq pureS(storage Q = LV ;) = pureL(LV) .
+    eq pureS(LV += E ;) = pureL(LV) and pure(E) .
+    eq pureS(LV -= E ;) = pureL(LV) and pure(E) .
+    eq pureS(LV *= E ;) = pureL(LV) and pure(E) .
+    eq pureS(LV /= E ;) = pureL(LV) and pure(E) .
+    eq pureS(LV %= E ;) = pureL(LV) and pure(E) .
+    eq pureS(LV ++ ;) = pureL(LV) .   eq pureS(LV -- ;) = pureL(LV) .
+    eq pureS(++ LV ;) = pureL(LV) .   eq pureS(-- LV ;) = pureL(LV) .
+    eq pureS(delete LV ;) = pureL(LV) .
+    eq pureS(LV .pop() ;) = pureL(LV) .
+    eq pureS(LV .push() ;) = pureL(LV) .
+    eq pureS(LV .push( E ) ;) = pureL(LV) and pure(E) .
+    eq pureS(require( P ) ;) = pureP(P) .
+    eq pureS(assert( P ) ;) = pureP(P) .
+    eq pureS(return E ;) = pure(E) .
+    eq pureS(E .transfer( E2 ) ;) = pure(E) and pure(E2) .
+    *** a while guard is re-evaluated per iteration and must NOT be hoisted
+    eq pureS(St) = true [owise] .
+
+    *** ---- the hook --------------------------------------------------------
+    *** k is normalized bottom-up, so this fires before any { k(…) C } rule.
+    var KS : K .
+    ceq k(St KK) = k(KS KK)
+        if pureS(St) =/= true /\ KS := lin(St) /\ KS =/= St .
+endfm

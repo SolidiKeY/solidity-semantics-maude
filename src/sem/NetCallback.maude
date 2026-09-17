@@ -77,15 +77,15 @@ mod SOL-CALLBACK-TEST{Field :: TRIV} is
 
     *** naive: send BEFORE zeroing (checks-interactions-effects) — the DAO bug
     eq withdrawNaive =
-        require($bals [ msg·sender ] > 0) ;
+        require($bals [ msg·sender ] > # 0) ;
         msg·sender .call{value: $bals [ msg·sender ] } ;
-        $bals [ msg·sender ] = 0 ; .
+        $bals [ msg·sender ] = # 0 ; .
 
     *** safe: zero BEFORE sending (checks-effects-interactions)
     eq withdrawSafe =
-        require($bals [ msg·sender ] > 0) ;
+        require($bals [ msg·sender ] > # 0) ;
         var 'amt = $bals [ msg·sender ] ;
-        $bals [ msg·sender ] = 0 ;
+        $bals [ msg·sender ] = # 0 ;
         msg·sender .call{value: 'amt } ; .
 
     op stInit : -> Struct .
@@ -102,6 +102,12 @@ mod SOL-CALLBACK-TEST{Field :: TRIV} is
     var NT : Struct .   var I : Int .
     ceq drained(NT) = true if I := find(NT, 1) /\ I < -100 .
     eq drained(NT) = false [owise] .
+
+    *** root lvalues: Field$Elt is not a subsort of LValue (see Syntax.maude),
+    *** so each field constant usable as a ROOT is overloaded at Root < LValue.
+    ops $bals : -> Root .
+    var Clv : Cells .
+    eq lower($bals, Clv) = sloc($bals) .
 endm
 
 *** How much the attacker gets on the no-callback path (both contracts): 100.

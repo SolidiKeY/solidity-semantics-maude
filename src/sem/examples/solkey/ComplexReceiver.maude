@@ -20,48 +20,48 @@ endfm
 
 *** ---- testStorageComplexReceiverEmptyPush: push on a nested array ----
 red < $bucket . $tokens .push() ;
-      storage 'bt = $bucket . $tokens ; > ('bt . length == 1) .           *** true
+      storage 'bt = $bucket . $tokens ; > ('bt . length == # 1) .           *** true
 
 *** ---- testStorageComplexReceiverPushFieldLvalue: bucket.tokens.push().value = 5 ----
 red < $bucket . $tokens .push() ;
-      $bucket . $tokens [ 0 ] . $value = 5 ;
+      $bucket . $tokens [ # 0 ] . $value = # 5 ;
       storage 'bt = $bucket . $tokens ; >
-      ('bt . length == 1 && 'bt [ 0 ] . $value == 5) .                    *** true
+      ('bt . length == # 1 && 'bt [ # 0 ] . $value == # 5) .                    *** true
 
 *** ---- testStorageComplexReceiverPushLvalueCopy: bucket.tokens.push() = tokRef ----
-red < $alice . $account . $token . $value = 7 ;
+red < $alice . $account . $token . $value = # 7 ;
       storage 'tokRef = $alice . $account . $token ;
       $bucket . $tokens .push('tokRef) ; >
-      ($bucket . $tokens . length == 1 && $bucket . $tokens [ 0 ] . $value == 7) .   *** true
+      ($bucket . $tokens . length == # 1 && $bucket . $tokens [ # 0 ] . $value == # 7) .   *** true
 
 *** ---- testStorageArrayReadWrite: tokens.push(); tokens[0].value = 100 ----
 red < $tokens .push() ;
-      $tokens [ 0 ] . $value = 100 ;
-      var 'v = $tokens [ 0 ] . $value ; > ('v == 100) .                   *** true
+      $tokens [ # 0 ] . $value = # 100 ;
+      var 'v = $tokens [ # 0 ] . $value ; > ('v == # 100) .                   *** true
 
 *** ---- testStoragePushFieldLvalue: tokens.push().value = 11 ----
 red < $tokens .push() ;
-      $tokens [ 0 ] . $value = 11 ; >
-      ($tokens . length == 1 && $tokens [ 0 ] . $value == 11) .           *** true
+      $tokens [ # 0 ] . $value = # 11 ; >
+      ($tokens . length == # 1 && $tokens [ # 0 ] . $value == # 11) .           *** true
 
 *** ---- testStoragePushLvalueCopiesStorageSource: tokens.push() = storageRef ----
-red < $alice . $account . $token . $value = 9 ;
+red < $alice . $account . $token . $value = # 9 ;
       storage 'storageRef = $alice . $account . $token ;
       $tokens .push('storageRef) ; >
-      ($tokens . length == 1 && $tokens [ 0 ] . $value == 9) .            *** true
+      ($tokens . length == # 1 && $tokens [ # 0 ] . $value == # 9) .            *** true
 
 *** ---- testStoragePushLvaluePrimitive: values.push() = 77 ----
-red < $values .push(77) ; >
-      ($values . length == 1 && $values [ 0 ] == 77) .                    *** true
+red < $values .push(# 77) ; >
+      ($values . length == # 1 && $values [ # 0 ] == # 77) .                    *** true
 
 *** ---- testStoragePushReturnAlias: Token storage t = tokens.push() ----
 red < $tokens .push() ;
-      storage 't = $tokens [ 0 ] ;
-      't . $value = 99 ; >
-      ($tokens . length == 1 && $tokens [ 0 ] . $value == 99) .           *** true
+      storage 't = $tokens [ # 0 ] ;
+      't . $value = # 99 ; >
+      ($tokens . length == # 1 && $tokens [ # 0 ] . $value == # 99) .           *** true
 
 *** ---- testStorageNestedPushReturnAlias: acc = persons.push().account ----
 red < $persons .push() ;
-      storage 'acc = $persons [ 0 ] . $account ;
-      'acc . $balance = 50 ; >
-      ($persons . length == 1 && 'acc . $balance == 50) .                 *** true
+      storage 'acc = $persons [ # 0 ] . $account ;
+      'acc . $balance = # 50 ; >
+      ($persons . length == # 1 && 'acc . $balance == # 50) .                 *** true

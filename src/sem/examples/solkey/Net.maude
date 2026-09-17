@@ -19,18 +19,18 @@ red [ mtSt ]< var 'paid = msg·value ; var 'paidBy = msg·sender ; >
        ('paid == msg·value && 'paidBy == msg·sender) .        *** true  (both 0 from init's msg(0,0))
 
 *** ---- transfer to a literal address (net-transfer-simple) ----
-red < 1 .transfer(5) ; > (net[1] == neg 5) .                  *** true   net(1) = -5
-red < 1 .transfer(5) ; > (net[2] == 0) .                      *** true   untouched address is 0
+red < # 1 .transfer(# 5) ; > (net[# 1] == neg # 5) .                  *** true   net(1) = -5
+red < # 1 .transfer(# 5) ; > (net[# 2] == # 0) .                      *** true   untouched address is 0
 
 *** ---- transfer to a receiver read from storage (net-transfer-capture-receiver) ----
-red < $owner = 7 ; $owner .transfer(5) ; > (net[7] == neg 5) .    *** true
+red < $owner = # 7 ; $owner .transfer(# 5) ; > (net[# 7] == neg # 5) .    *** true
 
 *** ---- transfer amount computed from an expression (net-transfer-capture-argument) ----
-red < var 'amt = 2 + 3 ; 1 .transfer('amt) ; > (net[1] == neg 5) .   *** true
+red < var 'amt = # 2 + # 3 ; # 1 .transfer('amt) ; > (net[# 1] == neg # 5) .   *** true
 
 *** ---- manual ledger update via transfer arithmetic (net-manual-update analogue) ----
 *** SolKey books net(1) += 5; a self-credit is the receiving side of a transfer.
-red < 1 .transfer(neg 5) ; > (net[1] == 5 && net[2] == 0) .   *** true   net(1) = -(-5) = 5
+red < # 1 .transfer(neg # 5) ; > (net[# 1] == # 5 && net[# 2] == # 0) .   *** true   net(1) = -(-5) = 5
 
 *** two transfers accumulate on the ledger
-red < 3 .transfer(10) ; 3 .transfer(4) ; > (net[3] == neg 14) .   *** true
+red < # 3 .transfer(# 10) ; # 3 .transfer(# 4) ; > (net[# 3] == neg # 14) .   *** true

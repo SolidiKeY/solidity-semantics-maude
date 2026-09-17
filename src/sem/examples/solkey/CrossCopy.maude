@@ -17,48 +17,48 @@ endfm
 
 *** ---- testMemoryToStorageCopyRoot: alice = carol snapshots the object ----
 red < memory 'carol = new ;
-      'carol . $age = 42 ;
+      'carol . $age = # 42 ;
       $alice = 'carol ;
-      'carol . $age = 43 ; > ($alice . $age == 42) .                      *** true
+      'carol . $age = # 43 ; > ($alice . $age == # 42) .                      *** true
 
 *** ---- testMemoryToStorageCopyField: alice.account = carolAcc ----
 red < memory 'carolAcc = new ;
-      'carolAcc . $balance = 50 ;
+      'carolAcc . $balance = # 50 ;
       $alice . $account = 'carolAcc ;
-      'carolAcc . $balance = 51 ; > ($alice . $account . $balance == 50) .   *** true
+      'carolAcc . $balance = # 51 ; > ($alice . $account . $balance == # 50) .   *** true
 
 *** ---- testMemoryToStorageCopyComplexSource: alice.account = carol.account ----
 red < memory 'carol = new ;
-      'carol . $account . $balance = 50 ;
+      'carol . $account . $balance = # 50 ;
       $alice . $account = 'carol . $account ;
-      'carol . $account . $balance = 51 ; > ($alice . $account . $balance == 50) .   *** true
+      'carol . $account . $balance = # 51 ; > ($alice . $account . $balance == # 50) .   *** true
 
 *** ---- testMemoryToStorageCopyComplexTarget: alice.account.token = carolToken ----
 red < memory 'carolToken = new ;
-      'carolToken . $value = 99 ;
+      'carolToken . $value = # 99 ;
       $alice . $account . $token = 'carolToken ;
-      'carolToken . $value = 100 ; > ($alice . $account . $token . $value == 99) .   *** true
+      'carolToken . $value = # 100 ; > ($alice . $account . $token . $value == # 99) .   *** true
 
 *** ---- testStorageToMemoryCopyRoot: Person memory carol = alice ----
-red < $alice . $age = 25 ;
+red < $alice . $age = # 25 ;
       memory 'carol = $alice ;
-      $alice . $age = 30 ;
-      var 'v = 'carol . $age ; > ('v == 25) .                             *** true
+      $alice . $age = # 30 ;
+      var 'v = 'carol . $age ; > ('v == # 25) .                             *** true
 
 *** ---- testStorageToMemoryCopyField: Account memory acc = alice.account ----
-red < $alice . $account . $balance = 10 ;
+red < $alice . $account . $balance = # 10 ;
       memory 'acc = $alice . $account ;
-      $alice . $account . $balance = 20 ;
-      var 'v = 'acc . $balance ; > ('v == 10) .                           *** true
+      $alice . $account . $balance = # 20 ;
+      var 'v = 'acc . $balance ; > ('v == # 10) .                           *** true
 
 *** ---- testStorageToMemoryCopyComplexPath: Token memory t = alice.account.token ----
-red < $alice . $account . $token . $value = 17 ;
+red < $alice . $account . $token . $value = # 17 ;
       memory 't = $alice . $account . $token ;
-      $alice . $account . $token . $value = 18 ; > ('t . $value == 17) .  *** true
+      $alice . $account . $token . $value = # 18 ; > ('t . $value == # 17) .  *** true
 
 *** ---- testMemoryFieldShallowCopy: carol.account = david.account ALIASES ----
 red < memory 'carol = new ; memory 'david = new ;
-      'david . $account . $balance = 50 ;
+      'david . $account . $balance = # 50 ;
       'carol . $account = 'david . $account ;
-      'carol . $account . $balance = 60 ; >
-      ('david . $account . $balance == 60 && 'carol . $account . $balance == 60) .   *** true
+      'carol . $account . $balance = # 60 ; >
+      ('david . $account . $balance == # 60 && 'carol . $account . $balance == # 60) .   *** true

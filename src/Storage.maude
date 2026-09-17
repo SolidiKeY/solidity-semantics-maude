@@ -1,3 +1,17 @@
+*** src/Storage.maude — the nested/lazy storage model.
+***
+*** SIBLING: ../src/StorageCopy.maude is the variant aligned with SolKey's
+*** current structRules.key. This file is deliberately left as it was, so the
+*** two can be compared; src/sem/ runs on StorageCopy. Three deltas there:
+***   1. save's leaf does not collapse -- a struct copy keeps the TARGET's
+***      mapping members, since Solidity never copies a mapping. Here
+***      `find(save(st,p,v), p) = v` takes them from the SOURCE.
+***   2. delete is sort-directed (delValue/delNode), so the exact read of a
+***      deleted struct slot is a delete-marked struct rather than a
+***      primitive default, and a delete of a strict descendant survives a
+***      copy of its ancestor. Here both are lost.
+***   3. push() clears the appended slot (SolKey storagePushLengthSave).
+
 load Fields .
 
 fmod STORAGE{Field :: TRIV} is

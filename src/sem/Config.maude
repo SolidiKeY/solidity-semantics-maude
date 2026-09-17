@@ -23,7 +23,7 @@
 ***   stat(_)       — ok / reverted / failed (failed = assert violation)
 
 load Syntax .
-load ../Storage .
+load ../StorageCopy .
 load ../Memory .
 
 fmod SOL-CONFIG{Field :: TRIV} is
@@ -70,20 +70,26 @@ fmod SOL-CONFIG{Field :: TRIV} is
     eq find(mtSt, LFXS RMFd Id) = mtSt .
     eq find(mtSt, LFXS RAFd Id) = mtSt .
     *** [owise] so the two struct-element defaults above win; NB any future
-    *** non-owise find(mtSt, …) equation would silently pre-empt this 0
+    *** non-owise find(mtSt, …) equation would silently pre-empt this 0.
+    *** ../StorageCopy.maude's new equations are safe here: each has a
+    *** non-variable constructor — save / ovr / delNode / delAt — in argument
+    *** 1, which mtSt is not, so none of them can match ahead of this.
     eq find(mtSt, LFXS Id) = 0 [owise] .    *** prim elements / mapping values default to 0
 
-    *** reading THROUGH a stored struct value: the base model's owise
-    *** passthrough skips a whole-struct save when the query path extends the
-    *** saved path, so deep reads after a struct copy silently missed it.
-    *** (Latent in ../Storage.maude — its tests only ever read prefixes.
-    *** Flagged for the Agda/F*/Prolog twins.)
-    var FXSd FXSd2 : NeList{Field} .  var STd : Struct .  var Vd : StValue .
-    eq find(save(STd, FXSd, Vd), FXSd FXSd2) = find(Vd, FXSd2) .
+    *** Reading THROUGH a stored struct value is handled by
+    *** ../StorageCopy.maude's leaf rules, sort-directed:
+    ***     find(save(st, p, str), p flds) = find(ovr(v→st(find(st,p)), str), flds)
+    *** and the four ovr equations. This file used to carry the sort-BLIND
+    *** version, `find(save(STd, FXSd, Vd), FXSd FXSd2) = find(Vd, FXSd2)`,
+    *** which reads every member out of the source — including the mapping
+    *** members, which Solidity never copies. SolKey deleted its own
+    *** collapsing `saveOnEmpty` for exactly that reason.
+    *** The gap is still latent in ../Storage.maude, whose tests only ever
+    *** read prefixes — flagged there and for the Agda/F*/Prolog twins.
 
     *** ---- deep memory access along a field path ---------------------------
-    *** (BANK's readR misses the singleton path; these helpers cover it and
-    *** resolve the intermediate Identity chain for writes.)
+    *** BANK's readR misses the singleton path; these helpers cover it and
+    *** resolve the intermediate Identity chain for writes.
     op mread : Memory Identity NeList{Field} -> MemValue .
     op mwrite : Memory Identity NeList{Field} MemValue -> Memory .
 
@@ -113,6 +119,12 @@ fmod SOL-CONFIG{Field :: TRIV} is
     op cnt : Int -> Cell [ctor] .
     op out : Value? -> Cell [ctor] .
     op stat : Status -> Cell [ctor] .
+    *** nochk marks a LOGIC-level read: array indices are not bounds-checked.
+    *** SolKey's postconditions are plain find<[int]>(storage, …) terms with no
+    *** bounds branch -- that is what lets storage-pop-nonempty assert the
+    *** popped slot reads 0 -- so the test extractors inject this cell, while
+    *** in-program reads and assert(…) stay checked, as in Solidity.
+    op nochk : -> Cell [ctor] .
 
     *** ---- drivers -----------------------------------------------------------
     *** init: plain execution from a given storage, no payment context.
@@ -171,6 +183,10 @@ fmod SOL-CONFIG-TEST{Field :: TRIV} is
 
     eq st1 = save(mtSt, $alice $balance, 7) .
     eq cf1 = init(nilK, st1) .
+
+    *** root lvalues: Field$Elt is not a subsort of LValue (see Syntax.maude),
+    *** so each field constant usable as a ROOT is overloaded at Root < LValue.
+    ops $alice $balance : -> Root .
 endfm
 
 red sread(cf1, $alice $balance) .                 *** 7
@@ -181,7 +197,7 @@ red envR(envW(envW(mtEnv, 'x, bv(1)), 'y, bv(3)), 'x) .   *** bv(1) — pass-thr
 red mread(write(write(emptyMemory, idC(pid(0), nil), $alice, idC(pid(1), nil)),
                 idC(pid(1), nil), $balance, 42),
           idC(pid(0), nil), $alice $balance) .    *** 42 — deep read through the reference
-red statOf(doRevert(k('x = 1 ;) sto(save(st1, $alice $balance, 99)) sto0(st1)
+red statOf(doRevert(k('x = # 1 ;) sto(save(st1, $alice $balance, 99)) sto0(st1)
                     net(mtSt) net0(mtSt) stat(ok))) .          *** reverted
-red stOf(doRevert(k('x = 1 ;) sto(save(st1, $alice $balance, 99)) sto0(st1)
+red stOf(doRevert(k('x = # 1 ;) sto(save(st1, $alice $balance, 99)) sto0(st1)
                   net(mtSt) net0(mtSt) stat(ok))) .            *** st1 rolled back: find = 7

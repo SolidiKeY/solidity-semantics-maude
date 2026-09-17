@@ -45,8 +45,23 @@
 *** Sibling variant of Storage.maude (same find/save/push/pop/delete API);
 *** the src/sem/ semantics still runs on the lazy model. Flagged for the
 *** Agda/F*/Prolog twins (no port here).
+***
+*** ALIGNMENT with ../src/StorageCopy.maude -- of its three SolKey deltas,
+*** two ALREADY HOLD here by construction:
+***   delete is sort-directed: `del` is declared per struct type and keeps the
+***     mapping member -- eq del(Ledger(I, M)) = Ledger(0, M) -- and
+***     delete(V,NP) = save(V,NP,del(find(V,NP))) is eager, so the deleted node
+***     IS a real struct; `delete p ; q = p ;` composes already.
+***   push() already appends a cleared element, via pushA on the array sort.
+*** The one that does NOT hold is the non-collapsing copy leaf: save(V, nil, X)
+*** = X here still overwrites a mapping-bearing field wholesale. The typed fix
+*** is a per-struct-type merge, one equation per struct type, e.g.
+***     eq merge(Ledger(I1, M1), Ledger(I2, M2)) = Ledger(I2, M1) .
+*** That is a genuine second variant rather than a small edit, so it is
+*** recorded here rather than done.
 
 *** ---- 1. core sorts and the one-step operations at the kind ---------------
+
 fmod SVALUE is
     pr INT .
     sorts StValue Struct Field Ty IntT .

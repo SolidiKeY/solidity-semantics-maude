@@ -23,13 +23,18 @@
 >   irreparably with the prelude's Nat one; a fresh range coexists as a
 >   benign ad-hoc overload). `evalP` maps a `Prop` to the truth value 1/0,
 >   so guards still read `=/= 0`. Bools can be stored (`flag = bal < 0 ;`).
-> - **Arithmetic `+ - *` reuse the prelude INT ops (`[ditto]`); `/ % **` are
->   ours.** `-` on Int-capable operands is genuinely ambiguous with the
->   field-list `a (neg b)` (Int is both an Exp and a mapping/array key), so
->   internal DEFINING equations use the prefix form `_-_(a,b)`; surface
->   programs keep `a - b` and Maude reliably takes the arithmetic parse
->   (the two benign advisory categories are whitelisted in run-tests.sh,
->   with the expected-result comments as the real correctness gate).
+> - **`Exp` has its own kind; the arithmetic operators are ours and non-AC.**
+>   `+ - *` used to be `[ditto]` off the prelude INT ops, because `Int` sat in
+>   `Exp`'s kind via `Int < Field$Elt < PrimField < LValue < Exp` and via
+>   `Value < Exp`. That made `+` and `*` `assoc comm`, so `'i ++ + 'i` and
+>   `'i + 'i ++` were the SAME TERM — solc's right-operand-first order was not
+>   merely unimplemented, it was **unstatable**. Both subsorts are now cut: a
+>   literal is injected (`# 5`), and a root field constant is overloaded at the
+>   sort `Root`, so program text is unchanged. Costs and gains: syntax no
+>   longer folds (`# 1 + # 2` stays a term) and terms keep their source shape
+>   instead of an AC normal form; in exchange the two benign parser advisory
+>   categories disappeared entirely, so the run-tests whitelist is gone and
+>   `_-_(a,b)` reverts to plain infix at the Exp level.
 > - **Modules are `SOL-`prefixed** (`SOL-SYNTAX`, `SOL-STMT`, …) and the
 >   whole tree lives in `src/sem/`, so nothing clashes with the sibling
 >   `STORAGE`/`BANK` variants (CLAUDE.md).
@@ -115,16 +120,22 @@ ops, no inheritance. Same tiering as `solkey/docs/taclet-ideas.md`.
 ```
 src/sem/
   Syntax.maude        -- Exp, Stmt, LValue, Block constructors (deep embedding)
-  Path.maude          -- lvalue → List{Field} lowering; storage-alias binding
   Config.maude        -- configuration sort, env (locals), revert marker
-  Expr.maude          -- big-step expression evaluation (Tier 1)
+  Expr.maude          -- big-step expression evaluation (Tier 1); lvalue
+                         lowering and the array bounds guard. Path.maude from
+                         the original layout was never needed: lowering is
+                         small enough to live here.
+  Order.maude         -- solc's evaluation order as a capture pass (see below)
   Stmt.maude          -- assignment family, decl, delete, push/pop (Tier 2)
   Flow.maude          -- if / while / return / require / assert / revert (Tier 3)
   Net.maude           -- net ledger, msg, transfer (no-callback)
   NetCallback.maude   -- with-callback transfer, invariants, re-entrancy (rules)
   Contract.maude      -- contract decl, function table, call/inline, constructor
+  golden.sh           -- expected-value gate: run-tests.sh only checks for
+                         warnings and stuck terms, not results
   examples/
     Bank.maude        -- the PaperTest.sol-style end-to-end suite
+    solkey/           -- the SolKey cross-check mirror suite; see its README
     Casino.maude      -- (stretch) the ISoLA paper's running example
 ```
 
@@ -203,7 +214,8 @@ outputs match the trailing `*** …` comments.
   - storage-alias declaration and rebinding (path-valued locals).
 - Tests: port the SolKey focused-example matrix (`keyext.solidity.examples/
   taclets/`) — root/field/index × read/write/copy/inc-dec/compound, aliases,
-  push/pop incl. RHS-before-LHS evaluation order (`testStorageEvaluationOrder`),
+  push/pop; evaluation order is done — see `examples/solkey/EvalOrder.maude`
+  (`testStorageEvaluationOrder` and the binary-operand family);
   deep-pop-preserves-mapping (`testDeepPopDoesNotResetMappingMember`).
 
 ## Phase 3 — Control flow (SolKey Tier 3: the keystone)

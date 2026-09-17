@@ -1,0 +1,259 @@
+*** src/StorageCopy.maude — storage variant: a struct copy keeps the TARGET's
+*** mapping members, and delete is sort-directed.
+***
+*** Sibling of ../src/Storage.maude, which is left untouched for comparison
+*** -- both define STORAGE, so they can never be loaded together, see
+*** CLAUDE.md. Three deltas, all mirroring SolKey's current structRules.key:
+***
+***  1. save's leaf does not collapse.  SolKey deleted `saveOnEmpty :
+***     save(st,nil,v) ⇝ v` because Solidity NEVER copies a mapping: a struct
+***     written over a location keeps that location's mapping members. The
+***     leaf stays a term and is read through by the member's sort.
+***  2. delete is sort-directed (delValue / delNode).  The exact read of a
+***     deleted STRUCT slot is a delete-marked struct, not a primitive
+***     default, so `delete p ; q = p ;` composes with the copy rules.
+***  3. push() clears the appended slot (SolKey storagePushLengthSave), using
+***     the mapping-preserving delAt.
+***
+*** ENCODING.  SolKey reads one selector at a time (selectSt), so its leaf can
+*** literally be save(st, nil, v). Here reads are whole-path (find), and
+*** widening save to List{Field} would make save(st, P1 P2, v) with P2 = nil
+*** overlap the exact-read case. So the leaf is an explicit constructor `ovr`
+*** -- target-old, source-new -- built ON READ when the query reaches the written
+*** path. Correspondence with SolKey:
+***
+***     save(st, nil, v)              ovr(target, source)
+***     delNode / delValue            delNode / delValue
+***     cast<[Struct]>                v→st
+***     selectOnSaveEmptyMap          find(ovr(st,str), mapf flds)
+***     selectOnSaveEmptyDefault      find(ovr(st,str), pf flds)
+***     selectOnSaveEmptyIndexStruct  find(ovr(st,str), i flds)
+***     selectOnSaveEmptyRef          find(ovr(st,str), rf flds)
+***
+*** DISPATCH is by sort, never by owise, on two disjoint splits already in
+*** Fields.maude: Prim vs Struct under StValue (was a primitive or a struct
+*** written here?), and PrimField / RefField / MapField / Int under Field$Elt
+*** -- the path-based analogue of "the member's sort".
+***
+*** CONFLUENCE.  The three find(save(…)) rules are pairwise non-overlapping:
+*** prm and str have disjoint sorts, and the prefix rule needs the query
+*** strictly SHORTER than the write path while the leaf rule needs it at least
+*** as long. The four ovr rules and the four delNode rules are separated by the
+*** disjoint sorts of the head field; find(delNode(st), i) vs (i fldsN) by path
+*** length. Only two owise equations survive — delValue's primitive fallback
+*** -- SolKey's delValueDefault, the generic-alphaPrim case -- and the pre-existing
+*** disjoint-path passthrough. Neither can pre-empt sem/Config.maude's
+*** `find(mtSt, LFXS Id) = 0 [owise]`, because every equation here has a
+*** non-variable constructor (save/ovr/delNode/delAt) in argument 1.
+***
+*** TERMINATION.  Lexicographic on ⟨remaining query-path length, write-chain
+*** depth, find-nesting depth⟩: each recursive rule strictly decreases the
+*** first, or peels one save/delAt layer off a finite chain; the flattening
+*** rule find(find(st,p),q) = find(st, p q) decreases the third and preserves
+*** the first.
+***
+*** Invariants live in the term algebra (ovr / delNode / delValue are
+*** sort-directed constructors), not in cmb checker predicates. The only
+*** memberships are the three find(…) : Struct sort stamps — the Maude
+*** analogue of SolKey's find<[Struct]> cast, moved here from sem/Stmt.maude
+*** because the delValue dispatch needs them.
+
+load Fields .
+
+fmod STORAGE{Field :: TRIV} is
+    pr FIELDS{Field} .
+    pr LIST{Field} .
+
+    sort Struct .
+
+    subsort Struct < StValue .   *** structHeader.key: Struct \extends StValue
+
+    *** signatures mirror SolKey structRules.key: storage holds StValue
+    op mtSt : -> Struct .
+    op storeSt : Struct Field$Elt StValue -> Struct .
+    op selectSt : Struct Field$Elt -> StValue .
+    op find : Struct List{Field} -> StValue .
+    op save : Struct NeList{Field} StValue -> Struct .
+    op push : Struct NeList{Field} StValue -> Struct .
+    op push : Struct NeList{Field} -> Struct .
+    op pop : Struct NeList{Field} -> Struct .
+
+    vars st nSt : Struct .
+    var fld : Field$Elt .
+    var val : StValue .
+    var str : Struct .
+    var prm : Prim .
+    var flds flds2 : List{Field} .
+    var fldsN fldsN2 : NeList{Field} .
+    vars nl old_length : Int .
+
+    var pf : PrimField .   var rf : RefField .   var mapf : MapField .   var i : Int .
+    var raf : RefArrField .   var rmf : RefMapField .
+    var dp : NeList{Field} .
+    vars pre rest qp : List{Field} .
+
+    *** the Maude analogue of SolKey's find<[Struct]> cast, whose sort the
+    *** converter stamps from the declared mapping/array value type. This is
+    *** what lets `accountMap[2] = accountMap[1]` copy a whole mapping entry.
+    mb find(st, flds rf)    : Struct .
+    mb find(st, flds raf i) : Struct .
+    mb find(st, flds rmf i) : Struct .
+
+    eq find(storeSt(st, fld, val), fld flds) = find(val, flds) .
+    eq find(val, nil) = val .
+
+    *** SolKey's cast<[Struct]>: a slot whose zero-init is a primitive has no
+    *** mapping members to keep, so it casts to the empty struct. Two
+    *** equations on disjoint sorts, deliberately NOT an owise — an
+    *** unknown-sort cast must surface as a visible stuck term.
+    op v→st : Value -> Struct .
+    eq v→st(str) = str .
+    eq v→st(prm) = mtSt .
+
+    eq find(find(st, fldsN), fldsN2) =  find(st, fldsN fldsN2) .
+
+    *** ---- write: save, whose leaf is the non-collapsing overlay ----------
+    eq find(save(st, fldsN, prm), fldsN) = prm .                    *** saveOnEmptyPrim
+    eq find(save(st, fldsN, str), fldsN flds) =
+        find(ovr(v→st(find(st, fldsN)), str), flds) .               *** selectOnSaveCons -> leaf
+    *** prefix read: the query stops short of the written path, so the write
+    *** is re-suspended one level in. v→st is SolKey's cast<[Struct]>: the
+    *** prefix may land on a slot whose zero-init is a primitive -- an Int-keyed
+    *** element read after the container's RefArrField stamp has been consumed
+    *** by an earlier reference step -- and save's first argument is a Struct.
+    *** Without the cast that term sits at the KIND, which is what
+    *** run-tests.sh's kind_re now catches.
+    eq find(save(st, fldsN fldsN2, val), fldsN) = save(v→st(find(st, fldsN)), fldsN2, val) .
+    ceq find(save(st, fldsN, val), fldsN2) = find(st, fldsN2)
+        if fldsN =/= fldsN2 [owise] .
+
+    *** ---- the overlay leaf: read through by the member's sort ------------
+    op ovr : Struct StValue -> Struct .   *** SolKey's irreducible save(st, nil, v)
+
+    eq find(ovr(st, str), mapf flds) = find(st, mapf flds) .        *** mapping: the TARGET's own
+    eq find(ovr(st, str), pf flds)   = find(str, pf flds) .         *** primitive: the SOURCE's
+    eq find(ovr(st, str), i flds)    = find(str, i flds) .          *** element:   the SOURCE's
+    eq find(ovr(st, str), rf flds)   =
+        find(ovr(v→st(find(st, rf)), find(str, rf)), flds) .        *** ref: leaf one level down
+
+    *** ---- delete (skips mappings, sort-directed) -------------------------
+    op delAt : Struct NeList{Field} -> Struct .   *** lazy delete, resolved by find
+    op delNode : Struct -> Struct .               *** SolKey delNode: the delete marker
+    op delValue : StValue -> StValue .            *** SolKey delValue<[alpha]>
+
+    eq delValue(str) = delNode(str) .   *** delValueStruct
+    eq delValue(val) = 0 [owise] .      *** delValueDefault: defaultValue<[alphaPrim]>
+
+    eq delAt(st, pre mapf) = st .   *** delete m : whole-mapping no-op (fires before find can mis-recurse a map key)
+
+    *** read-through: query strictly below the deleted path dp
+    eq find(delAt(st, dp), dp pf)        = defaultValue(pf) .                       *** reset primitive member
+    eq find(delAt(st, dp), dp rf rest)   = find(delAt(st, dp rf), dp rf rest) .   *** recurse into referenced struct/array
+    eq find(delAt(st, dp), dp i rest)    = find(delAt(st, dp i),  dp i rest) .    *** recurse into keyed element
+    eq find(delAt(st, dp), dp mapf rest) = find(st, dp mapf rest) .              *** PRESERVE mapping: read original
+
+    *** exact read of the deleted node itself: delAtEmpty + delValue
+    eq find(delAt(st, pre pf), pre pf) = defaultValue(pf) .   *** deleted primitive -> its default
+    eq find(delAt(st, pre rf), pre rf) = delNode(v→st(find(st, pre rf))) .   *** deleted struct/array -> delete-marked
+    eq find(delAt(st, pre i),  pre i)  = delValue(find(st, pre i)) .         *** element: struct -> marked, prim -> 0
+
+    *** ANCESTOR read: the query stops short of the deleted path, so the
+    *** delete is re-suspended on the extracted subtree. SolKey gets this for
+    *** free -- selectOnDelAtCons peels one selector at a time and rebuilds
+    *** `(alpha) delAt(selectSt(st,a1), flds)` -- whereas a whole-path find
+    *** would otherwise fall through to the passthrough below and LOSE the
+    *** delete. Without this, `delete b.xs ; a = b ;` copies the pre-delete b.
+    eq find(delAt(st, qp dp), qp) = delAt(v→st(find(st, qp)), dp) .
+
+    *** disjoint path: pass through to the original
+    eq find(delAt(st, dp), qp) = find(st, qp) [owise] .
+
+    *** ---- the delete marker: read through by the member's sort -----------
+    eq find(delNode(st), mapf flds) = find(st, mapf flds) .   *** selectStDelNodeMap: mapping preserved
+    eq find(delNode(st), pf flds)   = defaultValue(pf) .      *** selectStDelNodeDefault
+    eq find(delNode(st), rf flds)   = find(delNode(v→st(find(st, rf))), flds) .   *** selectStDelNodeRef
+    eq find(delNode(st), i)         = 0 .
+    eq find(delNode(st), i fldsN)   = find(delNode(v→st(find(st, i))), fldsN) .
+
+    *** ---- push / pop -----------------------------------------------------
+    ceq push(st, fldsN, val) = save(nSt, fldsN length, s old_length)
+        if old_length := find(st, fldsN length) /\ s nl := old_length /\ nSt := save(st, fldsN nl, val) .
+    *** storagePushLengthSave: push() CLEARS the appended slot (mapping-preserving)
+    ceq push(st, fldsN) = save(delAt(st, fldsN old_length), fldsN length, s old_length)
+        if old_length := find(st, fldsN length) .
+    ceq pop(st, fldsN) = save(delAt(st, fldsN nl), fldsN length, nl)
+        if old_length := find(st, fldsN length) /\ s nl := old_length .
+endfm
+
+fmod Example{Field :: TRIV} is
+    pr STORAGE{Field} .
+
+    ops $alice $bob $carol $account $a : -> RefField .
+    ops $ledger $ledger2 $inner : -> RefField .
+    ops $balance $nonce : -> PrimField .
+    op $m : -> MapField .
+    op $balances : -> MapField .
+    ops st stEx stEx2 stD stArr stPop stCopy : -> Struct .
+
+    var pf : PrimField .
+    eq defaultValue(pf) = 0 .          *** every primitive reset is 0 (incl. defaultValue(length) = 0)
+    eq defaultValue($account) = mtSt .
+    eq defaultValue($a) = mtSt .
+
+    eq stEx = save(save(st, $alice $account length, 10), $alice $account 5, 20) .
+
+    eq stEx2 = save(st, $account length, 10) .
+
+    *** delete tests: struct with a primitive, a nested struct, and a mapping
+    eq stD   = save(save(save(st, $alice $balance, 5), $alice $account $balance, 7), $alice $m 9, 42) .
+    *** delete tests: a dynamic array (length slot + element)
+    eq stArr = save(save(st, $a length, 3), $a 1, 100) .
+    *** pop test: array of structs, element 0 holds a nested mapping and a primitive
+    eq stPop = save(save(save(st, $a length, 1), $a 0 $account $m 1, 10), $a 0 $account $balance, 5) .
+
+    *** copy test: ledger2 = ledger, mirroring keyext.solidity.examples/storage/copyKeepsMapping.key
+    eq stCopy = save(st, $ledger2, find(st, $ledger)) .
+endfm
+
+red find(stEx, $alice $account length) .
+red find(stEx, $alice $account 5) .
+red find(stEx, $alice) .
+
+red push(stEx2, $account, 20) .
+red pop(stEx, $alice $account) .
+
+red push(stEx2, $account) .   *** now CLEARS the appended slot: delAt(…, $account 10)
+
+*** ---- delete: nested / lazy / sort-directed ------------------------------
+red find(delAt(stEx2, $account length), $account length) .  *** 0   value-type reset
+red find(delAt(stD, $alice),      $alice $balance) .        *** 0   sibling primitive reset
+red find(delAt(stD, $alice),      $alice $account $balance) . *** 0  nested struct reset
+red find(delAt(stD, $alice),      $alice $m 9) .            *** 42  MAP PRESERVED (critical)
+red find(delAt(stD, $alice $m),   $alice $m 9) .            *** 42  delete m : no-op
+red find(delAt(stD, $alice $m 9), $alice $m 9) .            *** 0   delete m[9] : one entry reset
+red find(delAt(stD, $alice $m 9), $alice $m 3) .            *** find(st, $alice $m 3)  other key untouched
+red find(delAt(stArr, $a),        $a length) .              *** 0   whole-array delete: length 0
+red find(delAt(stArr, $a 1),      $a length) .              *** 3   delete arr[1]: length untouched
+red find(delAt(stArr, $a 1),      $a 1) .                   *** 0
+
+*** the exact read of a deleted STRUCT slot is a delete-MARKED struct, not 0.
+*** This is what makes `delete p ; q = p ;` compose with the copy rules
+*** SolKey storageRootDeleteThenCopy. ../Storage.maude returns a primitive
+*** default here and the whole-struct read corner stays open.
+red find(delAt(stD, $alice), $alice) .                      *** delNode(…)  a Struct
+
+*** ---- pop = delete last element, skipping mappings ----------------------
+red find(pop(stPop, $a), $a length) .                        *** 0
+red find(push(pop(stPop, $a), $a), $a length) .              *** 1
+red find(push(pop(stPop, $a), $a), $a 0 $account $m 1) .     *** 10  MAP PRESERVED across pop+push
+red find(push(pop(stPop, $a), $a), $a 0 $account $balance) . *** 0   nested primitive reset by pop
+
+*** ---- struct copy keeps the TARGET's mapping members --------------------
+*** copyKeepsMapping.key: value members come from the source, at the top and
+*** through the RefField; mapping members stay the target's own, at the top
+*** and one level down.
+red find(stCopy, $ledger2 $nonce) .                   *** find(st, $ledger $nonce)          value  <- SOURCE
+red find(stCopy, $ledger2 $inner $nonce) .            *** find(st, $ledger $inner $nonce)   value  <- SOURCE, through a RefField
+red find(stCopy, $ledger2 $balances 1) .              *** find(st, $ledger2 $balances 1)    map    <- TARGET's own
+red find(stCopy, $ledger2 $inner $balances 1) .       *** find(st, $ledger2 $inner $balances 1)  map <- TARGET's own, one level down
+red find(stCopy, $ledger2) .                          *** ovr(…)  the leaf is irreducible

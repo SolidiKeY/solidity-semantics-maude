@@ -1,3 +1,15 @@
+(* TWIN NOTE (Maude: src/StorageCopy.maude). `save Mtst [] v = v` below is the
+   collapsing leaf that SolKey deleted and that src/StorageCopy.maude replaces:
+   a struct written over a storage location must keep that location's mapping
+   members, since Solidity never copies a mapping. select_save is proved about
+   the collapsing form, so this is a theorem change, not just a definition
+   change.
+
+   Prerequisite, as for the Agda twin: the field sort split
+   PrimField / RefField / MapField (src/Fields.maude). The dispatch that sends
+   mapping members to the target and everything else to the source cannot be
+   written over the flat key type `b` used here. *)
+
 module Storage
 
 type value a b =

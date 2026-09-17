@@ -1,0 +1,111 @@
+*** src/sem/examples/solkey/EvalOrder.maude
+***
+*** solc's EVALUATION ORDER. Mirrors the TestSuite.sol witnesses SolKey added
+*** for the legacy-pipeline order, which is NOT left to right:
+***
+***   BINARY OPERATORS: the RIGHT operand is compiled first
+***     additionLeftImpureRightReadFirst, additionRightImpure,
+***     additionBothOperandsImpure, subtractionLeftImpureRightReadFirst,
+***     lessThanLeftImpureRightReadFirst
+***   INDEX WRITES: right-hand side, then receiver, then index
+***     testStorageIndexWriteImpureIndexPrimitiveRhs, testStorageEvaluationOrder,
+***     testStorageIndexWriteImpureIndexRefRhs, testNestedIndexWrite*,
+***     testStoragePushImpureReceiver, testCompoundAssignImpureReceiver,
+***     testStorageDeleteImpureReceiver
+***
+*** These were unstatable here until two changes landed together:
+***   Syntax.maude -- ++ / -- became Exp constructors, not just statements;
+***   Syntax.maude -- Int left Exp's kind, so + and * stopped inheriting the
+***     prelude's assoc comm. Under AC, `'i ++ + 'i` and `'i + 'i ++` were the
+***     SAME TERM, so at most one of them could ever be right.
+*** The order itself is imposed by the capture pass in ../../Order.maude.
+***
+*** SolKey notes that via-IR evaluates left to right, so these witnesses pin
+*** the legacy pipeline, as SolKey's do.
+
+load Store .
+
+fmod EVALORDER-DEMO{Field :: TRIV} is
+    pr PAPER-STORE{Field} .
+endfm
+
+*** ---- binary operands: RIGHT before LEFT --------------------------------
+*** additionLeftImpureRightReadFirst. Left-first would give 3; the EVM gives 2
+*** because the right operand reads i BEFORE the left one bumps it.
+red < var 'i = # 1 ; var 'x = # 0 ; 'x = 'i ++ + 'i ; >
+    ('x == # 2 && 'i == # 2) .                                    *** true
+*** additionRightImpure: the right operand's bump is visible to the left
+red < var 'i = # 1 ; var 'x = # 0 ; 'x = 'i + 'i ++ ; >
+    ('x == # 3 && 'i == # 2) .                                    *** true
+*** additionBothOperandsImpure
+red < var 'i = # 1 ; var 'x = # 0 ; 'x = 'i ++ + 'i ++ ; >
+    ('x == # 3 && 'i == # 3) .                                    *** true
+*** subtractionLeftImpureRightReadFirst -- a NON-commutative operator, so this
+*** one pins the direction independently of any AC question
+red < var 'i = # 5 ; var 'x = # 0 ; 'x = 'i ++ - 'i ; >
+    ('x == # 0 && 'i == # 6) .                                    *** true
+red < var 'i = # 5 ; var 'x = # 0 ; 'x = 'i - 'i ++ ; >
+    ('x == # 1 && 'i == # 6) .                                    *** true
+*** lessThanLeftImpureRightReadFirst: 1 < 1 is false
+red < var 'i = # 1 ; var 'b = # 0 ; 'b = 'i ++ < 'i ; >
+    ('b == # 0 && 'i == # 2) .                                    *** true
+red < var 'i = # 1 ; var 'b = # 0 ; 'b = 'i < 'i ++ ; >
+    ('b == # 0 && 'i == # 2) .                                    *** true
+
+*** ---- increment as an expression, on a storage lvalue -------------------
+red < $alice . $age = # 30 ; var 'r = $alice . $age ++ ; >
+    ('r == # 30 && $alice . $age == # 31) .                       *** true   post: old value
+red < $alice . $age = # 30 ; var 'r = ++ $alice . $age ; >
+    ('r == # 31 && $alice . $age == # 31) .                       *** true   pre: new value
+red < $alice . $age = # 30 ; var 'r = $alice . $age -- ; >
+    ('r == # 30 && $alice . $age == # 29) .                       *** true
+red < $alice . $age = # 30 ; var 'r = -- $alice . $age ; >
+    ('r == # 29 && $alice . $age == # 29) .                       *** true
+
+*** ---- index writes: RHS, then receiver, then index ----------------------
+*** testStorageIndexWriteImpureIndexPrimitiveRhs: a[i++] = i stores the OLD i
+red < $values .push(# 0) ; $values .push(# 0) ; var 'i = # 0 ;
+      $values [ 'i ++ ] = 'i ; >
+    ('i == # 1 && $values [ # 0 ] == # 0) .                       *** true
+*** testStorageEvaluationOrder: a[++i] = ++i -- both bumps happen, the RHS is
+*** read first so the value stored is the FIRST new value
+red < $values .push(# 0) ; $values .push(# 0) ; $values .push(# 0) ; var 'i = # 0 ;
+      $values [ ++ 'i ] = ++ 'i ; >
+    ('i == # 2 && $values [ # 2 ] == # 1) .                       *** true
+*** testStorageIndexWriteImpureIndexRefRhs -- the documented ASYMMETRY: solc is
+*** not RHS-first when the source is a STRUCT. It resolves the target slot and
+*** copies field by field, reading the source at copy time, so the incremented
+*** age lands in storage. Contrast the primitive case above.
+red < $persons .push() ; $bob . $age = # 0 ;
+      $persons [ $bob . $age ++ ] = $bob ; >
+    ($bob . $age == # 1 && $persons [ # 0 ] . $age == # 1) .      *** true
+*** testNestedIndexWriteImpureIndexPrimitiveRhs: nesting decomposes by
+*** recursion, not by any depth-keyed rule
+red < $matrix .push() ; $matrix .push() ;
+      $matrix [ # 0 ] .push(# 0) ; $matrix [ # 1 ] .push(# 0) ; var 'i = # 0 ;
+      $matrix [ 'i ++ ] [ # 0 ] = 'i ; >
+    ('i == # 1 && $matrix [ # 0 ] [ # 0 ] == # 0) .               *** true
+*** both receiver index and outer index impure
+red < $matrix .push() ; $matrix .push() ;
+      $matrix [ # 0 ] .push(# 0) ; $matrix [ # 0 ] .push(# 0) ;
+      $matrix [ # 1 ] .push(# 0) ; $matrix [ # 1 ] .push(# 0) ; var 'i = # 0 ;
+      $matrix [ 'i ++ ] [ 'i ++ ] = # 77 ; >
+    ('i == # 2 && $matrix [ # 0 ] [ # 1 ] == # 77) .              *** true
+*** testStoragePushImpureReceiver -- push is compiled as a CALL, so the
+*** receiver is evaluated BEFORE the argument. The opposite of assignment.
+red < $matrix .push() ; $matrix .push() ; var 'i = # 0 ;
+      $matrix [ 'i ++ ] .push('i) ; >
+    ('i == # 1 && $matrix [ # 0 ] [ # 0 ] == # 1) .               *** true
+*** testCompoundAssignImpureReceiver -- RHS first, so the OLD i is added
+red < $persons .push() ; $persons .push() ; var 'i = # 0 ;
+      $persons [ 'i ++ ] . $age += 'i ; >
+    ('i == # 1 && $persons [ # 0 ] . $age == # 0) .               *** true
+*** testStorageDeleteImpureReceiver
+red < $matrix .push() ; $matrix [ # 0 ] .push(# 7) ; var 'i = # 0 ;
+      delete $matrix [ 'i ++ ] ; >
+    ('i == # 1 && $matrix [ # 0 ] . length == # 0) .              *** true
+
+*** ---- memory index writes follow the same order -------------------------
+red < memory 'xs = new( # 2 ) ; var 'i = # 0 ;
+      'xs [ 'i ++ ] = 'i ; >
+    ('i == # 1 && 'xs [ # 0 ] == # 0) .                           *** true
