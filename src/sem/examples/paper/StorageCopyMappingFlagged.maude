@@ -1,0 +1,195 @@
+*** src/sem/examples/paper/StorageCopyMappingFlagged.maude
+***
+*** StorageCopyMapping.maude's program, run by the sem/ layer on the OTHER
+*** storage model. Same statements, same derivation notation, same answers --
+*** reached by asking a different question at the copy leaf.
+***
+***     StorageCopyMapping.maude   ../../../StorageCopy.maude   the FIELD's sort
+***     this file                  ../../../StorageFlag.maude   the VALUE at the path
+***
+*** That file's block C already steps `find` in both models. This one is the
+*** other half: the whole STATEMENT derivation, in a session whose storage model
+*** is the flagged one.
+***
+*** HOW THE SWITCH IS DONE, and why it is a separate file. ../../Config.maude
+*** loads one storage model for the whole session (line 26), and the variants
+*** all define the module STORAGE, so two of them can never be in scope at once
+*** -- that is the repo's swap idiom, and it is why this is a file over rather
+*** than a block. Here the chain is loaded as usual and STORAGE is then
+*** REDEFINED as a wrapper over STORAGE-FLAG:
+***
+***     load Domain .                      *** the sem/ layer, on StorageCopy
+***     sload ../../../StorageFlag .
+***     fmod STORAGE{Field :: TRIV} is pr STORAGE-FLAG{Field} . endfm
+***
+*** Maude reparses every importer of STORAGE -- SOL-CONFIG, SOL-EXPR, SOL-STMT
+*** and the rest -- against the new one, which it announces as an Advisory and
+*** not a Warning, so run-tests.sh stays green. The sem/ layer needs no port.
+*** STORAGE-FLAG is missing exactly two of STORAGE's operators, storeSt and
+*** selectSt: sem/ never names selectSt at all, and names storeSt only in two
+*** comments in Contract.maude.
+***
+*** THE LAYOUT IS THE INPUT. The flagged model has no field sorts to read
+*** map-ness off, so a mapping slot must be DECLARED, and the sem/ layer has no
+*** notion of a declaration: ../../Steps.maude starts every goal at mtSt. An
+*** initial update supplies it instead --
+***
+***     red steps({ storage := layout } < … >) .
+***
+*** -- which is a plain goal, not a new mechanism: `fill` applies `storage := S`
+*** and takes the entry snapshot from it, the same convention Hoare.maude's
+*** `[ st ]< … >` uses. Block C below is what happens without it.
+***
+*** WHAT EACH BLOCK SHOWS
+***   A  the derivation, arrow for arrow with StorageCopyMapping.maude's A
+***   B  the same claim, written out and CHECKED
+***   C  the same program with NO layout: the mapping IS copied, 'b := 11
+***
+*** A ZERO-INIT OVERLAP to know about. ../../Config.maude:66-74 gives find(mtSt,
+*** …) a sort-directed default -- a PrimField reads defaultValue, a RefField
+*** reads mtSt -- and STORAGE-FLAG:120 gives it an untyped one, find(mtSt,
+*** fldsN) = 0, deliberately non-owise. Both are in scope here and they overlap
+*** on every path, agreeing at a primitive and disagreeing at a reference,
+*** where Config says mtSt and the flagged model says 0. Nothing below depends
+*** on the difference -- v→st casts a primitive to mtSt on the way down, which
+*** is exactly the case the flagged model's own zero-init is written for -- but
+*** a file that reads an unwritten struct location for its VALUE rather than to
+*** descend through it would be reading an unspecified choice between two
+*** equations, and should not be written against this session.
+
+load Domain .
+sload ../../../StorageFlag .
+
+*** the switch: STORAGE is now the value-directed model
+fmod STORAGE{Field :: TRIV} is
+    pr STORAGE-FLAG{Field} .
+endfm
+
+*** As in StorageCopyMapping.maude, this is the module Steps.maude reflects, so
+*** $ledger2 and `layout` are declared INSIDE it: a constant added from outside
+*** does not exist in the module metaRewrite runs in.
+fmod PAPER-FLAG-DOMAIN{Field :: TRIV} is
+    pr PAPER-DOMAIN{Field} .
+
+    op $ledger2 : -> RefField .
+    eq defaultValue($ledger2) = mtSt .
+
+    op $ledger2 : -> Root .
+    var Clv : Cells .
+    eq lower($ledger2, Clv) = sloc($ledger2) .
+
+    *** the contract's storage layout: every mapping slot, with its entry
+    *** template. In StorageCopyMapping.maude this information is carried by
+    *** $balances being declared at sort MapField; here it is a term.
+    op layout : -> Struct .
+    eq layout = decl(decl(mtSt, $ledger $balances, 0), $ledger2 $balances, 0) .
+endfm
+
+fmod PAPER-FLAG-STEPS{Field :: TRIV} is
+    pr PAPER-FLAG-DOMAIN{Field} .
+    pr SOL-STEPS{Field} .
+    eq theModule = 'PAPER-FLAG-DOMAIN .
+endfm
+
+*** ---- A  the derivation ---------------------------------------------------
+*** Compare StorageCopyMapping.maude's A: same five statements, same five ~>,
+*** same 'b := 0 || 'n := 5. The storage terms differ only by the layout they
+*** are built over, and by the copied subtree carrying the source's declared
+*** slot save(mtSt, $balances, mapOf(0)) where the sorted model has bare mtSt.
+red in PAPER-FLAG-STEPS :
+steps({ storage := layout }
+      < $ledger . $nonce = # 5 ;  $ledger . $balances [ # 1 ] = # 11 ;
+        $ledger2 = $ledger ;
+        var 'n = $ledger2 . $nonce ;
+        var 'b = $ledger2 . $balances [ # 1 ] ; >) .
+*** {storage := layout}< … > ~> {storage := save(layout, $ledger $nonce, 5)}< … >
+***   ~> {storage := L2}< ($ledger2).Root = ($ledger).Root ; … >
+***   ~> {storage := save(L2, $ledger2, SRC)}< var 'n = … ; var 'b = … ; >
+***   ~> {storage := save(L2, $ledger2, SRC) || 'n := 5}< var 'b = … ; >
+***   ~> {storage := save(L2, $ledger2, SRC) || 'b := 0 || 'n := 5}
+*** where L2  = save(save(layout, $ledger $nonce, 5), $ledger $balances 1, 11)
+***       SRC = save(save(save(mtSt, $balances, mapOf(0)), $nonce, 5), $balances 1, 11)
+
+*** ---- B  the claim, written out and checked -------------------------------
+*** StorageCopyMapping.maude's B, arrow for arrow, with `layout` standing for
+*** the two decls it reduces to.
+red in PAPER-FLAG-STEPS :
+|- { storage := layout }
+   < $ledger . $nonce = # 5 ;  $ledger . $balances [ # 1 ] = # 11 ;
+     $ledger2 = $ledger ;
+     var 'n = $ledger2 . $nonce ;
+     var 'b = $ledger2 . $balances [ # 1 ] ; >
+    ~*> { storage := save(save(layout, $ledger $nonce, 5),
+                    $ledger $balances 1, 11) }
+        < $ledger2 = $ledger ;
+          var 'n = $ledger2 . $nonce ;
+          var 'b = $ledger2 . $balances [ # 1 ] ; >
+    ~>  { storage := save(save(save(layout, $ledger $nonce, 5),
+                    $ledger $balances 1, 11),
+                    $ledger2, save(save(save(mtSt, $balances, mapOf(0)),
+                    $nonce, 5), $balances 1, 11)) }
+        < var 'n = $ledger2 . $nonce ;
+          var 'b = $ledger2 . $balances [ # 1 ] ; >
+    ~>  { storage := save(save(save(layout, $ledger $nonce, 5),
+                    $ledger $balances 1, 11),
+                    $ledger2, save(save(save(mtSt, $balances, mapOf(0)),
+                    $nonce, 5), $balances 1, 11))
+          || 'n := 5 }
+        < var 'b = $ledger2 . $balances [ # 1 ] ; >
+    ~>  { storage := save(save(save(layout, $ledger $nonce, 5),
+                    $ledger $balances 1, 11),
+                    $ledger2, save(save(save(mtSt, $balances, mapOf(0)),
+                    $nonce, 5), $balances 1, 11))
+          || 'n := 5 || 'b := 0 } .                                        *** true
+
+*** the negation, as in StorageCopyMapping.maude: 'b did NOT come from the
+*** source. Not derivable here either.
+red in PAPER-FLAG-STEPS :
+|- { storage := layout }
+   < $ledger . $nonce = # 5 ;  $ledger . $balances [ # 1 ] = # 11 ;
+     $ledger2 = $ledger ;
+     var 'b = $ledger2 . $balances [ # 1 ] ; >
+    ~*> { storage := save(save(save(layout, $ledger $nonce, 5),
+                    $ledger $balances 1, 11),
+                    $ledger2, save(save(save(mtSt, $balances, mapOf(0)),
+                    $nonce, 5), $balances 1, 11))
+          || 'b := 11 } .                                                  *** false
+
+*** and the one-shot triple. A triple carries its entry storage in Hoare.maude's
+*** own bracket, `[ st ]< … >(phi)`, not in a Steps.maude update: the two
+*** notations mean the same thing here -- `fill` takes the entry snapshot from
+*** `storage :=` precisely so that they do.
+red in PAPER-FLAG-STEPS :
+[ layout ]
+< $ledger . $nonce = # 5 ;  $ledger . $balances [ # 1 ] = # 11 ;
+  $ledger2 = $ledger ;
+  var 'n = $ledger2 . $nonce ;
+  var 'b = $ledger2 . $balances [ # 1 ] ; >
+    ('n == # 5 && 'b == # 0) .                                             *** true
+
+*** ---- C  the same program with NO layout ----------------------------------
+*** Drop the initial update and the model is told nothing about where the
+*** mappings are. It is an untyped store, so the only evidence left is the
+*** VALUE at the path, and an unwritten target has none: the copy leaf reads
+*** the member off the source and 'b := 11 -- the mapping IS copied, which is
+*** wrong for Solidity. This is ../../../StorageCompare.maude's 2d, reached
+*** from the statement level instead of from a storage term.
+***
+*** It is not a defect of the model but the price of its input: map-ness lives
+*** in the store, so a store that was never declared does not have it. The
+*** sorted model cannot go wrong this way and cannot be told anything either --
+*** its answer is fixed when $balances is declared at sort MapField. What each
+*** model needs in order to be right is the whole difference between them.
+red in PAPER-FLAG-STEPS :
+run(< $ledger . $nonce = # 5 ;  $ledger . $balances [ # 1 ] = # 11 ;
+      $ledger2 = $ledger ;
+      var 'n = $ledger2 . $nonce ;
+      var 'b = $ledger2 . $balances [ # 1 ] ; >) .
+*** {storage := save(save(save(mtSt, $ledger $nonce, 5), $ledger $balances 1,
+*** 11), $ledger2, save(save(mtSt, $nonce, 5), $balances 1, 11))
+***  || 'b := 11 || 'n := 5}
+red in PAPER-FLAG-STEPS :
+< $ledger . $nonce = # 5 ;  $ledger . $balances [ # 1 ] = # 11 ;
+  $ledger2 = $ledger ;
+  var 'b = $ledger2 . $balances [ # 1 ] ; >
+    ('b == # 11) .                                    *** true -- the undeclared store

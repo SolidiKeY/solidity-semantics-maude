@@ -47,6 +47,7 @@ roots=(
   "$here/examples/paper/StorageArrays.maude"
   "$here/examples/paper/StorageDelete.maude"
   "$here/examples/paper/StorageCopyMapping.maude"
+  "$here/examples/paper/StorageCopyMappingFlagged.maude"
   "$here/examples/paper/Arithmetic.maude"
   "$here/examples/paper/MemoryExamples.maude"
   "$here/examples/paper/MemoryDelete.maude"

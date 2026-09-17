@@ -23,13 +23,27 @@ Each file ends in a block of reductions with the expected value in a trailing
 
 The last is the only form that steps *below* the statement level, where one
 `~>` is one statement and the whole read of a storage location is hidden
-inside it. It comes from `src/FindSteps.maude` rather than `src/sem/Steps.maude`,
-it takes the module to step as its first argument, and because it works on raw
-storage terms it is also the only place in `examples/` where a second storage
-model appears: `StorageCopyMapping.maude` runs the same read through both
-`src/StorageCopy.maude` (map-ness in the field's sort) and
-`src/StorageFlag.maude` (map-ness in the store). `src/StorageCompare.maude` is
-the systematic head-to-head of those two.
+inside it. It comes from `src/FindSteps.maude` rather than `src/sem/Steps.maude`
+and takes the module to step as its first argument. `StorageCopyMapping.maude`
+uses it to continue its own derivation: block C steps the two reads that
+blocks A and B perform in one arrow each.
+
+### The second storage model
+
+Everything here runs on `src/StorageCopy.maude`, which `src/sem/Config.maude`
+loads for the whole session. Two files show the alternative,
+`src/StorageFlag.maude`, where map-ness is carried by the value at the path
+rather than by the field's sort:
+
+- `StorageCopyMapping.maude` block C — both models, at the level of raw
+  storage terms, via the theory in `src/StorageApi.maude`.
+- `StorageCopyMappingFlagged.maude` — the same program at the **statement**
+  level, in a session that redefines `STORAGE` over `STORAGE-FLAG` after the
+  chain is loaded. The sem/ layer needs no port; what it does need is a
+  declared layout, supplied as an initial `{ storage := layout }`, and the file
+  also shows what the model answers without one.
+
+`src/StorageCompare.maude` is the systematic head-to-head of the two.
 
 ## Files ↔ paper sections
 
@@ -39,7 +53,8 @@ the systematic head-to-head of those two.
 | `StorageExamples.maude` | `sections/storage-examples.tex` |
 | `StorageArrays.maude` | `sections/storage-examples-arrays.tex` |
 | `StorageDelete.maude` | `sections/storage-examples-delete.tex` |
-| `StorageCopyMapping.maude` | no paper section — SolKey `copyKeepsMapping.key`: the storage→storage copy over a mapping, ending in the `find` reduction itself, in both storage models |
+| `StorageCopyMapping.maude` | no paper section — SolKey `copyKeepsMapping.key`: the storage→storage copy over a mapping, with its two reads continued into the `find` reduction itself, in both storage models |
+| `StorageCopyMappingFlagged.maude` | the file above's program at the statement level, on `src/StorageFlag.maude` instead |
 | `Arithmetic.maude` | `sections/arithmetic.tex` (compound storage update) |
 | `MemoryExamples.maude` | `sections/memory-examples.tex` |
 | `MemoryDelete.maude` | `sections/memory-examples-delete.tex` |
