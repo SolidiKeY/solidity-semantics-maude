@@ -30,7 +30,9 @@
 ***                                             find(str, rf)), flds)    ref: leaf one level down
 ***
 *** So the copy is not a merge and not a filter: the source struct is written
-*** whole, and the READER decides which side each member comes from.
+*** whole, and the READER decides which side each member comes from. Block F is
+*** those four equations firing, one arrow each; blocks A-E only ever show the
+*** answer they add up to.
 ***
 *** WHAT EACH BLOCK SHOWS
 ***   A  the derivation, one ~> per statement, with the written struct value
@@ -38,21 +40,32 @@
 ***   C  a key the target never wrote: not merged, not copied -- just 0
 ***   D  the leaf itself, printed: copying the copy leaves ovr(...) in storage
 ***   E  the RefField equation: the same split one level down, via alice = bob
+***   F  the read itself, one ~> per find equation -- in BOTH storage models
+***
+*** THE TARGET IS NOT SET UP in A and B. The program writes only $ledger, so the
+*** target's own mapping entry is unset and the copied read of $balances[1]
+*** answers 0, not a value the target wrote. That is weaker evidence on its own
+*** -- a reset answers 0 too -- so the discrimination is carried elsewhere: C
+*** reads a key the SOURCE set to 22 and still gets 0, D keeps a target write of
+*** 77 and gets it back, and F shows the arrow that chooses the side.
 ***
 *** WHAT `base: false` MEANS HERE. It marks a reduction that flips if you point
 *** ../../Config.maude at ../../../Storage.maude instead, as ../solkey/Copy.maude
 *** already marks this obligation. Do not read it as "the base model copies the
-*** mapping": measured, the base model has no struct-copy leaf AT ALL, so a read
-*** through a copied struct never resolves to the source. The block-B program
-*** there gives 'n := 1 -- the target's stale nonce, not the source's 5 -- and
-*** the value-copy check at the bottom reads 0. Mapping preservation does not
-*** even arise; that is the latent gap ../../Config.maude:87 flags.
+*** mapping": measured, the base model has no struct-copy leaf AT ALL. Its only
+*** applicable equation is the disjoint-path passthrough, so a read through a
+*** copied struct ignores the copy entirely and resolves against the pre-copy
+*** storage. The block-B program there gives 'n := 0 and 'b := 0 -- the copy is
+*** invisible, not selective. Mapping preservation does not even arise; that is
+*** the latent gap ../../Config.maude:87 flags.
 ***
 *** PAPER-COPY-DOMAIN is the module Steps.maude reflects, so it must NOT import
 *** META-LEVEL, and the constants it steps over must be declared INSIDE it: a
 *** constant added from outside does not exist in the module metaRewrite runs
 *** in. PAPER-STEPS already fixes theModule = 'PAPER-DOMAIN, so the layer below
-*** imports SOL-STEPS directly rather than going through it.
+*** imports SOL-STEPS directly rather than going through it. The same trap is
+*** why block F declares its storage terms inside PAPER-CMP-SORTED and
+*** PAPER-CMP-FLAGGED rather than in the stepper wrappers above them.
 
 load Domain .
 
@@ -75,91 +88,80 @@ fmod PAPER-COPY-STEPS{Field :: TRIV} is
 endfm
 
 *** ---- A  the derivation ---------------------------------------------------
-*** Four setup writes, the copy, then two reads: seven statements, seven ~>.
-*** Below, S4 abbreviates the storage after the four setup writes,
+*** Two setup writes, the copy, then two reads: five statements, five ~>.
+*** Below, S2 abbreviates the storage after the two setup writes,
 ***
-***     S4 = save(save(save(save(mtSt, $ledger $nonce, 5), $ledger $balances 1,
-***                    11), $ledger2 $nonce, 1), $ledger2 $balances 1, 77)
+***     S2 = save(save(mtSt, $ledger $nonce, 5), $ledger $balances 1, 11)
 ***
-*** The fifth goal is the one to look at. The copy writes
+*** The third goal is the one to look at. The copy writes
 ***
-***     save(S4, $ledger2, save(save(mtSt, $nonce, 5), $balances 1, 11))
+***     save(S2, $ledger2, save(save(mtSt, $nonce, 5), $balances 1, 11))
 ***
 *** and that written value DOES carry the source's mapping entry, 11. Two steps
-*** later the read of $ledger2 . $balances[1] still answers 77, the target's
-*** own: the skip happens in find, not in save. A root-to-root assignment
-*** prints as ($ledger2).Root = ($ledger).Root ; -- see Syntax.maude on why a
-*** root lvalue is overloaded at sort Root.
+*** later the read of $ledger2 . $balances[1] answers 0, not 11: the skip
+*** happens in find, not in save. A root-to-root assignment prints as
+*** `($ledger2).Root = ($ledger).Root ;` -- see Syntax.maude on why a root
+*** lvalue is overloaded at sort Root.
 red steps(< $ledger . $nonce = # 5 ;  $ledger . $balances [ # 1 ] = # 11 ;
-            $ledger2 . $nonce = # 1 ; $ledger2 . $balances [ # 1 ] = # 77 ;
             $ledger2 = $ledger ;
             var 'n = $ledger2 . $nonce ;
             var 'b = $ledger2 . $balances [ # 1 ] ; >) .
 *** < … > ~> {storage := save(mtSt, $ledger $nonce, 5)}< … >
-***        ~> {storage := save(save(mtSt, $ledger $nonce, 5), $ledger $balances 1, 11)}< … >
-***        ~> {storage := save(save(save(mtSt, $ledger $nonce, 5), $ledger
-***                       $balances 1, 11), $ledger2 $nonce, 1)}< … >
-***        ~> {storage := S4}< ($ledger2).Root = ($ledger).Root ; … >
-***        ~> {storage := save(S4, $ledger2, save(save(mtSt, $nonce, 5),
+***        ~> {storage := S2}< ($ledger2).Root = ($ledger).Root ; … >
+***        ~> {storage := save(S2, $ledger2, save(save(mtSt, $nonce, 5),
 ***                       $balances 1, 11))}< var 'n = … ; var 'b = … ; >
-***        ~> {storage := save(S4, $ledger2, save(save(mtSt, $nonce, 5),
+***        ~> {storage := save(S2, $ledger2, save(save(mtSt, $nonce, 5),
 ***                       $balances 1, 11)) || 'n := 5}< var 'b = … ; >
-***        ~> {storage := save(S4, $ledger2, save(save(mtSt, $nonce, 5),
-***                       $balances 1, 11)) || 'b := 77 || 'n := 5}
+***        ~> {storage := save(S2, $ledger2, save(save(mtSt, $nonce, 5),
+***                       $balances 1, 11)) || 'b := 0 || 'n := 5}
 
 *** ---- B  the claim, written out and checked -------------------------------
 *** The elision above is informal; this is the exact claim, machine-checked.
-*** ~*> skips the four setup writes, then one ~> per remaining statement.
+*** ~*> skips the two setup writes, then one ~> per remaining statement.
 red |- < $ledger . $nonce = # 5 ;  $ledger . $balances [ # 1 ] = # 11 ;
-         $ledger2 . $nonce = # 1 ; $ledger2 . $balances [ # 1 ] = # 77 ;
          $ledger2 = $ledger ;
          var 'n = $ledger2 . $nonce ;
          var 'b = $ledger2 . $balances [ # 1 ] ; >
-    ~*> { storage := save(save(save(save(mtSt, $ledger $nonce, 5),
-                    $ledger $balances 1, 11), $ledger2 $nonce, 1),
-                    $ledger2 $balances 1, 77) }
+    ~*> { storage := save(save(mtSt, $ledger $nonce, 5),
+                    $ledger $balances 1, 11) }
         < $ledger2 = $ledger ;
           var 'n = $ledger2 . $nonce ;
           var 'b = $ledger2 . $balances [ # 1 ] ; >
-    ~>  { storage := save(save(save(save(save(mtSt, $ledger $nonce, 5),
-                    $ledger $balances 1, 11), $ledger2 $nonce, 1),
-                    $ledger2 $balances 1, 77),
+    ~>  { storage := save(save(save(mtSt, $ledger $nonce, 5),
+                    $ledger $balances 1, 11),
                     $ledger2, save(save(mtSt, $nonce, 5), $balances 1, 11)) }
         < var 'n = $ledger2 . $nonce ;
           var 'b = $ledger2 . $balances [ # 1 ] ; >
-    ~>  { storage := save(save(save(save(save(mtSt, $ledger $nonce, 5),
-                    $ledger $balances 1, 11), $ledger2 $nonce, 1),
-                    $ledger2 $balances 1, 77),
+    ~>  { storage := save(save(save(mtSt, $ledger $nonce, 5),
+                    $ledger $balances 1, 11),
                     $ledger2, save(save(mtSt, $nonce, 5), $balances 1, 11))
           || 'n := 5 }
         < var 'b = $ledger2 . $balances [ # 1 ] ; >
-    ~>  { storage := save(save(save(save(save(mtSt, $ledger $nonce, 5),
-                    $ledger $balances 1, 11), $ledger2 $nonce, 1),
-                    $ledger2 $balances 1, 77),
+    ~>  { storage := save(save(save(mtSt, $ledger $nonce, 5),
+                    $ledger $balances 1, 11),
                     $ledger2, save(save(mtSt, $nonce, 5), $balances 1, 11))
-          || 'n := 5 || 'b := 77 } .                                       *** true
+          || 'n := 5 || 'b := 0 } .                                        *** true
 
 *** the SAME derivation but claiming 'b came from the SOURCE, 11. This is the
 *** reading a COLLAPSING leaf would license -- SolKey deleted its saveOnEmpty
 *** rule, `save(st, nil, v) => v`, for exactly this reason. Not derivable here:
 *** `|-` decides it false rather than getting stuck.
 red |- < $ledger . $nonce = # 5 ;  $ledger . $balances [ # 1 ] = # 11 ;
-         $ledger2 . $nonce = # 1 ; $ledger2 . $balances [ # 1 ] = # 77 ;
          $ledger2 = $ledger ;
          var 'b = $ledger2 . $balances [ # 1 ] ; >
-    ~*> { storage := save(save(save(save(save(mtSt, $ledger $nonce, 5),
-                    $ledger $balances 1, 11), $ledger2 $nonce, 1),
-                    $ledger2 $balances 1, 77),
+    ~*> { storage := save(save(save(mtSt, $ledger $nonce, 5),
+                    $ledger $balances 1, 11),
                     $ledger2, save(save(mtSt, $nonce, 5), $balances 1, 11))
           || 'b := 11 } .                                                  *** false
 
-*** and the same fact as a one-shot triple, the form ../solkey/Copy.maude uses
+*** and the same fact as a one-shot triple, the form ../solkey/Copy.maude uses.
+*** It is `base: false` on the 'n conjunct: there the copy is invisible and 'n
+*** reads 0, the unset target, rather than the source's 5.
 red < $ledger . $nonce = # 5 ;  $ledger . $balances [ # 1 ] = # 11 ;
-      $ledger2 . $nonce = # 1 ; $ledger2 . $balances [ # 1 ] = # 77 ;
       $ledger2 = $ledger ;
       var 'n = $ledger2 . $nonce ;
       var 'b = $ledger2 . $balances [ # 1 ] ; >
-    ('n == # 5 && 'b == # 77) .                            *** true   base: false
+    ('n == # 5 && 'b == # 0) .                            *** true   base: false
 
 *** ---- C  a key the target never wrote -------------------------------------
 *** The target has NOTHING at key 2 and the source has 22. If the copy merged
@@ -177,6 +179,8 @@ red < $ledger . $nonce = # 5 ; $ledger . $balances [ # 2 ] = # 22 ;
                                                            *** true   base: false
 
 *** ---- D  the leaf, printed -------------------------------------------------
+*** The one block that writes the TARGET's own mapping entry, so the leaf has a
+*** non-empty left side and 77 is a value only the target could supply.
 *** Reading $ledger2 WHOLE -- as the right-hand side of a further copy -- hits
 *** the leaf rule with an empty remainder, so the value of $ledger2 is the
 *** irreducible ovr(target-old, source). This is the one place in the sem/
@@ -231,3 +235,129 @@ red < $alice . $ledger . $balances [ # 1 ] = # 77 ;
 *** not reach it. Only the MAPPING members are shared-by-not-being-copied.
 red < $ledger . $nonce = # 5 ; $ledger2 = $ledger ; $ledger . $nonce = # 9 ; >
     ($ledger2 . $nonce == # 5) .                                           *** true
+
+*** ===========================================================================
+*** F  the read itself: one ~> per find equation, in BOTH storage models
+*** ===========================================================================
+***
+*** Everything above is the statement level, where the whole read is one arrow.
+*** ../../../FindSteps.maude steps the storage model instead, so the leaf being
+*** built and then dispatched is visible. Two things are on show at once.
+***
+*** WHICH SIDE. The `ovr` arm that fires is the answer to "does this member come
+*** from the target or the source", and it is chosen by the head of the
+*** remaining path -- the MapField $balances reads LEFT, the PrimField $nonce
+*** reads RIGHT. Same leaf, same storage, two different sides.
+***
+*** WHICH MODEL. ../../../StorageCopy.maude answers "is this a mapping?" from
+*** the FIELD's sort; ../../../StorageFlag.maude answers it from the VALUE at
+*** the path, with the mapping slots declared up front in `layout` and carried
+*** as mapOf(...). The sem/ layer cannot show the second: ../../Config.maude
+*** fixes the storage model for the whole session at line 26. So block F drops
+*** to raw storage terms, where ../../../StorageApi.maude's theory lets both
+*** models sit in one file. The systematic head-to-head is
+*** ../../../StorageCompare.maude; this is the one obligation, twice.
+***
+*** THE TERMS. s2 is block A's storage after the two setup writes, s3 is A's
+*** final storage, and s2w / s3w are the same with the target's own 77 -- block
+*** D's setup, reduced to the storage it produces. `src` is the copied value,
+*** the source subtree; it is written out rather than as find(s2, $ledger) so
+*** that a trace does not open with arrows extracting it, and the first two
+*** reductions below are what justify that.
+***
+*** Note that `sload` brings StorageFlag.maude's own standalone check with it,
+*** so its ExampleFlag reductions print above these. That is the same deal
+*** ../../Config.maude already makes with StorageCopy.maude's Example block,
+*** whose reductions print in every file in this directory.
+
+sload ../../../FindSteps .
+
+fmod PAPER-CMP-SORTED is                  *** map-ness in the FIELD's sort
+    pr CMP-SORTED .
+    ops s2 s2w src s3 s3w : -> Struct .
+    eq s2  = save(save(mtSt, $ledger $nonce, 5), $ledger $balances 1, 11) .
+    eq s2w = save(s2, $ledger2 $balances 1, 77) .
+    eq src = save(save(mtSt, $nonce, 5), $balances 1, 11) .
+    eq s3  = save(s2,  $ledger2, src) .
+    eq s3w = save(s2w, $ledger2, src) .
+endfm
+
+fmod PAPER-CMP-FLAGGED is                 *** map-ness in the STORE
+    pr CMP-FLAGGED .
+    ops layout s2 s2w src s3 s3w : -> Struct .
+    *** the layout IS the model's input: no field here carries a sort
+    eq layout = decl(decl(mtSt, $ledger $balances, 0), $ledger2 $balances, 0) .
+    eq s2  = save(save(layout, $ledger $nonce, 5), $ledger $balances 1, 11) .
+    eq s2w = save(s2, $ledger2 $balances 1, 77) .
+    eq src = save(save(save(mtSt, $balances, mapOf(0)), $nonce, 5), $balances 1, 11) .
+    eq s3  = save(s2,  $ledger2, src) .
+    eq s3w = save(s2w, $ledger2, src) .
+endfm
+
+fmod PAPER-FIND-SORTED is
+    pr PAPER-CMP-SORTED .  pr FIND-TRACE{Sorted} .
+endfm
+
+fmod PAPER-FIND-FLAGGED is
+    pr PAPER-CMP-FLAGGED .  pr FIND-TRACE{Flagged} .
+endfm
+
+*** `src` really is what the copy writes, in each model on its own terms
+red in PAPER-CMP-SORTED  : find(s2, $ledger) == src .                      *** true
+red in PAPER-CMP-FLAGGED : find(s2, $ledger) == src .                      *** true
+
+*** ---- F1  the PrimField arm: $nonce reads RIGHT, the source's -------------
+red in PAPER-FIND-SORTED : findSteps('PAPER-CMP-SORTED, find(s3, $ledger2 $nonce)) .
+*** find(s3, $ledger2 $nonce)
+***  ~> find(ovr(mtSt, save(save(mtSt, $nonce, 5), $balances 1, 11)), $nonce)
+***  ~> find(save(save(mtSt, $nonce, 5), $balances 1, 11), $nonce)
+***  ~> find(save(mtSt, $nonce, 5), $nonce)  ~>  5
+red in PAPER-FIND-FLAGGED : findSteps('PAPER-CMP-FLAGGED, find(s3, $ledger2 $nonce)) .
+*** the same three arrows, over a store whose mapping slots are mapOf(0):
+*** find(s3, $ledger2 $nonce)
+***  ~> find(ovr(save(mtSt, $balances, mapOf(0)), save(save(save(mtSt,
+***          $balances, mapOf(0)), $nonce, 5), $balances 1, 11)), $nonce)
+***  ~> find(save(save(save(mtSt, $balances, mapOf(0)), $nonce, 5),
+***          $balances 1, 11), $nonce)
+***  ~> find(save(save(mtSt, $balances, mapOf(0)), $nonce, 5), $nonce)  ~>  5
+red in PAPER-CMP-SORTED  : find(s3, $ledger2 $nonce) .                     *** 5
+red in PAPER-CMP-FLAGGED : find(s3, $ledger2 $nonce) .                     *** 5
+
+*** ---- F2  the MapField arm: $balances reads LEFT, the target's ------------
+*** The target here is unset, so LEFT is mtSt in the sorted model and the bare
+*** declared slot in the flagged one -- and the answer is 0. Which arm fired is
+*** still visible: the second term keeps the WHOLE remaining path, `$balances
+*** 1`, on the target side, where F1 handed `$nonce` to the source side.
+red in PAPER-FIND-SORTED : findSteps('PAPER-CMP-SORTED, find(s3, $ledger2 $balances 1)) .
+*** find(s3, $ledger2 $balances 1)
+***  ~> find(ovr(mtSt, save(save(mtSt, $nonce, 5), $balances 1, 11)), $balances 1)
+***  ~> find(mtSt, $balances 1)  ~>  0
+red in PAPER-FIND-FLAGGED : findSteps('PAPER-CMP-FLAGGED, find(s3, $ledger2 $balances 1)) .
+*** find(s3, $ledger2 $balances 1)
+***  ~> find(ovr(save(mtSt, $balances, mapOf(0)), save(save(save(mtSt,
+***          $balances, mapOf(0)), $nonce, 5), $balances 1, 11)), $balances 1)
+***  ~> find(save(mtSt, $balances, mapOf(0)), $balances 1)
+***  ~> find(mapOf(0), 1)  ~>  0
+*** the flagged model takes one arrow more: its unset key is the declared
+*** slot's template, mapOf(0), not a zero-init default read off a field sort.
+red in PAPER-CMP-SORTED  : find(s3, $ledger2 $balances 1) .                *** 0
+red in PAPER-CMP-FLAGGED : find(s3, $ledger2 $balances 1) .                *** 0
+
+*** ---- F3  the same arm with the target written: 77, not 11 ----------------
+*** Block D's storage. Now LEFT is non-empty and the answer distinguishes the
+*** two sides outright: the source has 11 at that key and the read returns the
+*** target's 77. Both models, three arrows each, same value.
+red in PAPER-FIND-SORTED : findSteps('PAPER-CMP-SORTED, find(s3w, $ledger2 $balances 1)) .
+*** find(s3w, $ledger2 $balances 1)
+***  ~> find(ovr(save(mtSt, $balances 1, 77), save(save(mtSt, $nonce, 5),
+***          $balances 1, 11)), $balances 1)
+***  ~> find(save(mtSt, $balances 1, 77), $balances 1)  ~>  77
+red in PAPER-FIND-FLAGGED : findSteps('PAPER-CMP-FLAGGED, find(s3w, $ledger2 $balances 1)) .
+*** find(s3w, $ledger2 $balances 1)
+***  ~> find(ovr(save(save(mtSt, $balances, mapOf(0)), $balances 1, 77),
+***          save(save(save(mtSt, $balances, mapOf(0)), $nonce, 5),
+***          $balances 1, 11)), $balances 1)
+***  ~> find(save(save(mtSt, $balances, mapOf(0)), $balances 1, 77), $balances 1)
+***  ~> 77
+red in PAPER-CMP-SORTED  : find(s3w, $ledger2 $balances 1) .               *** 77
+red in PAPER-CMP-FLAGGED : find(s3w, $ledger2 $balances 1) .               *** 77

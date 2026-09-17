@@ -1,0 +1,158 @@
+*** src/FindSteps.maude — a `find` reduction, one arrow per equation.
+***
+*** src/sem/Steps.maude recovers the paper's derivations by reflecting the
+*** domain module and turning every equation whose left-hand side is a
+*** CONFIGURATION into a rule, so that one `~>` is one statement. This file is
+*** that construction one layer down: it turns every equation whose left-hand
+*** side is a `find` into a rule, so that one `~>` is one equation of the
+*** storage model. It is what shows the copy leaf being built and then
+*** dispatched — `find(ovr(target, source), fld …)` choosing a side by the sort
+*** of `fld` — which a statement-level derivation hides inside a single arrow.
+***
+***     red in PAPER-FIND-SORTED :
+***         findSteps('PAPER-CMP-SORTED, find(s3w, $ledger2 $balances 1)) .
+***
+***     find(s3w, $ledger2 $balances 1)
+***      ~> find(ovr(save(mtSt, $balances 1, 77),                selectOnSaveCons:
+***                 save(save(mtSt, $nonce, 5), $balances 1, 11)),  the leaf
+***              $balances 1)
+***      ~> find(save(mtSt, $balances 1, 77), $balances 1)       ovr / MapField:
+***      ~> 77                                                     read LEFT
+***
+*** The module to step is the first argument, a Qid, and the term to step is
+*** the second. The constants the term is built from must be declared INSIDE
+*** that module: one added from outside does not exist in the module
+*** metaRewrite runs in, the same trap sem/Steps.maude records.
+***
+*** TWO MODULES, and the split matters. FIND-META holds META-LEVEL and the
+*** metaprogram, and is NOT parameterized: the transformation reads a module
+*** term and knows nothing about storage. FIND-TRACE{X :: STORAGE-API} is the
+*** thin wrapper that has to mention `X$StValue`, and it takes the module to
+*** step as a Qid argument rather than a `theModule` constant, so two instances
+*** over two different storage models can sit in one file without racing to
+*** define one constant. Instantiating FIND-TRACE therefore does not copy
+*** META-LEVEL.
+***
+*** THE CLONE. The obvious transformation — delete the `find` equations, add
+*** them back as rules — works for the field-sorted model and LEAVES THE
+*** FLAGGED ONE STUCK: StorageFlag's dispatch is conditional, `ceq
+*** find(ovr(st, nd), f flds) = find(nd, f flds) if isMap(find(st, f)) = false
+*** /\ prm := find(nd, f)`, and those conditions call `find`. With `find`
+*** demoted to a rule they cannot reduce, so no `ovr` equation ever fires and
+*** the trace stalls on the leaf. So the rules go on a CLONE, `findS`: every
+*** `find` equation stays an equation, and each also becomes a rule
+*** `findS(…) => …` whose right-hand side renames only a TOP-LEVEL `find` back
+*** to `findS`. Conditions keep the equational `find` and still decide; inner
+*** `find`s — `find(st, fldsN)` under `v→st` — normalize silently instead of
+*** filling the trace with arrows nobody asked about; and the step is exactly
+*** one outermost equation.
+***
+*** THE THREE META-LEVEL TRAPS of Steps.maude apply unchanged, two of them
+*** here. The LIST renamings keep META-LEVEL's NatList out of List{Field}'s
+*** kind, which `Int < Field$Elt` would otherwise merge with. And a term cannot
+*** be held as-is while it is stepped, since `find` would normalize it away:
+*** `inert` is the frozen wrapper, `[strat (0)]`, uplifted whole and stripped
+*** at the meta level by `openF`. Do not give the wrapper a name containing
+*** `|` — `'~`|_`|~` does not lex as a Qid literal.
+***
+*** PRIORITY. `[owise]` is dropped when an equation becomes a rule, because
+*** rules have no `owise`. The disjoint-path passthrough of the sorted model,
+*** `ceq find(save(st, fldsN, val), fldsN2) = find(st, fldsN2) if fldsN =/=
+*** fldsN2 [owise]`, therefore relies on coming last among the rules. It does,
+*** but EquationSet is assoc comm, so that is an observation and not a
+*** guarantee: pair every `findSteps` with a plain `red find(…) .`, and a
+*** mis-ordered trace shows up as a final value that disagrees.
+
+sload StorageApi .
+
+fmod FIND-META is
+    pr META-LEVEL * (sort Trace to MetaTrace,
+        op _`[_`] : Qid NeTermList -> Term to _`{`[_`]`},
+        op _+_ : ModuleExpression ModuleExpression -> ModuleExpression to _+M_,
+        op nil : -> NatList to nilN,
+        op __ : NatList NatList -> NatList to _;;_,
+        op append : NatList NatList -> NatList to appendN,
+        op head : NeNatList -> Nat to headN,
+        op tail : NeNatList -> NatList to tailN,
+        op last : NeNatList -> Nat to lastN,
+        op front : NeNatList -> NatList to frontN,
+        op occurs : Nat NatList -> Bool to occursN,
+        op reverse : NatList -> NatList to reverseN,
+        op $reverse : NatList NatList -> NatList to $reverseN,
+        op size : NatList -> Nat to sizeN,
+        op $size : NatList Nat -> Nat to $sizeN) .
+
+    var H : Header .            var IL : ImportList .    var SS : SortSet .
+    var SSDS : SubsortDeclSet .  var MAS : MembAxSet .
+    var OPDS : OpDeclSet .       var OPD : OpDecl .
+    var EQS : EquationSet .      var EQ : Equation .      var AS : AttrSet .
+    vars T T2 : Term .           var TL : TermList .      var COND : Condition .
+    var TYL : TypeList .         var TY : Type .          var Q : Qid .
+
+    *** ---- the metaprogram: every find equation also becomes a findS rule ---
+    op findModule : Qid -> Module [memo] .
+    eq findModule(Q) = mkMod(upModule(Q, true)) .
+
+    op mkMod : Module -> Module .
+    eq mkMod(fmod H is IL sorts SS . SSDS OPDS MAS EQS endfm) =
+        (mod H is IL sorts SS . SSDS addS(OPDS) MAS EQS mkRules(EQS) endm) .
+
+    *** findS gets find's profile, every overload of it
+    op addS : OpDeclSet -> OpDeclSet .
+    eq addS(none) = none .
+    eq addS((op 'find : TYL -> TY [AS] .) OPDS) =
+        (op 'find : TYL -> TY [AS] .) (op 'findS : TYL -> TY [none] .) addS(OPDS) .
+    eq addS(OPD OPDS) = OPD addS(OPDS) [owise] .
+
+    *** only the OUTERMOST find is stepped; the rest stays equational
+    op topS : Term -> Term .
+    eq topS('find{[TL]}) = 'findS{[TL]} .
+    eq topS(T) = T [owise] .
+
+    op mkRules : EquationSet -> RuleSet .
+    eq mkRules(none) = none .
+    eq mkRules((eq 'find{[TL]} = T [AS] .) EQS) =
+        (rl 'findS{[TL]} => topS(T) [label('fnd)] .) mkRules(EQS) .
+    eq mkRules((ceq 'find{[TL]} = T if COND [AS] .) EQS) =
+        (crl 'findS{[TL]} => topS(T) if COND [label('fnd)] .) mkRules(EQS) .
+    eq mkRules(EQ EQS) = mkRules(EQS) [owise] .
+
+    *** ---- one step, at the meta level -------------------------------------
+    *** The argument arrives wrapped and frozen; unwrap, promote the outermost
+    *** find, take one rule, demote it again.
+    op stepT : Qid Term -> Term .
+    eq stepT(Q, 'inert{[T]}) =
+        'inert{[unS(getTerm(metaRewrite(findModule(Q), topS(T), 1)))]} .
+    op unS : Term -> Term .
+    eq unS('findS{[TL]}) = 'find{[TL]} .
+    eq unS(T) = T [owise] .
+endfm
+
+fmod FIND-TRACE{X :: STORAGE-API} is
+    pr FIND-META .
+
+    sorts FState FTrace .
+    subsort FState < FTrace .
+    *** frozen: the whole point is that this find does NOT reduce
+    op inert : X$StValue -> FState [ctor strat (0)] .
+    op bad : -> FState [ctor] .
+    op _~>_ : FState FTrace -> FTrace [ctor prec 90 gather (e E)] .
+
+    var Q : Qid .   var N : Nat .   var V : X$StValue .   var FS : FState .
+
+    op fstep : Qid FState -> FState .
+    eq fstep(Q, inert(V)) = downTerm(stepT(Q, upTerm(inert(V))), bad) .
+    eq fstep(Q, bad) = bad .
+
+    *** `findSteps` is frozen too, or its argument is the answer before it is
+    *** ever seen. The bound is a safety net; a storage read terminates.
+    op findSteps : Qid X$StValue -> FTrace [strat (0 1)] .
+    eq findSteps(Q, V) = ftr(Q, inert(V), 40) .
+
+    op ftr : Qid FState Nat -> FTrace .
+    eq ftr(Q, bad, N) = bad .
+    eq ftr(Q, FS, 0) = FS .
+    eq ftr(Q, inert(V), s N) =
+        if fstep(Q, inert(V)) == inert(V) then inert(V)
+        else (inert(V) ~> ftr(Q, fstep(Q, inert(V)), N)) fi .
+endfm

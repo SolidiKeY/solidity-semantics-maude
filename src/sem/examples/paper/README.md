@@ -12,13 +12,24 @@ bash src/sem/run-tests.sh                                        # all of them
 ```
 
 Each file ends in a block of reductions with the expected value in a trailing
-`*** …` comment, per the repo convention. Three kinds of reduction appear:
+`*** …` comment, per the repo convention. These forms appear:
 
 | form | what it shows |
 |---|---|
 | `red steps(< prog >) .` | the derivation, `G0 ~> G1 ~> … ~> Gn` |
 | `red \|- < prog > ~> { … } ~*> { … } .` | the paper's own claim about that derivation, as `true` |
 | `red < prog > (post) .` | the value the paper ends at, as a Hoare triple |
+| `red findSteps(M, find(…)) .` | the `find` reduction, one `~>` per equation of the storage model |
+
+The last is the only form that steps *below* the statement level, where one
+`~>` is one statement and the whole read of a storage location is hidden
+inside it. It comes from `src/FindSteps.maude` rather than `src/sem/Steps.maude`,
+it takes the module to step as its first argument, and because it works on raw
+storage terms it is also the only place in `examples/` where a second storage
+model appears: `StorageCopyMapping.maude` runs the same read through both
+`src/StorageCopy.maude` (map-ness in the field's sort) and
+`src/StorageFlag.maude` (map-ness in the store). `src/StorageCompare.maude` is
+the systematic head-to-head of those two.
 
 ## Files ↔ paper sections
 
@@ -28,7 +39,7 @@ Each file ends in a block of reductions with the expected value in a trailing
 | `StorageExamples.maude` | `sections/storage-examples.tex` |
 | `StorageArrays.maude` | `sections/storage-examples-arrays.tex` |
 | `StorageDelete.maude` | `sections/storage-examples-delete.tex` |
-| `StorageCopyMapping.maude` | no paper section — SolKey `copyKeepsMapping.key`: the storage→storage copy over a mapping |
+| `StorageCopyMapping.maude` | no paper section — SolKey `copyKeepsMapping.key`: the storage→storage copy over a mapping, ending in the `find` reduction itself, in both storage models |
 | `Arithmetic.maude` | `sections/arithmetic.tex` (compound storage update) |
 | `MemoryExamples.maude` | `sections/memory-examples.tex` |
 | `MemoryDelete.maude` | `sections/memory-examples-delete.tex` |

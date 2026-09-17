@@ -5,34 +5,14 @@
 *** set of test terms through both, in one Maude session, so the answers sit on
 *** adjacent lines.
 ***
-*** HOW THE SWAP IS DONE. The repo's usual idiom is module-name identity plus
-*** load: Storage.maude, StorageCopy.maude, StorageSelect.maude and
-*** list/Storage.maude all define STORAGE, and src/sem/Config.maude picks one by
-*** which file it loads. That is a whole-session switch — the variants can never
-*** meet, which is exactly what makes them hard to compare.
+*** HOW THE SWAP IS DONE is StorageApi.maude: a theory STORAGE-API, a view per
+*** model (Sorted / Flagged), and the two wrapper modules CMP-SORTED and
+*** CMP-FLAGGED they land in. Read that file for why a parameter and not a
+*** load, and for the one API mismatch (`decl`). Here the theory buys one
+*** parameterized module SUITE{X :: STORAGE-API} holding the test terms, so the
+*** terms are written once and instantiated twice:
 ***
-*** Here the switch is a parameter instead. A theory STORAGE-API names the API
-*** both models present; a view per model says how that model realizes it; and
-*** ONE parameterized module SUITE{X :: STORAGE-API} holds the test terms, so
-*** the terms are written once and instantiated twice:
-***
-***     fth STORAGE-API  ---- Sorted  --->  CMP-SORTED   (pr STORAGE{Fld},  StorageCopy.maude)
-***            |         ---- Flagged --->  CMP-FLAGGED  (pr STORAGE-FLAG{Fld})
-***       SUITE{X}       ---- SUITE{Sorted} = SUITE-S,  SUITE{Flagged} = SUITE-F
-***
-*** Adding a third model is a module, a view and a wrapper; the suite is
-*** untouched. Note `red in SUITE{Sorted} :` is rejected by Maude — "module
-*** expressions not supported in commands" — hence the named wrappers.
-***
-*** THE ONE API MISMATCH is `decl`, which declares a mapping slot. It is the
-*** flagged model's whole mechanism and it is meaningless in the sorted model,
-*** where a field's sort is fixed at declaration time. Rather than add a
-*** harness-only operator to CMP-SORTED, the Sorted view maps it away:
-***
-***     op decl(S:Struct, P:NeList{Fld}, V:StValue) to term S:Struct .
-***
-*** so a declaration is literally the identity on a sorted storage. The Flagged
-*** view is the empty view: STORAGE-FLAG already has the theory's signature.
+***       SUITE{X}  ---- SUITE{Sorted} = SUITE-S,  SUITE{Flagged} = SUITE-F
 ***
 *** WHAT TO LOOK FOR. The first group is the two models agreeing — it is the
 *** trailing red block of StorageCopy.maude, rebuilt over an mtSt root plus a
@@ -41,81 +21,7 @@
 *** store, one is a limitation of field sorts, and two are the field-sorted
 *** model answering a symbolic query that the flagged model leaves stuck.
 
-sload StorageCopy .
-sload StorageFlag .
-
-*** ---- one flat field signature, shared by both models ----------------------
-fmod CMP-FIELDS is
-    pr INT .
-    sort Fld .
-    subsort Int < Fld .
-    ops $alice $bob $ledger $ledger2 $inner $account $a : -> Fld .
-    ops $balance $nonce $m $balances : -> Fld .
-endfm
-
-view Fld from TRIV to CMP-FIELDS is sort Elt to Fld . endv
-
-*** ---- the API both models present -----------------------------------------
-fth STORAGE-API is
-    pr CMP-FIELDS .
-    pr LIST{Fld} .
-
-    sorts Struct StValue .
-    subsort Struct < StValue .
-    subsort Int < StValue .
-
-    *** `length` belongs HERE, not in CMP-FIELDS: both targets already get it
-    *** from Fields.maude at sort PrimField, and a second declaration at Fld
-    *** would arrive with no common ancestor.
-    op length : -> Fld .
-
-    op mtSt : -> Struct .
-    op find : Struct List{Fld} -> StValue .
-    op save : Struct NeList{Fld} StValue -> Struct .
-    op decl : Struct NeList{Fld} StValue -> Struct .
-    op delAt : Struct NeList{Fld} -> Struct .
-    op push : Struct NeList{Fld} StValue -> Struct .
-    op push : Struct NeList{Fld} -> Struct .
-    op pop : Struct NeList{Fld} -> Struct .
-endfth
-
-*** ---- model A: map-ness in the FIELD's sort -------------------------------
-*** Each constant is re-declared at its sorted refinement. That is a subsort
-*** overload of the CMP-FIELDS declaration, so the constant keeps one name and
-*** picks up the least sort — which is the whole input the sorted model has.
-fmod CMP-SORTED is
-    pr STORAGE{Fld} .
-
-    ops $m $balances : -> MapField .
-    ops $balance $nonce : -> PrimField .
-    ops $alice $bob $ledger $ledger2 $inner $account $a : -> RefField .
-
-    var PFd : PrimField .   var IDFd : RefField .
-    var RMFd : RefMapField .   var RAFd : RefArrField .
-    var LFXS : List{Fld} .   var Id : Int .
-
-    eq defaultValue(PFd) = 0 .
-    eq defaultValue(IDFd) = mtSt .
-
-    *** zero-init, copied verbatim from src/sem/Config.maude — the base STORAGE
-    *** model leaves find-on-mtSt stuck, and every term below is mtSt-rooted.
-    eq find(mtSt, LFXS PFd) = defaultValue(PFd) .
-    eq find(mtSt, LFXS IDFd) = defaultValue(IDFd) .
-    eq find(mtSt, LFXS RMFd Id) = mtSt .
-    eq find(mtSt, LFXS RAFd Id) = mtSt .
-    eq find(mtSt, LFXS Id) = 0 [owise] .
-endfm
-
-*** ---- model B: map-ness in the STORE --------------------------------------
-fmod CMP-FLAGGED is
-    pr STORAGE-FLAG{Fld} .
-endfm
-
-view Sorted from STORAGE-API to CMP-SORTED is
-    op decl(S:Struct, P:NeList{Fld}, V:StValue) to term S:Struct .
-endv
-
-view Flagged from STORAGE-API to CMP-FLAGGED is endv
+sload StorageApi .
 
 *** ---- the test terms, written once ----------------------------------------
 fmod SUITE{X :: STORAGE-API} is
