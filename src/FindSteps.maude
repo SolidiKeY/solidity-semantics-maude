@@ -1,23 +1,35 @@
-*** src/FindSteps.maude — a `find` reduction, one arrow per equation.
+*** src/FindSteps.maude — a `find` reduction, one arrow per equation, anywhere.
 ***
 *** src/sem/Steps.maude recovers the paper's derivations by reflecting the
 *** domain module and turning every equation whose left-hand side is a
 *** CONFIGURATION into a rule, so that one `~>` is one statement. This file is
-*** that construction one layer down: it turns every equation whose left-hand
-*** side is a `find` into a rule, so that one `~>` is one equation of the
-*** storage model. It is what shows the copy leaf being built and then
-*** dispatched — `find(ovr(target, source), fld …)` choosing a side by the sort
-*** of `fld` — which a statement-level derivation hides inside a single arrow.
+*** that construction one layer down: one `~>` is one equation of the storage
+*** model, applied at whatever position it fires — INCLUDING inside the term.
+*** It is what shows the copy leaf being built and then dispatched, and what
+*** shows the sub-read that decides the leaf's left side, both of which a
+*** statement-level derivation hides inside a single arrow.
 ***
 ***     red in PAPER-FIND-SORTED :
-***         findSteps('PAPER-CMP-SORTED, find(s3w, $ledger2 $balances 1)) .
+***         findSteps('PAPER-CMP-SORTED, find(s3, $ledger2 $nonce)) .
 ***
-***     find(s3w, $ledger2 $balances 1)
-***      ~> find(ovr(save(mtSt, $balances 1, 77),                selectOnSaveCons:
-***                 save(save(mtSt, $nonce, 5), $balances 1, 11)),  the leaf
-***              $balances 1)
-***      ~> find(save(mtSt, $balances 1, 77), $balances 1)       ovr / MapField:
-***      ~> 77                                                     read LEFT
+***     find(s3, $ledger2 $nonce)
+***      ~> find(ovr(v→st(find(save(save(mtSt, $ledger $nonce, 5),     selectOnSaveCons:
+***                              $ledger $balances 1, 11), $ledger2)),   the leaf,
+***                 save(save(mtSt, $nonce, 5), $balances 1, 11)),       target-old
+***              $nonce)                                                 still pending
+***      ~> find(ovr(v→st(find(save(mtSt, $ledger $nonce, 5), $ledger2)), …), $nonce)
+***      ~> find(ovr(v→st(find(mtSt, $ledger2)), …), $nonce)      target had nothing
+***      ~> find(ovr(v→st(mtSt), …), $nonce)
+***      ~> find(ovr(mtSt, save(save(mtSt, $nonce, 5), $balances 1, 11)), $nonce)
+***      ~> find(save(save(mtSt, $nonce, 5), $balances 1, 11), $nonce)  ovr / PrimField:
+***      ~> find(save(mtSt, $nonce, 5), $nonce)                           read RIGHT
+***      ~> 5
+***
+*** The middle four arrows are the point. `find(s2, $ledger2)` under `v→st` is
+*** the question "what did the TARGET hold before the copy?", and its answer is
+*** what the mapping members will later be read from. An earlier version of this
+*** file stepped only the OUTERMOST `find`, so all four collapsed into the first
+*** arrow and the leaf appeared with its left side already computed.
 ***
 *** The module to step is the first argument, a Qid, and the term to step is
 *** the second. The constants the term is built from must be declared INSIDE
@@ -33,27 +45,54 @@
 *** define one constant. Instantiating FIND-TRACE therefore does not copy
 *** META-LEVEL.
 ***
-*** THE CLONE. The obvious transformation — delete the `find` equations, add
-*** them back as rules — works for the field-sorted model and LEAVES THE
-*** FLAGGED ONE STUCK: StorageFlag's dispatch is conditional, `ceq
-*** find(ovr(st, nd), f flds) = find(nd, f flds) if isMap(find(st, f)) = false
-*** /\ prm := find(nd, f)`, and those conditions call `find`. With `find`
-*** demoted to a rule they cannot reduce, so no `ovr` equation ever fires and
-*** the trace stalls on the leaf. So the rules go on a CLONE, `findS`: every
-*** `find` equation stays an equation, and each also becomes a rule
-*** `findS(…) => …` whose right-hand side renames only a TOP-LEVEL `find` back
-*** to `findS`. Conditions keep the equational `find` and still decide; inner
-*** `find`s — `find(st, fldsN)` under `v→st` — normalize silently instead of
-*** filling the trace with arrows nobody asked about; and the step is exactly
-*** one outermost equation.
+*** THE CONSTRUCTION. To see every step, `find` must not reduce at all — an
+*** equational `find` normalizes its inner reads away before any outer rule can
+*** fire. So in the clone:
 ***
-*** THE THREE META-LEVEL TRAPS of Steps.maude apply unchanged, two of them
-*** here. The LIST renamings keep META-LEVEL's NatList out of List{Field}'s
-*** kind, which `Int < Field$Elt` would otherwise merge with. And a term cannot
-*** be held as-is while it is stepped, since `find` would normalize it away:
-*** `inert` is the frozen wrapper, `[strat (0)]`, uplifted whole and stripped
-*** at the meta level by `openF`. Do not give the wrapper a name containing
-*** `|` — `'~`|_`|~` does not lex as a Qid literal.
+***   1. `drop` DELETES every equation whose left-hand side is headed by `find`
+***      or `v→st`. Those two symbols are now inert: a term keeps its shape.
+***   2. `mkR` re-adds exactly those equations as RULES, left- and right-hand
+***      sides unchanged — so a rule's right-hand side keeps its inner `find`s
+***      steppable — and only the CONDITION rewritten.
+***   3. `shadow` re-adds them a second time as EQUATIONS under the shadow names
+***      `findE` / `vstE`, and `addE` / `shMb` give those names the same
+***      profiles and membership axioms.
+***
+*** Step 3 is what makes the FLAGGED model work. StorageFlag's dispatch is
+*** conditional — `ceq find(ovr(st, nd), f flds) = find(nd, f flds) if
+*** isMap(find(st, f)) = false /\ prm := find(nd, f)` — and those conditions
+*** call `find`. Rewritten to `findE`, they still reduce and still decide,
+*** while the subject term's own `find`s stay frozen. With a single inert
+*** `find` the guards could never decide and every trace would stall on the leaf.
+***
+*** INNERMOST-LEFTMOST, and it is not cosmetic. `stp` recurses into arguments
+*** and steps at the top only when no argument can step. That order guarantees a
+*** sub-read like `find(s2, $ledger2)` is resolved BEFORE the enclosing `ovr`
+*** dispatch is attempted, so `isMap(findE(st, f))` always has a ground `st`.
+*** Outermost order would attempt the dispatch against an unreduced left side.
+***
+*** TWO TRAPS THIS FILE PAID FOR
+***
+***   `_/\_` HAS `nil` AS ITS IDENTITY. The obvious condition traversal,
+***   `eq renC(C1 /\ C2) = renC(C1) /\ renC(C2)`, matches ANY single condition
+***   with C2 bound to nil, and loops forever. Peel one fragment at a time
+***   instead, as `renC` below does.
+***
+***   DO NOT DEEP-RENAME THE FLATTENED MODULE. `upModule(Q, true)` drags in the
+***   whole prelude; walking every term of every equation in it exhausts memory.
+***   Only the `find` / `v→st` equations need renaming, and they are selected by
+***   a head-level match that never looks inside anything else.
+***
+*** THE META-LEVEL TRAPS of Steps.maude apply unchanged, two of them here. The
+*** LIST renamings keep META-LEVEL's NatList out of List{Field}'s kind, which
+*** `Int < Field$Elt` would otherwise merge with. And a term cannot be held
+*** as-is while it is stepped, since `find` would normalize it away in the
+*** CALLER's module, where it is still equational: `inert` is the frozen
+*** wrapper, `[strat (0)]`, uplifted whole and stripped at the meta level by
+*** `stepT`. Do not give the wrapper a name containing `|` — `'~`|_`|~` does
+*** not lex as a Qid literal. The wrapper is why a raw trace prints as
+*** `inert(find(…)) ~> inert(find(…))`; the expected-value comments beside each
+*** reduction drop it.
 ***
 *** PRIORITY. `[owise]` is dropped when an equation becomes a rule, because
 *** rules have no `owise`. The disjoint-path passthrough of the sorted model,
@@ -82,50 +121,115 @@ fmod FIND-META is
         op size : NatList -> Nat to sizeN,
         op $size : NatList Nat -> Nat to $sizeN) .
 
-    var H : Header .            var IL : ImportList .    var SS : SortSet .
-    var SSDS : SubsortDeclSet .  var MAS : MembAxSet .
+    var H : Header .             var IL : ImportList .    var SS : SortSet .
+    var SSDS : SubsortDeclSet .  var MAS : MembAxSet .    var MA : MembAx .
     var OPDS : OpDeclSet .       var OPD : OpDecl .
     var EQS : EquationSet .      var EQ : Equation .      var AS : AttrSet .
-    vars T T2 : Term .           var TL : TermList .      var COND : Condition .
-    var TYL : TypeList .         var TY : Type .          var Q : Qid .
+    vars T T2 : Term .           var NTL NTL2 : NeTermList .
+    var COND : Condition .
+    var TYL : TypeList .         var TY : Type .
+    vars Q Qd : Qid .            var S : Sort .
 
-    *** ---- the metaprogram: every find equation also becomes a findS rule ---
+    *** ---- deep rename, applied ONLY to the find / v→st equations ---------
+    op ren : Term -> Term .
+    op renL : NeTermList -> NeTermList .
+    eq ren('find{[NTL]}) = 'findE{[renL(NTL)]} .
+    eq ren('v→st{[NTL]}) = 'vstE{[renL(NTL)]} .
+    ceq ren(Qd{[NTL]}) = Qd{[renL(NTL)]} if Qd =/= 'find /\ Qd =/= 'v→st .
+    eq ren(T) = T [owise] .
+    eq renL((T, NTL)) = (ren(T), renL(NTL)) .
+    eq renL(T) = ren(T) .
+
+    *** `_/\_` has nil as its IDENTITY, so peel one fragment at a time: a
+    *** two-variable split would match every single condition with the second
+    *** half bound to nil, and recur forever.
+    op renC : Condition -> Condition .
+    eq renC(nil) = nil .
+    eq renC((T = T2)  /\ COND) = (ren(T) = ren(T2))  /\ renC(COND) .
+    eq renC((T := T2) /\ COND) = (ren(T) := ren(T2)) /\ renC(COND) .
+    eq renC((T : S)   /\ COND) = (ren(T) : S)        /\ renC(COND) .
+
+    *** ---- 1. the stepped symbols lose their equations --------------------
+    op drop : EquationSet -> EquationSet .
+    eq drop(none) = none .
+    eq drop((eq 'find{[NTL]} = T [AS] .) EQS) = drop(EQS) .
+    eq drop((ceq 'find{[NTL]} = T if COND [AS] .) EQS) = drop(EQS) .
+    eq drop((eq 'v→st{[NTL]} = T [AS] .) EQS) = drop(EQS) .
+    eq drop((ceq 'v→st{[NTL]} = T if COND [AS] .) EQS) = drop(EQS) .
+    eq drop(EQ EQS) = EQ drop(EQS) [owise] .
+
+    *** ---- 2. and come back as rules, conditions shadowed ------------------
+    op mkR : EquationSet -> RuleSet .
+    eq mkR(none) = none .
+    eq mkR((eq 'find{[NTL]} = T [AS] .) EQS) =
+        (rl 'find{[NTL]} => T [label('fnd)] .) mkR(EQS) .
+    eq mkR((ceq 'find{[NTL]} = T if COND [AS] .) EQS) =
+        (crl 'find{[NTL]} => T if renC(COND) [label('fnd)] .) mkR(EQS) .
+    eq mkR((eq 'v→st{[NTL]} = T [AS] .) EQS) =
+        (rl 'v→st{[NTL]} => T [label('fnd)] .) mkR(EQS) .
+    eq mkR((ceq 'v→st{[NTL]} = T if COND [AS] .) EQS) =
+        (crl 'v→st{[NTL]} => T if renC(COND) [label('fnd)] .) mkR(EQS) .
+    eq mkR(EQ EQS) = mkR(EQS) [owise] .
+
+    *** ---- 3. and a second time as equations, for the conditions to call ---
+    op shadow : EquationSet -> EquationSet .
+    eq shadow(none) = none .
+    eq shadow((eq 'find{[NTL]} = T [AS] .) EQS) =
+        (eq ren('find{[NTL]}) = ren(T) [AS] .) shadow(EQS) .
+    eq shadow((ceq 'find{[NTL]} = T if COND [AS] .) EQS) =
+        (ceq ren('find{[NTL]}) = ren(T) if renC(COND) [AS] .) shadow(EQS) .
+    eq shadow((eq 'v→st{[NTL]} = T [AS] .) EQS) =
+        (eq ren('v→st{[NTL]}) = ren(T) [AS] .) shadow(EQS) .
+    eq shadow((ceq 'v→st{[NTL]} = T if COND [AS] .) EQS) =
+        (ceq ren('v→st{[NTL]}) = ren(T) if renC(COND) [AS] .) shadow(EQS) .
+    eq shadow(EQ EQS) = shadow(EQS) [owise] .
+
+    *** the shadow names need the same profiles, and the same memberships:
+    *** StorageCopy stamps a symbolic read as a Struct with `mb find(…)`.
+    op addE : OpDeclSet -> OpDeclSet .
+    eq addE(none) = none .
+    eq addE((op 'find : TYL -> TY [AS] .) OPDS) =
+        (op 'find : TYL -> TY [AS] .) (op 'findE : TYL -> TY [none] .) addE(OPDS) .
+    eq addE((op 'v→st : TYL -> TY [AS] .) OPDS) =
+        (op 'v→st : TYL -> TY [AS] .) (op 'vstE : TYL -> TY [none] .) addE(OPDS) .
+    eq addE(OPD OPDS) = OPD addE(OPDS) [owise] .
+
+    op shMb : MembAxSet -> MembAxSet .
+    eq shMb(none) = none .
+    eq shMb((mb 'find{[NTL]} : S [AS] .) MAS) =
+        (mb 'find{[NTL]} : S [AS] .) (mb ren('find{[NTL]}) : S [AS] .) shMb(MAS) .
+    eq shMb(MA MAS) = MA shMb(MAS) [owise] .
+
     op findModule : Qid -> Module [memo] .
     eq findModule(Q) = mkMod(upModule(Q, true)) .
-
     op mkMod : Module -> Module .
     eq mkMod(fmod H is IL sorts SS . SSDS OPDS MAS EQS endfm) =
-        (mod H is IL sorts SS . SSDS addS(OPDS) MAS EQS mkRules(EQS) endm) .
+        (mod H is IL sorts SS . SSDS addE(OPDS) shMb(MAS)
+            (drop(EQS) shadow(EQS)) mkR(EQS) endm) .
 
-    *** findS gets find's profile, every overload of it
-    op addS : OpDeclSet -> OpDeclSet .
-    eq addS(none) = none .
-    eq addS((op 'find : TYL -> TY [AS] .) OPDS) =
-        (op 'find : TYL -> TY [AS] .) (op 'findS : TYL -> TY [none] .) addS(OPDS) .
-    eq addS(OPD OPDS) = OPD addS(OPDS) [owise] .
+    *** ---- one step, innermost-leftmost -----------------------------------
+    *** `find` and `v→st` are inert here, so metaRewrite normalizes only the
+    *** surrounding helpers before applying exactly one rule at the top.
+    op top1 : Qid Term -> Term .
+    eq top1(Q, T) = getTerm(metaRewrite(findModule(Q), T, 1)) .
 
-    *** only the OUTERMOST find is stepped; the rest stays equational
-    op topS : Term -> Term .
-    eq topS('find{[TL]}) = 'findS{[TL]} .
-    eq topS(T) = T [owise] .
+    op stp : Qid Term -> Term .
+    op stpL : Qid NeTermList -> NeTermList .
+    ceq stp(Q, 'find{[NTL]}) =
+        if NTL2 =/= NTL then 'find{[NTL2]} else top1(Q, 'find{[NTL]}) fi
+        if NTL2 := stpL(Q, NTL) .
+    ceq stp(Q, 'v→st{[NTL]}) =
+        if NTL2 =/= NTL then 'v→st{[NTL2]} else top1(Q, 'v→st{[NTL]}) fi
+        if NTL2 := stpL(Q, NTL) .
+    ceq stp(Q, Qd{[NTL]}) = Qd{[stpL(Q, NTL)]} if Qd =/= 'find /\ Qd =/= 'v→st .
+    eq stp(Q, T) = T [owise] .
+    ceq stpL(Q, (T, NTL)) = if T2 =/= T then (T2, NTL) else (T, stpL(Q, NTL)) fi
+        if T2 := stp(Q, T) .
+    eq stpL(Q, T) = stp(Q, T) .
 
-    op mkRules : EquationSet -> RuleSet .
-    eq mkRules(none) = none .
-    eq mkRules((eq 'find{[TL]} = T [AS] .) EQS) =
-        (rl 'findS{[TL]} => topS(T) [label('fnd)] .) mkRules(EQS) .
-    eq mkRules((ceq 'find{[TL]} = T if COND [AS] .) EQS) =
-        (crl 'findS{[TL]} => topS(T) if COND [label('fnd)] .) mkRules(EQS) .
-    eq mkRules(EQ EQS) = mkRules(EQS) [owise] .
-
-    *** ---- one step, at the meta level -------------------------------------
-    *** The argument arrives wrapped and frozen; unwrap, promote the outermost
-    *** find, take one rule, demote it again.
+    *** The argument arrives wrapped and frozen; unwrap, step, wrap again.
     op stepT : Qid Term -> Term .
-    eq stepT(Q, 'inert{[T]}) =
-        'inert{[unS(getTerm(metaRewrite(findModule(Q), topS(T), 1)))]} .
-    op unS : Term -> Term .
-    eq unS('findS{[TL]}) = 'find{[TL]} .
-    eq unS(T) = T [owise] .
+    eq stepT(Q, 'inert{[T]}) = 'inert{[stp(Q, T)]} .
 endfm
 
 fmod FIND-TRACE{X :: STORAGE-API} is
@@ -138,7 +242,7 @@ fmod FIND-TRACE{X :: STORAGE-API} is
     op bad : -> FState [ctor] .
     op _~>_ : FState FTrace -> FTrace [ctor prec 90 gather (e E)] .
 
-    var Q : Qid .   var N : Nat .   var V : X$StValue .   var FS : FState .
+    var Q : Qid .   var N : Nat .   var V : X$StValue .   vars FS FS2 : FState .
 
     op fstep : Qid FState -> FState .
     eq fstep(Q, inert(V)) = downTerm(stepT(Q, upTerm(inert(V))), bad) .
@@ -147,12 +251,11 @@ fmod FIND-TRACE{X :: STORAGE-API} is
     *** `findSteps` is frozen too, or its argument is the answer before it is
     *** ever seen. The bound is a safety net; a storage read terminates.
     op findSteps : Qid X$StValue -> FTrace [strat (0 1)] .
-    eq findSteps(Q, V) = ftr(Q, inert(V), 40) .
+    eq findSteps(Q, V) = ftr(Q, inert(V), 100) .
 
     op ftr : Qid FState Nat -> FTrace .
     eq ftr(Q, bad, N) = bad .
     eq ftr(Q, FS, 0) = FS .
-    eq ftr(Q, inert(V), s N) =
-        if fstep(Q, inert(V)) == inert(V) then inert(V)
-        else (inert(V) ~> ftr(Q, fstep(Q, inert(V)), N)) fi .
+    ceq ftr(Q, FS, s N) = if FS2 == FS then FS else (FS ~> ftr(Q, FS2, N)) fi
+        if FS2 := fstep(Q, FS) .
 endfm

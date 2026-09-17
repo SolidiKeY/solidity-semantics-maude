@@ -19,12 +19,16 @@ Each file ends in a block of reductions with the expected value in a trailing
 | `red steps(< prog >) .` | the derivation, `G0 ~> G1 ~> … ~> Gn` |
 | `red \|- < prog > ~> { … } ~*> { … } .` | the paper's own claim about that derivation, as `true` |
 | `red < prog > (post) .` | the value the paper ends at, as a Hoare triple |
-| `red findSteps(M, find(…)) .` | the `find` reduction, one `~>` per equation of the storage model |
+| `red findSteps(M, find(…)) .` | the `find` reduction, one `~>` per equation of the storage model, applied wherever it fires |
 
 The last is the only form that steps *below* the statement level, where one
 `~>` is one statement and the whole read of a storage location is hidden
 inside it. It comes from `src/FindSteps.maude` rather than `src/sem/Steps.maude`
-and takes the module to step as its first argument. `StorageCopyMapping.maude`
+and takes the module to step as its first argument. It hides nothing: an
+equation firing *inside* the term gets its own arrow too, so the sub-read
+that decides the copy leaf's left side — `v→st(find(s2, $ledger2))`, "what
+did the target hold before the copy?" — is four of the eight arrows rather
+than a step that already happened. `StorageCopyMapping.maude`
 uses it to continue its own derivation: block C steps the two reads that
 blocks A and B perform in one arrow each.
 

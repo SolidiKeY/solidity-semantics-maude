@@ -39,7 +39,8 @@
 *** WHAT EACH BLOCK SHOWS
 ***   A  the derivation, one ~> per statement, with the written struct value
 ***   B  the same claim written out and CHECKED, plus its negation as false
-***   C  B's two reads CONTINUED, one ~> per find equation, in both models
+***   C  B's two reads CONTINUED, one ~> per find equation wherever it
+***      fires -- inner reads included -- in both models
 ***   D  a key the target never wrote: not merged, not copied -- just 0
 ***   E  the leaf itself, printed: copying the copy leaves ovr(...) in storage
 ***   F  the RefField equation: the same split one level down, via alice = bob
@@ -261,57 +262,205 @@ red in PAPER-CMP-SORTED  : find(s2, $ledger) == src .                      *** t
 red in PAPER-CMP-FLAGGED : find(s2, $ledger) == src .                      *** true
 
 *** ---- C1  B's fourth arrow: $nonce, the PrimField arm, reads RIGHT --------
+*** Eight arrows, and the first six are the leaf being ASSEMBLED. Arrow 1
+*** suspends the copy as ovr(v->st(find(s2, $ledger2)), src) -- selectOnSaveCons
+*** -- with the target's old value still UNREAD. Arrows 2-4 are that sub-read:
+*** s2 is peeled one write at a time by the disjoint-path passthrough until it
+*** reaches mtSt, whose RefField default is mtSt. Arrow 5 is the v->st cast.
+*** Only at arrow 6 is the leaf ovr(mtSt, src) ready to dispatch, and arrow 7
+*** is the dispatch. $nonce is a PrimField, so it reads RIGHT: the source's 5.
 red in PAPER-FIND-SORTED : findSteps('PAPER-CMP-SORTED, find(s3, $ledger2 $nonce)) .
 *** find(s3, $ledger2 $nonce)
-***  ~> find(ovr(mtSt, save(save(mtSt, $nonce, 5), $balances 1, 11)), $nonce)
+***  ~> find(ovr(v→st(find(save(save(mtSt, $ledger $nonce, 5), $ledger
+***         $balances 1, 11), $ledger2)), save(save(mtSt, $nonce, 5),
+***         $balances 1, 11)), $nonce)
+***  ~> find(ovr(v→st(find(save(mtSt, $ledger $nonce, 5), $ledger2)),
+***         save(save(mtSt, $nonce, 5), $balances 1, 11)), $nonce)
+***  ~> find(ovr(v→st(find(mtSt, $ledger2)), save(save(mtSt, $nonce, 5),
+***         $balances 1, 11)), $nonce)
+***  ~> find(ovr(v→st(mtSt), save(save(mtSt, $nonce, 5), $balances 1,
+***         11)), $nonce)
+***  ~> find(ovr(mtSt, save(save(mtSt, $nonce, 5), $balances 1, 11)),
+***         $nonce)
 ***  ~> find(save(save(mtSt, $nonce, 5), $balances 1, 11), $nonce)
-***  ~> find(save(mtSt, $nonce, 5), $nonce)  ~>  5
+***  ~> find(save(mtSt, $nonce, 5), $nonce)
+***  ~> 5
+*** the same read in the flagged model: eleven arrows, and all three extra ones
+*** are in the sub-read. The target's old value there is not mtSt but the
+*** DECLARED slot save(mtSt, $balances, mapOf(0)), so the passthrough has to
+*** rebuild it through the prefix rule before v->st can cast it. The dispatch is
+*** then the `prm := find(nd, f)` guard rather than a field's sort, and lands on
+*** the same 5.
 red in PAPER-FIND-FLAGGED : findSteps('PAPER-CMP-FLAGGED, find(s3, $ledger2 $nonce)) .
-*** the same three arrows, over a store whose mapping slots are mapOf(0):
 *** find(s3, $ledger2 $nonce)
+***  ~> find(ovr(v→st(find(save(save(save(save(mtSt, $ledger $balances,
+***         mapOf(0)), $ledger2 $balances, mapOf(0)), $ledger $nonce, 5),
+***         $ledger $balances 1, 11), $ledger2)), save(save(save(mtSt,
+***         $balances, mapOf(0)), $nonce, 5), $balances 1, 11)), $nonce)
+***  ~> find(ovr(v→st(find(save(save(save(mtSt, $ledger $balances,
+***         mapOf(0)), $ledger2 $balances, mapOf(0)), $ledger $nonce, 5),
+***         $ledger2)), save(save(save(mtSt, $balances, mapOf(0)), $nonce,
+***         5), $balances 1, 11)), $nonce)
+***  ~> find(ovr(v→st(find(save(save(mtSt, $ledger $balances, mapOf(0)),
+***         $ledger2 $balances, mapOf(0)), $ledger2)),
+***         save(save(save(mtSt, $balances, mapOf(0)), $nonce, 5),
+***         $balances 1, 11)), $nonce)
+***  ~> find(ovr(v→st(save(v→st(find(save(mtSt, $ledger $balances,
+***         mapOf(0)), $ledger2)), $balances, mapOf(0))),
+***         save(save(save(mtSt, $balances, mapOf(0)), $nonce, 5),
+***         $balances 1, 11)), $nonce)
+***  ~> find(ovr(v→st(save(v→st(find(mtSt, $ledger2)), $balances,
+***         mapOf(0))), save(save(save(mtSt, $balances, mapOf(0)), $nonce,
+***         5), $balances 1, 11)), $nonce)
+***  ~> find(ovr(v→st(save(v→st(0), $balances, mapOf(0))),
+***         save(save(save(mtSt, $balances, mapOf(0)), $nonce, 5),
+***         $balances 1, 11)), $nonce)
+***  ~> find(ovr(v→st(save(mtSt, $balances, mapOf(0))),
+***         save(save(save(mtSt, $balances, mapOf(0)), $nonce, 5),
+***         $balances 1, 11)), $nonce)
 ***  ~> find(ovr(save(mtSt, $balances, mapOf(0)), save(save(save(mtSt,
-***          $balances, mapOf(0)), $nonce, 5), $balances 1, 11)), $nonce)
+***         $balances, mapOf(0)), $nonce, 5), $balances 1, 11)), $nonce)
 ***  ~> find(save(save(save(mtSt, $balances, mapOf(0)), $nonce, 5),
-***          $balances 1, 11), $nonce)
-***  ~> find(save(save(mtSt, $balances, mapOf(0)), $nonce, 5), $nonce)  ~>  5
+***         $balances 1, 11), $nonce)
+***  ~> find(save(save(mtSt, $balances, mapOf(0)), $nonce, 5), $nonce)
+***  ~> 5
 red in PAPER-CMP-SORTED  : find(s3, $ledger2 $nonce) .                     *** 5
 red in PAPER-CMP-FLAGGED : find(s3, $ledger2 $nonce) .                     *** 5
 
 *** ---- C2  B's fifth arrow: $balances, the MapField arm, reads LEFT --------
+*** The SAME leaf, assembled by the same six arrows, dispatched the other way.
 *** The target here is unset, so LEFT is mtSt in the sorted model and the bare
 *** declared slot in the flagged one -- and the answer is 0. Which arm fired is
-*** still visible: the second term keeps the WHOLE remaining path, `$balances
-*** 1`, on the target side, where C1 handed `$nonce` to the source side.
+*** visible in the dispatch arrow: it keeps the WHOLE remaining path,
+*** `$balances 1`, on the target side, where C1 handed `$nonce` to the source.
 red in PAPER-FIND-SORTED : findSteps('PAPER-CMP-SORTED, find(s3, $ledger2 $balances 1)) .
 *** find(s3, $ledger2 $balances 1)
-***  ~> find(ovr(mtSt, save(save(mtSt, $nonce, 5), $balances 1, 11)), $balances 1)
-***  ~> find(mtSt, $balances 1)  ~>  0
+***  ~> find(ovr(v→st(find(save(save(mtSt, $ledger $nonce, 5), $ledger
+***         $balances 1, 11), $ledger2)), save(save(mtSt, $nonce, 5),
+***         $balances 1, 11)), $balances 1)
+***  ~> find(ovr(v→st(find(save(mtSt, $ledger $nonce, 5), $ledger2)),
+***         save(save(mtSt, $nonce, 5), $balances 1, 11)), $balances 1)
+***  ~> find(ovr(v→st(find(mtSt, $ledger2)), save(save(mtSt, $nonce, 5),
+***         $balances 1, 11)), $balances 1)
+***  ~> find(ovr(v→st(mtSt), save(save(mtSt, $nonce, 5), $balances 1,
+***         11)), $balances 1)
+***  ~> find(ovr(mtSt, save(save(mtSt, $nonce, 5), $balances 1, 11)),
+***         $balances 1)
+***  ~> find(mtSt, $balances 1)
+***  ~> 0
 red in PAPER-FIND-FLAGGED : findSteps('PAPER-CMP-FLAGGED, find(s3, $ledger2 $balances 1)) .
 *** find(s3, $ledger2 $balances 1)
+***  ~> find(ovr(v→st(find(save(save(save(save(mtSt, $ledger $balances,
+***         mapOf(0)), $ledger2 $balances, mapOf(0)), $ledger $nonce, 5),
+***         $ledger $balances 1, 11), $ledger2)), save(save(save(mtSt,
+***         $balances, mapOf(0)), $nonce, 5), $balances 1, 11)), $balances
+***         1)
+***  ~> find(ovr(v→st(find(save(save(save(mtSt, $ledger $balances,
+***         mapOf(0)), $ledger2 $balances, mapOf(0)), $ledger $nonce, 5),
+***         $ledger2)), save(save(save(mtSt, $balances, mapOf(0)), $nonce,
+***         5), $balances 1, 11)), $balances 1)
+***  ~> find(ovr(v→st(find(save(save(mtSt, $ledger $balances, mapOf(0)),
+***         $ledger2 $balances, mapOf(0)), $ledger2)),
+***         save(save(save(mtSt, $balances, mapOf(0)), $nonce, 5),
+***         $balances 1, 11)), $balances 1)
+***  ~> find(ovr(v→st(save(v→st(find(save(mtSt, $ledger $balances,
+***         mapOf(0)), $ledger2)), $balances, mapOf(0))),
+***         save(save(save(mtSt, $balances, mapOf(0)), $nonce, 5),
+***         $balances 1, 11)), $balances 1)
+***  ~> find(ovr(v→st(save(v→st(find(mtSt, $ledger2)), $balances,
+***         mapOf(0))), save(save(save(mtSt, $balances, mapOf(0)), $nonce,
+***         5), $balances 1, 11)), $balances 1)
+***  ~> find(ovr(v→st(save(v→st(0), $balances, mapOf(0))),
+***         save(save(save(mtSt, $balances, mapOf(0)), $nonce, 5),
+***         $balances 1, 11)), $balances 1)
+***  ~> find(ovr(v→st(save(mtSt, $balances, mapOf(0))),
+***         save(save(save(mtSt, $balances, mapOf(0)), $nonce, 5),
+***         $balances 1, 11)), $balances 1)
 ***  ~> find(ovr(save(mtSt, $balances, mapOf(0)), save(save(save(mtSt,
-***          $balances, mapOf(0)), $nonce, 5), $balances 1, 11)), $balances 1)
+***         $balances, mapOf(0)), $nonce, 5), $balances 1, 11)), $balances
+***         1)
 ***  ~> find(save(mtSt, $balances, mapOf(0)), $balances 1)
-***  ~> find(mapOf(0), 1)  ~>  0
-*** the flagged model takes one arrow more: its unset key is the declared
-*** slot's template, mapOf(0), not a zero-init default read off a field sort.
+***  ~> find(mapOf(0), 1)
+***  ~> 0
+*** the flagged model takes one arrow more at the END as well: its unset key is
+*** the declared slot's template, find(mapOf(0), 1), not a zero-init default
+*** read off a field's sort.
 red in PAPER-CMP-SORTED  : find(s3, $ledger2 $balances 1) .                *** 0
 red in PAPER-CMP-FLAGGED : find(s3, $ledger2 $balances 1) .                *** 0
 
 *** ---- C3  the same arm with the target written: 77, not 11 ----------------
 *** Block E's storage. Now LEFT is non-empty and the answer distinguishes the
 *** two sides outright: the source has 11 at that key and the read returns the
-*** target's 77. Both models, three arrows each, same value.
+*** target's 77. The extra arrows against C2 are all in the sub-read again --
+*** the target's old value is now save(mtSt, $balances 1, 77) rather than mtSt,
+*** so the passthrough must rebuild it through the prefix rule before the leaf
+*** can dispatch. That rebuild IS the mechanism by which a value written to the
+*** target BEFORE the copy survives it.
 red in PAPER-FIND-SORTED : findSteps('PAPER-CMP-SORTED, find(s3w, $ledger2 $balances 1)) .
 *** find(s3w, $ledger2 $balances 1)
+***  ~> find(ovr(v→st(find(save(save(save(mtSt, $ledger $nonce, 5),
+***         $ledger $balances 1, 11), $ledger2 $balances 1, 77),
+***         $ledger2)), save(save(mtSt, $nonce, 5), $balances 1, 11)),
+***         $balances 1)
+***  ~> find(ovr(v→st(save(v→st(find(save(save(mtSt, $ledger $nonce, 5),
+***         $ledger $balances 1, 11), $ledger2)), $balances 1, 77)),
+***         save(save(mtSt, $nonce, 5), $balances 1, 11)), $balances 1)
+***  ~> find(ovr(v→st(save(v→st(find(save(mtSt, $ledger $nonce, 5),
+***         $ledger2)), $balances 1, 77)), save(save(mtSt, $nonce, 5),
+***         $balances 1, 11)), $balances 1)
+***  ~> find(ovr(v→st(save(v→st(find(mtSt, $ledger2)), $balances 1, 77)),
+***         save(save(mtSt, $nonce, 5), $balances 1, 11)), $balances 1)
+***  ~> find(ovr(v→st(save(v→st(mtSt), $balances 1, 77)), save(save(mtSt,
+***         $nonce, 5), $balances 1, 11)), $balances 1)
+***  ~> find(ovr(v→st(save(mtSt, $balances 1, 77)), save(save(mtSt,
+***         $nonce, 5), $balances 1, 11)), $balances 1)
 ***  ~> find(ovr(save(mtSt, $balances 1, 77), save(save(mtSt, $nonce, 5),
-***          $balances 1, 11)), $balances 1)
-***  ~> find(save(mtSt, $balances 1, 77), $balances 1)  ~>  77
+***         $balances 1, 11)), $balances 1)
+***  ~> find(save(mtSt, $balances 1, 77), $balances 1)
+***  ~> 77
 red in PAPER-FIND-FLAGGED : findSteps('PAPER-CMP-FLAGGED, find(s3w, $ledger2 $balances 1)) .
 *** find(s3w, $ledger2 $balances 1)
+***  ~> find(ovr(v→st(find(save(save(save(save(save(mtSt, $ledger
+***         $balances, mapOf(0)), $ledger2 $balances, mapOf(0)), $ledger
+***         $nonce, 5), $ledger $balances 1, 11), $ledger2 $balances 1,
+***         77), $ledger2)), save(save(save(mtSt, $balances, mapOf(0)),
+***         $nonce, 5), $balances 1, 11)), $balances 1)
+***  ~> find(ovr(v→st(save(v→st(find(save(save(save(save(mtSt, $ledger
+***         $balances, mapOf(0)), $ledger2 $balances, mapOf(0)), $ledger
+***         $nonce, 5), $ledger $balances 1, 11), $ledger2)), $balances 1,
+***         77)), save(save(save(mtSt, $balances, mapOf(0)), $nonce, 5),
+***         $balances 1, 11)), $balances 1)
+***  ~> find(ovr(v→st(save(v→st(find(save(save(save(mtSt, $ledger
+***         $balances, mapOf(0)), $ledger2 $balances, mapOf(0)), $ledger
+***         $nonce, 5), $ledger2)), $balances 1, 77)),
+***         save(save(save(mtSt, $balances, mapOf(0)), $nonce, 5),
+***         $balances 1, 11)), $balances 1)
+***  ~> find(ovr(v→st(save(v→st(find(save(save(mtSt, $ledger $balances,
+***         mapOf(0)), $ledger2 $balances, mapOf(0)), $ledger2)),
+***         $balances 1, 77)), save(save(save(mtSt, $balances, mapOf(0)),
+***         $nonce, 5), $balances 1, 11)), $balances 1)
+***  ~> find(ovr(v→st(save(v→st(save(v→st(find(save(mtSt, $ledger
+***         $balances, mapOf(0)), $ledger2)), $balances, mapOf(0))),
+***         $balances 1, 77)), save(save(save(mtSt, $balances, mapOf(0)),
+***         $nonce, 5), $balances 1, 11)), $balances 1)
+***  ~> find(ovr(v→st(save(v→st(save(v→st(find(mtSt, $ledger2)),
+***         $balances, mapOf(0))), $balances 1, 77)), save(save(save(mtSt,
+***         $balances, mapOf(0)), $nonce, 5), $balances 1, 11)), $balances
+***         1)
+***  ~> find(ovr(v→st(save(v→st(save(v→st(0), $balances, mapOf(0))),
+***         $balances 1, 77)), save(save(save(mtSt, $balances, mapOf(0)),
+***         $nonce, 5), $balances 1, 11)), $balances 1)
+***  ~> find(ovr(v→st(save(v→st(save(mtSt, $balances, mapOf(0))),
+***         $balances 1, 77)), save(save(save(mtSt, $balances, mapOf(0)),
+***         $nonce, 5), $balances 1, 11)), $balances 1)
+***  ~> find(ovr(v→st(save(save(mtSt, $balances, mapOf(0)), $balances 1,
+***         77)), save(save(save(mtSt, $balances, mapOf(0)), $nonce, 5),
+***         $balances 1, 11)), $balances 1)
 ***  ~> find(ovr(save(save(mtSt, $balances, mapOf(0)), $balances 1, 77),
-***          save(save(save(mtSt, $balances, mapOf(0)), $nonce, 5),
-***          $balances 1, 11)), $balances 1)
-***  ~> find(save(save(mtSt, $balances, mapOf(0)), $balances 1, 77), $balances 1)
+***         save(save(save(mtSt, $balances, mapOf(0)), $nonce, 5),
+***         $balances 1, 11)), $balances 1)
+***  ~> find(save(save(mtSt, $balances, mapOf(0)), $balances 1, 77),
+***         $balances 1)
 ***  ~> 77
 red in PAPER-CMP-SORTED  : find(s3w, $ledger2 $balances 1) .               *** 77
 red in PAPER-CMP-FLAGGED : find(s3w, $ledger2 $balances 1) .               *** 77
