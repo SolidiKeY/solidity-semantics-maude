@@ -1,0 +1,120 @@
+*** src/sem/examples/paper/MemoryArrays.maude
+***
+*** sections/memory-examples-arrays.tex — indexed memory access.
+***
+*** Adaptation used throughout: a memory array is allocated with a SIZE,
+*** `memory q = new(n) ;`, and any element that is later read is written first.
+*** BANK has no default for an Int selector (src/Memory.maude:39-41 covers a
+*** primitive and a reference selector only), so an untouched memory slot is
+*** simply not readable — unlike storage, which zero-initializes. Indices are
+*** concrete, because a memory index is bounds-checked against the length slot.
+*** The rows using `makeValue()` are UNSUPPORTED: a call in expression position.
+
+load Domain .
+
+fmod PAPER-MEMORY-ARRAYS{Field :: TRIV} is
+    pr PAPER-STEPS{Field} .
+endfm
+
+*** ---- :4  v = carolValues[i];   in bounds, then out of bounds ------------
+red run(< memory 'carolValues = new(# 2) ;
+          'carolValues [ # 1 ] = # val ;
+          var 'i = # 1 ;
+          var 'v = 'carolValues [ 'i ] ; >) .
+*** {memory := write(write(addM(emptyMemory, pid(0)),
+*** idC(pid(0), nil), length, 2), idC(pid(0), nil), 1, val) || 'carolValues
+*** := idC(pid(0), nil) || 'i := 1 || 'v := val}
+red < memory 'carolValues = new(# 2) ; 'carolValues [ # 1 ] = # val ;
+      var 'i = # 1 ; var 'v = 'carolValues [ 'i ] ; > ('v == # val) .            *** true
+red < memory 'carolValues = new(# 2) ; var 'i = # 2 ;
+      var 'v = 'carolValues [ 'i ] ; > reverts .                                 *** true
+
+*** ---- :32  carolValues[i] = 100; --------------------------------------
+red run(< memory 'carolValues = new(# 2) ; var 'i = # 1 ;
+          'carolValues [ 'i ] = # 100 ; >) .
+*** {memory := write(write(addM(emptyMemory, pid(0)),
+*** idC(pid(0), nil), length, 2), idC(pid(0), nil), 1, 100) || 'carolValues
+*** := idC(pid(0), nil) || 'i := 1}
+
+*** ---- :47  v = carolValues[++i];   an impure index -------------------
+red run(< memory 'carolValues = new(# 3) ;
+          'carolValues [ # 1 ] = # val ;
+          var 'i = # 0 ;
+          var 'v = 'carolValues [ ++ 'i ] ; >) .
+*** {memory := write(write(addM(emptyMemory, pid(0)),
+*** idC(pid(0), nil), length, 3), idC(pid(0), nil), 1, val) || 'carolValues
+*** := idC(pid(0), nil) || 'i := 1 || 'v := val || tq(0) := 1}
+red < memory 'carolValues = new(# 3) ; 'carolValues [ # 1 ] = # val ;
+      var 'i = # 0 ; var 'v = 'carolValues [ ++ 'i ] ; > ('i == # 1 && 'v == # val) .   *** true
+
+*** ---- :78  carolValues[++i] = makeValue(); ---------------------------
+*** UNSUPPORTED: a call in expression position.
+
+*** ---- :96  carolValues[++i] = val;   the paper's pv / idx unfold ------
+red steps(< memory 'carolValues = new(# 3) ;
+            var 'i = # 0 ;
+            'carolValues [ ++ 'i ] = # val ; >) .
+
+*** ---- :122  carolValues[i] = makeValue(); ---------------------------
+*** UNSUPPORTED: a call in expression position.
+
+*** ---- :140  carol.account.values[i] = val;   a nested memory array ----
+red run(< memory 'carol = new ;
+          memory 'vs = new(# 2) ;
+          'carol . $account . $values = 'vs ;
+          var 'i = # 1 ;
+          'carol . $account . $values [ 'i ] = # val ; >) .
+*** {memory := write(write(write(addM(addM(emptyMemory,
+*** pid(0)), pid( 1)), idC(pid(1), nil), length, 2), idC(pid(0), $account),
+*** $values, idC(pid( 1), nil)), idC(pid(1), nil), 1, val) || 'carol :=
+*** idC(pid(0), nil) || 'i := 1 || 'vs := idC(pid(1), nil)}
+red < memory 'carol = new ; memory 'vs = new(# 2) ;
+      'carol . $account . $values = 'vs ; var 'i = # 1 ;
+      'carol . $account . $values [ 'i ] = # val ; > ('carol . $account . $values [ # 1 ] == # val) .  *** true
+
+*** ---- :165  carolTokens[i] = david.account.token; -------------------
+red run(< memory 'carolTokens = new(# 2) ; memory 'david = new ;
+          var 'i = # 1 ;
+          'carolTokens [ 'i ] = 'david . $account . $token ; >) .
+*** {memory := write(addM(write(addM(emptyMemory, pid(0)),
+*** idC(pid(0), nil), length, 2), pid(1)), idC(pid(0), nil), 1, idC(pid(1),
+*** $account $token)) || 'carolTokens := idC(pid(0), nil) || 'david :=
+*** idC(pid(1), nil) || 'i := 1}
+
+*** ---- :184  carol.account.token = davidTokens[i]; ------------------
+red run(< memory 'carol = new ;
+          memory 'davidTokens = new(# 2) ;
+          memory 'tk = new ;
+          'davidTokens [ # 1 ] = 'tk ;
+          var 'i = # 1 ;
+          'carol . $account . $token = 'davidTokens [ 'i ] ; >) .
+*** {memory := write(write(addM(write(addM(addM(emptyMemory,
+*** pid(0)), pid(1)), idC(pid(1), nil), length, 2), pid(2)), idC(pid(1),
+*** nil), 1, idC( pid(2), nil)), idC(pid(0), $account), $token, idC(pid(2),
+*** nil)) || 'carol := idC(pid(0), nil) || 'davidTokens := idC(pid(1), nil)
+*** || 'i := 1 || 'tk := idC(pid(2), nil)}
+
+*** ---- :206  Token memory tok = carol.account.tokens[i]; -------------
+red run(< memory 'carol = new ;
+          memory 'toks = new(# 2) ;
+          'carol . $account . $tokens = 'toks ;
+          memory 'tk = new ;
+          'toks [ # 1 ] = 'tk ;
+          var 'i = # 1 ;
+          memory 'tok = 'carol . $account . $tokens [ 'i ] ; >) .
+*** {memory := write(addM(write(write(addM(addM(emptyMemory,
+*** pid(0)), pid(1)), idC(pid(1), nil), length, 2), idC(pid(0), $account),
+*** $tokens, idC( pid(1), nil)), pid(2)), idC(pid(1), nil), 1, idC(pid(2),
+*** nil)) || 'carol := idC(pid(0), nil) || 'i := 1 || 'tk := idC(pid(2),
+*** nil) || 'tok := idC(pid( 2), nil) || 'toks := idC(pid(1), nil)}
+
+*** ---- :234  Token memory tok = carolTokens[++i]; -------------------
+red run(< memory 'carolTokens = new(# 2) ;
+          memory 'tk = new ;
+          'carolTokens [ # 1 ] = 'tk ;
+          var 'i = # 0 ;
+          memory 'tok = 'carolTokens [ ++ 'i ] ; >) .
+*** {memory := write(addM(write(addM(emptyMemory, pid(0)),
+*** idC(pid(0), nil), length, 2), pid(1)), idC(pid(0), nil), 1, idC(pid(1),
+*** nil)) || 'carolTokens := idC(pid(0), nil) || 'i := 1 || 'tk :=
+*** idC(pid(1), nil) || 'tok := idC(pid(1), nil) || tq(0) := 1}

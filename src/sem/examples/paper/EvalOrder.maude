@@ -1,0 +1,62 @@
+*** src/sem/examples/paper/EvalOrder.maude
+***
+*** sections/not-implemented.tex — the unsound derivation for `m[i++] = i;` and
+*** its two repairs, plus the two claims the section makes about on-chain
+*** behaviour, plus the overflow example.
+***
+*** The unsound derivation itself is NOT reproducible, by construction: it
+*** captured the INDEX before the value, and Order.maude implements Repair 1 --
+*** value first, then receiver, then index -- so the rule that made the paper's
+*** derivation unsound does not exist here. That is the point of the section,
+*** so its absence is the expected result rather than a gap.
+
+load Domain .
+
+fmod PAPER-EVAL-ORDER{Field :: TRIV} is
+    pr PAPER-STEPS{Field} .
+endfm
+
+*** ---- :103  uint8 x = 250; x += 10; ----------------------------------
+*** UNSUPPORTED as written: ints are unbounded here ("Solidity Light"), so
+*** there is no overflow branch and no revert. The unchecked value the paper
+*** attributes to the arithmetic section is what comes out.
+red run(< var 'x = # 250 ; 'x += # 10 ; >) .
+*** {'x := 260}
+red < var 'x = # 250 ; 'x += # 10 ; > ('x == # 260) .                            *** true
+
+*** ---- :253  Repair 1: capture the value and the index, in that order ----
+*** `m[i++] = i;` on a MAPPING, so the index may stay SYMBOLIC: mappings are
+*** total and carry no bounds branch.
+*** the paper: a := i, b := i, i := i+1, storage := save(m·at(i), i)
+*** i.e. the stored value is the OLD i, and it lands at the OLD i.
+red steps(< var 'i = # i0 ; $m [ 'i ++ ] = 'i ; >) .
+red |- < var 'i = # i0 ; $m [ 'i ++ ] = 'i ; >
+     ~> { 'i := i0 }< $m [ 'i ++ ] = 'i ; >
+     ~> { 'i := i0 }< capture tq(0) = 'i ; capture tq(1) = 'i ; 'i = 'i + # 1 ;
+                      $m [ tq(1) ] = tq(0) ; >
+     ~*> { storage := save(mtSt, $m i0, i0) || 'i := i0 + 1
+           || tq(0) := i0 || tq(1) := i0 } .                                     *** true
+
+*** ---- :280  Repair 2: settle the value, then reuse it ------------------
+*** `uint const a = i; m[i++] = a;` — there is no `const` binding form here, and
+*** on this program the paper says the two repairs agree. The derivation above
+*** is that agreed one.
+
+*** ---- :220  persons[p.age++] = p;   with p in MEMORY -------------------
+*** the paper's on-chain claim: persons[0].age == 1. The index is captured
+*** BEFORE the increment, so it is 0; the value is a memory REFERENCE, captured
+*** by reference, so the copy reads the already-incremented heap.
+red run(< memory 'p = new ; $persons .push() ; $persons [ 'p . $age ++ ] = 'p ; >) .
+*** {storage := save(save(delAt(mtSt, $persons 0), $persons
+*** length, 1), $persons 0, copyMem(mtSt, write(addM(emptyMemory, pid(0)),
+*** idC(pid(0), nil), $age, 1), idC(pid(0), nil))) || memory :=
+*** write(addM(emptyMemory, pid(0)), idC(pid(0), nil), $age, 1) || 'p :=
+*** idC(pid(0), nil) || tq(0) := idC(pid(0), nil) || tq(1) := 0}
+red < memory 'p = new ; $persons .push() ; $persons [ 'p . $age ++ ] = 'p ; >
+    ($persons [ # 0 ] . $age == # 1) .                                           *** true
+
+*** ---- :168  matrix[i++][0] = i;   the rejected rules stored i+1 --------
+*** here it stores the OLD i, which is 0, and i ends at 1
+red < $matrix .push() ; $matrix [ # 0 ] .push(# 0) ;
+      var 'i = # 0 ;
+      $matrix [ 'i ++ ] [ # 0 ] = 'i ; > ('i == # 1 && $matrix [ # 0 ] [ # 0 ] == # 0) .   *** true

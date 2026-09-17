@@ -29,7 +29,9 @@ CI (`.github/workflows/maude.yml`) installs `maude` via apt and runs `maude full
 proper `load` chain and a runner. It layers a small-step Solidity semantics
 on top of the storage/memory models (see `PLAN.md`): `Syntax` → `Config` →
 `Expr` → `Order` → `Stmt` → `Flow` → `Net` → `Contract` → `NetCallback` (a
-system `mod`), plus `examples/Bank.maude`. **Keep that chain linear** —
+system `mod`), plus `examples/Bank.maude`. Two further roots branch off
+`Contract`: `Hoare.maude`, and `Steps.maude` → `examples/paper/Domain.maude` →
+the eleven `examples/paper/` sections. **Keep that chain linear** —
 Maude's `load` is not idempotent, so a diamond re-executes the whole preamble
 and silently duplicates modules. Run the whole suite (each file green
 when it emits no `Warning:` and leaves no reduction stuck) with:
@@ -92,7 +94,21 @@ Everything is built on an abstract field signature and layered upward. `load` st
   rewrite rule (`SOL-CALLBACK`, a system `mod`: `call{value:}` re-entrancy,
   which `search` explores to find/exclude the DAO drain). `Hoare.maude` adds
   the Solidity-looking triple `< prog > (post)` that reduces to `true`/`false`
-  — a property checked by one `red`. Syntax reads like Solidity: member
+  — a property checked by one `red`. `Steps.maude` adds the pre-licentiate
+  paper's DERIVATION notation on top, by metaprogramming: it reflects the
+  domain module with `upModule` and turns every equation whose left-hand side
+  is a configuration `{ … }` (the ~43 statement equations) into a *rule*,
+  leaving the helpers equational, so one rule application is one step. That
+  gives `steps(< prog >)` printing `G0 ~> G1 ~> … ~> Gn` over paper-style goals
+  `{ storage := … || 'v := … }< rest >`, plus `~*>` for an elided run and a
+  judgement `|- G0 ~> G1 ~*> G2` that reduces to `true` exactly when the
+  written derivation is the one the semantics takes. It is pure addition: the
+  object semantics is untouched and `< prog > (post)` still reduces in one
+  `red`. The module being reflected must NOT itself import `META-LEVEL`, which
+  is why each instance is two modules (a domain, then a `pr SOL-STEPS` layer
+  defining `eq theModule = 'THE-DOMAIN .`). `examples/paper/` replays the
+  paper's worked examples through it, one file per section, with the
+  adaptations and the not-expressible forms documented in its `README.md`. Syntax reads like Solidity: member
   access `.`, assignment `=`, equality `==`, comparisons `< <= > >=`,
   `&& || !`. Conventions: conditions are a dedicated sort `Prop` (evaluated
   by `evalP` to the truth value 1/0, so guards stay Int-based); modules are

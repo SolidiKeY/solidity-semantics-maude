@@ -1,0 +1,74 @@
+*** src/sem/examples/paper/StorageDelete.maude
+***
+*** sections/storage-examples-delete.tex — the three storage delete traces.
+*** These are the paper's best oracles: it states both endpoints, including the
+*** values every read produces afterwards.
+***
+*** One presentational difference: where the paper writes the reset slot as
+*** `defVal`, this model leaves the delete MARKED, as `delAt(…)` / `delNode(…)`,
+*** and reads it through. The observable reads agree, which is what the Hoare
+*** claims below check.
+
+load Domain .
+
+fmod PAPER-STORAGE-DELETE{Field :: TRIV} is
+    pr PAPER-STEPS{Field} .
+endfm
+
+*** ---- :4  delete alice.account, then read balance and token.value --------
+*** the paper: S2 = delAt(S1, alice·account), b := 0, v := 0
+red steps(< $alice . $account . $balance = # 100 ;
+            $alice . $account . $token . $value = # 7 ;
+            delete $alice . $account ;
+            var 'b = $alice . $account . $balance ;
+            var 'v = $alice . $account . $token . $value ; >) .
+red < $alice . $account . $balance = # 100 ;
+      $alice . $account . $token . $value = # 7 ;
+      delete $alice . $account ;
+      var 'b = $alice . $account . $balance ;
+      var 'v = $alice . $account . $token . $value ; > ('b == # 0 && 'v == # 0) .    *** true
+
+*** ---- :93  delete alice.account.tokens[++i]; len = …tokens.length; ------
+*** An IMPURE index, so Order.maude captures it: `'i = 'i + # 1 ;` then
+*** `capture tq(0) = 'i ;` — the paper's `idx := i+1`, `i := i+1`. The length is
+*** untouched by an element delete.
+red run(< $alice . $account . $tokens .push() ;
+          $alice . $account . $tokens .push() ;
+          var 'i = # 0 ;
+          delete $alice . $account . $tokens [ ++ 'i ] ;
+          var 'len = $alice . $account . $tokens . length ; >) .
+*** {storage := delAt(save(delAt(save(delAt(mtSt, $alice
+*** $account $tokens 0), $alice $account $tokens length, 1), $alice $account
+*** $tokens 1), $alice $account $tokens length, 2), $alice $account $tokens
+*** 1) || 'i := 1 || 'len := 2 || tq(0) := 1}
+red < $alice . $account . $tokens .push() ;
+      $alice . $account . $tokens .push() ;
+      $alice . $account . $tokens [ # 1 ] . $value = # 9 ;
+      var 'i = # 0 ;
+      delete $alice . $account . $tokens [ ++ 'i ] ;
+      var 'len = $alice . $account . $tokens . length ; >
+    ('i == # 1 && 'len == # 2 && $alice . $account . $tokens [ # 1 ] . $value == # 0) .   *** true
+
+*** ---- :170  the mapping trace: delete skips mappings --------------------
+*** ledger.nonce = 5; ledger.balances[1] = 10; delete ledger; kept = …;
+*** delete ledger.balances[1]; nonce = …; gone = …;
+*** the paper: kept := 10 (the mapping SURVIVED the struct delete),
+***            nonce := 0, gone := 0.
+red run(< $ledger . $nonce = # 5 ;
+          $ledger . $balances [ # 1 ] = # 10 ;
+          delete $ledger ;
+          var 'kept = $ledger . $balances [ # 1 ] ;
+          delete $ledger . $balances [ # 1 ] ;
+          var 'nonce = $ledger . $nonce ;
+          var 'gone = $ledger . $balances [ # 1 ] ; >) .
+*** {storage := delAt(delAt(save(save(mtSt, $ledger $nonce, 5),
+*** $ledger $balances 1, 10), $ledger), $ledger $balances 1) || 'gone := 0
+*** || 'kept := 10 || 'nonce := 0}
+red < $ledger . $nonce = # 5 ;
+      $ledger . $balances [ # 1 ] = # 10 ;
+      delete $ledger ;
+      var 'kept = $ledger . $balances [ # 1 ] ;
+      delete $ledger . $balances [ # 1 ] ;
+      var 'nonce = $ledger . $nonce ;
+      var 'gone = $ledger . $balances [ # 1 ] ; >
+    ('kept == # 10 && 'nonce == # 0 && 'gone == # 0) .                              *** true

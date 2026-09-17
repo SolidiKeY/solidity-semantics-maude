@@ -1,0 +1,89 @@
+*** src/sem/examples/paper/StorageArrays.maude
+***
+*** sections/storage-examples-arrays.tex — the additional storage-array cases.
+***
+*** Two forms of the paper's do not exist in this fragment and are marked
+*** UNSUPPORTED below rather than silently dropped:
+***   - a FUNCTION CALL as an expression, `values.push(makeValue())`;
+***   - `push()` as an EXPRESSION, `values.push() = e` / `tokens.push().value = v`.
+*** The push-expression rows are desugared to a bare `push();` followed by an
+*** index write, which is the same slot. One real difference to keep in mind:
+*** the statement `push()` CLEARS the appended slot (SolKey storagePushLengthSave)
+*** where the paper's binding form does not. Harmless here, since every slot
+*** these examples append is fresh.
+
+load Domain .
+
+fmod PAPER-STORAGE-ARRAYS{Field :: TRIV} is
+    pr PAPER-STEPS{Field} .
+endfm
+
+*** ---- :4  values.push(makeValue()); ----------------------------------------
+*** UNSUPPORTED: `makeValue()` is a call in expression position. The paper's own
+*** first step binds it to a local, and THAT is expressible:
+red run(< var 'pv = # elemVal ; $values .push('pv) ; >) .
+*** {storage := save(save(mtSt, $values 0, elemVal), $values
+*** length, 1) || 'pv := elemVal}
+
+*** ---- :30  Token storage tokRef = bob.account.token; tokens.push(tokRef); --
+red run(< $bob . $account . $token . $value = # valueVal ;
+          storage 'tokRef = $bob . $account . $token ;
+          $tokens .push('tokRef) ; >) .
+*** {storage := save(save(save(mtSt, $bob $account $token
+*** $value, valueVal), $tokens 0, save(mtSt, $value, valueVal)), $tokens
+*** length, 1) || 'tokRef := sp($bob $account $token)}
+red < $bob . $account . $token . $value = # 5 ;
+      storage 'tokRef = $bob . $account . $token ;
+      $tokens .push('tokRef) ; > ($tokens [ # 0 ] . $value == # 5 && $tokens . length == # 1) .   *** true
+
+*** ---- :55  alice.account.tokens.push(tok);   a symbolic struct source -----
+red run(< $alice . $account . $tokens .push(# tok) ; >) .
+*** {storage := save(save(mtSt, $alice $account $tokens 0,
+*** tok), $alice $account $tokens length, 1)}
+
+*** ---- :80  tokens.push(); ------------------------------------------------
+red run(< $tokens .push() ; >) .
+*** {storage := save(delAt(mtSt, $tokens 0), $tokens length,
+*** 1)}
+
+*** ---- :81  uint i = tokens.push().value;   desugared to push then index ---
+red run(< $tokens .push() ; var 'i = $tokens [ # 0 ] . $value ; >) .
+*** {storage := save(delAt(mtSt, $tokens 0), $tokens length, 1)
+*** || 'i := 0}
+red < $tokens .push() ; var 'i = $tokens [ # 0 ] . $value ; > ('i == # 0 && $tokens . length == # 1) .   *** true
+
+*** ---- :82  values.push() = makeValue(); ---------------------------------
+*** UNSUPPORTED: a call expression AND push() in lvalue position.
+
+*** ---- :137  tokens.push() = tokRef;   desugared to push(tokRef) ----------
+red run(< $bob . $account . $token . $value = # valueVal ;
+          storage 'tokRef = $bob . $account . $token ;
+          $tokens .push('tokRef) ; >) .
+*** {storage := save(save(save(mtSt, $bob $account $token
+*** $value, valueVal), $tokens 0, save(mtSt, $value, valueVal)), $tokens
+*** length, 1) || 'tokRef := sp($bob $account $token)}
+
+*** ---- :139  tokens.push().value = 11; ----------------------------------
+red run(< $tokens .push() ; $tokens [ # 0 ] . $value = # 11 ; >) .
+*** {storage := save(save(delAt(mtSt, $tokens 0), $tokens
+*** length, 1), $tokens 0 $value, 11)}
+red < $tokens .push() ; $tokens [ # 0 ] . $value = # 11 ; > ($tokens [ # 0 ] . $value == # 11) .   *** true
+
+*** ---- :179  bucket.tokens.push(); ---------------------------------------
+red run(< $bucket . $tokens .push() ; >) .
+*** {storage := save(delAt(mtSt, $bucket $tokens 0), $bucket
+*** $tokens length, 1)}
+
+*** ---- :180  bucket.tokens.push() = tokRef; ----------------------------
+red < $bob . $account . $token . $value = # 5 ;
+      storage 'tokRef = $bob . $account . $token ;
+      $bucket . $tokens .push('tokRef) ; >
+    ($bucket . $tokens [ # 0 ] . $value == # 5 && $bucket . $tokens . length == # 1) .   *** true
+
+*** ---- :182  bucket.tokens.push().value = valueVal; --------------------
+*** the cumulative form: three pushes, so the paper's `q` reads 0, 1, 2
+red < $bucket . $tokens .push() ;
+      $bucket . $tokens .push() ;
+      $bucket . $tokens .push() ;
+      $bucket . $tokens [ # 2 ] . $value = # 7 ; >
+    ($bucket . $tokens . length == # 3 && $bucket . $tokens [ # 2 ] . $value == # 7) .   *** true

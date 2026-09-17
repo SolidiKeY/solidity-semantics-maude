@@ -1,0 +1,43 @@
+*** src/sem/examples/paper/StorageToMemory.maude
+***
+*** sections/storage-to-memory.tex — the three copy examples. A storage-to-memory
+*** assignment allocates a fresh identity and installs a LAZY copy, `copySt`,
+*** which reads through to the struct value captured at assignment time. The
+*** paper gives the final value of each, so all three are checkable oracles.
+
+load Domain .
+
+fmod PAPER-ST-TO-MEM{Field :: TRIV} is
+    pr PAPER-STEPS{Field} .
+endfm
+
+*** ---- :74  alice.age = 25; Person memory carol = alice; v = carol.age; ----
+*** the paper: mem := copySt(add(mem, r), r, select(S_age, alice)), v := 25
+red steps(< $alice . $age = # 25 ;
+            memory 'carol = $alice ;
+            var 'v = 'carol . $age ; >) .
+red < $alice . $age = # 25 ; memory 'carol = $alice ; var 'v = 'carol . $age ; > ('v == # 25) .   *** true
+
+*** ---- :147  alice.account.balance = 10; Account memory acc = alice.account;
+***            v = acc.balance;   — the paper: v := 10 ----------------------
+red run(< $alice . $account . $balance = # 10 ;
+          memory 'acc = $alice . $account ;
+          var 'v = 'acc . $balance ; >) .
+*** {storage := save(mtSt, $alice $account $balance, 10) ||
+*** memory := copySt(emptyMemory, pid(0), save(mtSt, $balance, 10)) || 'acc
+*** := idC(pid( 0), nil) || 'v := 10}
+red < $alice . $account . $balance = # 10 ;
+      memory 'acc = $alice . $account ;
+      var 'v = 'acc . $balance ; > ('v == # 10) .                                *** true
+
+*** ---- :288  Token memory t = alice.account.token; ---------------------
+red run(< $alice . $account . $token . $value = # valueVal ;
+          memory 't = $alice . $account . $token ; >) .
+*** {storage := save(mtSt, $alice $account $token $value,
+*** valueVal) || memory := copySt(emptyMemory, pid(0), save(mtSt, $value,
+*** valueVal)) || 't := idC(pid(0), nil)}
+
+*** the copy is a SNAPSHOT: a later storage write is invisible through it,
+*** and a write through the copy does not reach storage
+red < $alice . $age = # 5 ; memory 'carol = $alice ; $alice . $age = # 99 ; > ('carol . $age == # 5) .   *** true
+red < $alice . $age = # 5 ; memory 'carol = $alice ; 'carol . $age = # 7 ; > ($alice . $age == # 5) .    *** true

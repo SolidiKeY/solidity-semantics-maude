@@ -138,7 +138,16 @@ fmod SOL-STMT{Field :: TRIV} is
     op captL : Qid Loc? Value? K Cells -> Conf .
     eq { k((capture Q = LV ;) KK) C } = captL(Q, lower(LV, C), readLoc(lower(LV, C), C), KK, C) .
     eq { k((capture Q = P ;) KK) C } = decV(Q, evalP(P, C), KK, C) .
-    eq { k((capture Q = E ;) KK) C } = decV(Q, eval(E, C), KK, C) [owise] .
+    *** The non-lvalue case. Stated as an explicit disjointness condition
+    *** rather than [owise], because Steps.maude lifts the k-cell equations to
+    *** RULES and `owise` is meaningless on a rule: an owise fallback would
+    *** there compete with the lvalue equation above and could snapshot a
+    *** storage PATH by value. isLV keeps the owise on a plain predicate, which
+    *** stays equational under that lifting.
+    op isLV : Exp -> Bool .
+    eq isLV(LV) = true .
+    eq isLV(E) = false [owise] .
+    ceq { k((capture Q = E ;) KK) C } = decV(Q, eval(E, C), KK, C) if isLV(E) =/= true .
     eq captL(Q, sloc(FXS), ST2, KK, env(EV) C) = { k(KK) env(envW(EV, Q, bp(FXS))) C } .
     eq captL(Q, L?, I, KK, env(EV) C) = { k(KK) env(envW(EV, Q, bv(I))) C } .
     eq captL(Q, L?, ID, KK, env(EV) C) = { k(KK) env(envW(EV, Q, bv(ID))) C } .

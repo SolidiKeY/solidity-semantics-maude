@@ -1,0 +1,23 @@
+*** src/sem/examples/paper/Arithmetic.maude
+***
+*** sections/arithmetic.tex:61 — Example: Compound Storage Update.
+***
+***     alice.age += 1;
+***   ~> {storage := save(storage, <alice>.age, find(storage, <alice>.age) + 1)}
+***
+*** `+=` is itself a k-cell equation that rewrites to the core assignment, so it
+*** shows up as its own step — the desugaring is visible rather than hidden.
+
+load Domain .
+
+fmod PAPER-ARITHMETIC{Field :: TRIV} is
+    pr PAPER-STEPS{Field} .
+endfm
+
+red steps(< $alice . $age = # ageVal ; $alice . $age += # 1 ; >) .
+*** < $alice . $age = # ageVal ; $alice . $age += # 1 ; > ~>
+*** {storage := save(mtSt, $alice $age, ageVal)}< $alice . $age += # 1 ; >
+*** ~> {storage := save(mtSt, $alice $age, ageVal)}< $alice . $age = $alice
+*** . $age + # 1 ; > ~> {storage := save(save(mtSt, $alice $age, ageVal),
+*** $alice $age, ageVal + 1)}
+red < $alice . $age = # 30 ; $alice . $age += # 1 ; > ($alice . $age == # 31) .   *** true

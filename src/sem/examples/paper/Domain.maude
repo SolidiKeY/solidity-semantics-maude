@@ -1,0 +1,93 @@
+*** src/sem/examples/paper/Domain.maude
+***
+*** The running domain of the pre-licentiate paper (docs/PAPER.md): a three-level
+*** chain of structs, plus the arrays, mappings and roots its example sections
+*** use.
+***
+***     struct Person  { uint age;      Account account;  uint[] accounts; }
+***     struct Account { uint balance;  Token token;      Token[] tokens;  uint[] values; }
+***     struct Token   { uint value; }
+***     struct Ledger  { uint nonce;    mapping(uint => uint) balances; }
+***     struct TokenBucket { Token[] tokens; }
+***
+*** `alice` and `bob` are the storage Persons; `carol` and `david` are the MEMORY
+*** ones and need no declaration here — a memory object is a local, written 'carol.
+***
+*** PAPER-DOMAIN is the module that Steps.maude reflects, so it must NOT import
+*** META-LEVEL; PAPER-STEPS is the layer the derivations are taken in. Keeping
+*** them apart is what stops `upModule` from reflecting the whole meta-level.
+***
+*** The paper reasons about a SYMBOLIC storage; we run from mtSt instead, so a
+*** read needs a preceding write. Symbolic VALUES are still symbolic: the
+*** constants below are free Ints and flow through save / find / write
+*** unevaluated, so `$alice . $age = # ageVal ;` really does end at
+*** `storage := save(mtSt, $alice $age, ageVal)`. Symbolic INDICES and symbolic
+*** GUARDS are not available: an array index is bounds-checked and a guard is
+*** decided by =/= 0, so both must be concrete. See README.md.
+
+load ../../Steps .
+
+fmod PAPER-DOMAIN{Field :: TRIV} is
+    pr SOL-HOARE{Field} .
+
+    *** structs, and arrays whose elements are primitives
+    ops $alice $bob $account $token $accounts $values $ledger $bucket : -> RefField .
+    *** arrays whose elements are structs or arrays: an indexed read is a Struct
+    ops $tokens $matrix $persons : -> RefArrField .
+    *** primitive members
+    ops $age $balance $value $nonce $total $owner : -> PrimField .
+    *** mappings with primitive values
+    ops $balances $m : -> MapField .
+
+    *** zero-initialization: primitives to 0, references to mtSt
+    eq defaultValue($age) = 0 .      eq defaultValue($balance) = 0 .
+    eq defaultValue($value) = 0 .    eq defaultValue($nonce) = 0 .
+    eq defaultValue($total) = 0 .    eq defaultValue($owner) = 0 .
+    eq defaultValue(length) = 0 .
+    eq defaultValue($alice) = mtSt .    eq defaultValue($bob) = mtSt .
+    eq defaultValue($account) = mtSt .  eq defaultValue($token) = mtSt .
+    eq defaultValue($accounts) = mtSt . eq defaultValue($values) = mtSt .
+    eq defaultValue($ledger) = mtSt .   eq defaultValue($bucket) = mtSt .
+    eq defaultValue($tokens) = mtSt .   eq defaultValue($matrix) = mtSt .
+    eq defaultValue($persons) = mtSt .
+
+    *** root lvalues: Field$Elt is not a subsort of LValue (see Syntax.maude),
+    *** so each field constant usable as a ROOT is overloaded at Root < LValue.
+    ops $account $accounts $age $alice $balance $balances $bob $bucket $ledger
+        $m $matrix $nonce $owner $persons $token $tokens $total $value $values : -> Root .
+    var Clv : Cells .
+    eq lower($account, Clv) = sloc($account) .
+    eq lower($accounts, Clv) = sloc($accounts) .
+    eq lower($age, Clv) = sloc($age) .
+    eq lower($alice, Clv) = sloc($alice) .
+    eq lower($balance, Clv) = sloc($balance) .
+    eq lower($balances, Clv) = sloc($balances) .
+    eq lower($bob, Clv) = sloc($bob) .
+    eq lower($bucket, Clv) = sloc($bucket) .
+    eq lower($ledger, Clv) = sloc($ledger) .
+    eq lower($m, Clv) = sloc($m) .
+    eq lower($matrix, Clv) = sloc($matrix) .
+    eq lower($nonce, Clv) = sloc($nonce) .
+    eq lower($owner, Clv) = sloc($owner) .
+    eq lower($persons, Clv) = sloc($persons) .
+    eq lower($token, Clv) = sloc($token) .
+    eq lower($tokens, Clv) = sloc($tokens) .
+    eq lower($total, Clv) = sloc($total) .
+    eq lower($value, Clv) = sloc($value) .
+    eq lower($values, Clv) = sloc($values) .
+
+    *** ---- the paper's symbolic values ------------------------------------
+    *** Free Int constants, so a write of one really is symbolic. `toAddr` and
+    *** `xVal` are the paper's `to` and `x`, renamed: `to` is a keyword inside a
+    *** Maude renaming and is best not used as a constant.
+    ops ageVal valueVal balVal totalVal elemVal bal val : -> Int .
+    ops a b xVal toAddr ownerVal i0 : -> Int .
+    *** symbolic STRUCT values, for `alice = pVal;` and `tokens.push(tok);`
+    ops pVal tok : -> Struct .
+endfm
+
+fmod PAPER-STEPS{Field :: TRIV} is
+    pr PAPER-DOMAIN{Field} .
+    pr SOL-STEPS{Field} .
+    eq theModule = 'PAPER-DOMAIN .
+endfm

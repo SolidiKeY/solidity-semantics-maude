@@ -15,6 +15,7 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Roots that transitively cover the whole sem tree via `load`:
 #   NetCallback  -> Contract -> Net -> Flow -> Stmt -> Expr -> Config -> Syntax
 #   examples/Bank -> Contract -> ...
+#   examples/paper/*  -> paper/Domain -> Steps -> Hoare -> Contract -> ...
 roots=(
   "$here/Syntax.maude"
   "$here/Config.maude"
@@ -25,6 +26,7 @@ roots=(
   "$here/Contract.maude"
   "$here/NetCallback.maude"
   "$here/Hoare.maude"
+  "$here/Steps.maude"
   "$here/examples/Bank.maude"
   "$here/examples/solkey/Arithmetic.maude"
   "$here/examples/solkey/Storage.maude"
@@ -41,6 +43,17 @@ roots=(
   "$here/examples/solkey/Matrix.maude"
   "$here/examples/solkey/ComplexReceiver.maude"
   "$here/examples/solkey/CrossCopy.maude"
+  "$here/examples/paper/StorageExamples.maude"
+  "$here/examples/paper/StorageArrays.maude"
+  "$here/examples/paper/StorageDelete.maude"
+  "$here/examples/paper/Arithmetic.maude"
+  "$here/examples/paper/MemoryExamples.maude"
+  "$here/examples/paper/MemoryDelete.maude"
+  "$here/examples/paper/MemoryArrays.maude"
+  "$here/examples/paper/StorageToMemory.maude"
+  "$here/examples/paper/MemoryToStorage.maude"
+  "$here/examples/paper/Payment.maude"
+  "$here/examples/paper/EvalOrder.maude"
 )
 
 # A result is "stuck" if it still mentions an internal operator that a
@@ -49,7 +62,7 @@ roots=(
 # is not a stuck marker — only these never-final helper operators are.
 # holds( catches a Hoare triple whose guard or postcondition failed to
 # decide.)
-stuck_re='result[^:]*:.*(eval\(|lower\(|readLoc\(|asg\(|payNet\(|call2?\(|branch\(|reqD\(|retD\(|holds\()'
+stuck_re='result[^:]*:.*(eval\(|lower\(|readLoc\(|asg\(|payNet\(|call2?\(|branch\(|reqD\(|retD\(|holds\(|stuck\()'
 
 # No benign-advisory whitelist any more. Both advisories this file used to
 # tolerate were artifacts of Int sharing a kind with Exp:

@@ -1,0 +1,49 @@
+*** src/sem/examples/paper/Payment.maude
+***
+*** sections/payment.tex — the ISoLA payment model: `net` is a second storage
+*** term keyed by address, and `a.transfer(v)` books -v at at(a).
+***
+*** ONE SYSTEMATIC GAP, stated once. The paper's rules also update a
+*** `selfBalance` program variable, and the DIAMOND form of each rule carries
+*** the premise `0 <= v <= selfBalance`. src/sem/Net.maude has no selfBalance
+*** cell and no sufficient-funds branch: a transfer books unconditionally. So
+*** the BOX half of every example below is reproduced exactly, and the diamond
+*** premise has no image here. `to` and `x` are spelled `toAddr` and `xVal`:
+*** `to` is a keyword inside a Maude renaming and is better avoided.
+
+load Domain .
+
+fmod PAPER-PAYMENT{Field :: TRIV} is
+    pr PAPER-STEPS{Field} .
+endfm
+
+*** ---- :98  to.transfer(5); --------------------------------------------
+*** the paper (box): net := store(net, at(to), select(net, at(to)) - 5)
+red steps(< # toAddr .transfer(# 5) ; >) .
+*** < # toAddr .transfer(# 5); > ~> {net := save(mtSt, toAddr,
+*** -5)}
+red |- < # toAddr .transfer(# 5) ; > ~> { net := save(mtSt, toAddr, - 5) } .     *** true
+
+*** ---- :131  to.transfer(x + 2);   a symbolic amount -------------------
+*** the amount is PURE, so there is no `pv` capture step; the Int term is not
+*** folded, so the booking reads as the paper's `select(net, at(to)) - (x + 2)`.
+red run(< # toAddr .transfer(# xVal + # 2) ; >) .
+*** {net := save(mtSt, toAddr, 0 - (xVal + 2))}
+
+*** ---- :177  owner.transfer(5);   a storage-read receiver --------------
+red run(< $owner = # ownerVal ; $owner .transfer(# 5) ; >) .
+*** {storage := save(mtSt, $owner, ownerVal) || net :=
+*** save(mtSt, ownerVal, -5)}
+
+*** ---- :226  An Unfunded Transfer -------------------------------------
+*** The paper's diamond proof stays OPEN on `0 <= 5 <= selfBalance`. With no
+*** selfBalance to constrain, the box behaviour is all there is: the transfer
+*** books and the ledger simply goes negative. That negative entry is exactly
+*** what makes the drain observable in NetCallback.maude's re-entrancy search.
+red run(< # toAddr .transfer(# 5) ; # toAddr .transfer(# 5) ; >) .
+*** {net := save(save(mtSt, toAddr, -5), toAddr, -10)}
+
+*** msg.value credited at entry is visible to the body (Net.maude's tx driver),
+*** which is the protocol the paper's payment section assumes
+red run(< var 'v = msg·value ; >) .
+*** {'v := 0}

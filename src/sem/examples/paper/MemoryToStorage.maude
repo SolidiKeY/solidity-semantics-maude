@@ -1,0 +1,70 @@
+*** src/sem/examples/paper/MemoryToStorage.maude
+***
+*** sections/memory-to-storage.tex — the four copy examples. These are the only
+*** derivations in the paper that use the \rwStepStar macro, its named spelling
+*** of ~*>. A memory-to-storage assignment saves a LAZY `copyMem` struct whose
+*** every `find` delegates to a `readR` on the captured heap — the paper's
+*** findCopyMem rule. The paper gives v := 42 / 50 / 50 / 99.
+
+load Domain .
+
+fmod PAPER-MEM-TO-ST{Field :: TRIV} is
+    pr PAPER-STEPS{Field} .
+endfm
+
+*** ---- :77  carol.age = 42; alice = carol; v = alice.age; ----------------
+red steps(< memory 'carol = new ;
+            'carol . $age = # 42 ;
+            $alice = 'carol ;
+            var 'v = $alice . $age ; >) .
+red < memory 'carol = new ; 'carol . $age = # 42 ; $alice = 'carol ;
+      var 'v = $alice . $age ; > ('v == # 42) .                                  *** true
+
+*** ---- :148  carolAcc.balance = 50; alice.account = carolAcc;
+***            v = alice.account.balance; ---------------------------------
+red run(< memory 'carolAcc = new ;
+          'carolAcc . $balance = # 50 ;
+          $alice . $account = 'carolAcc ;
+          var 'v = $alice . $account . $balance ; >) .
+*** {storage := save(mtSt, $alice $account, copyMem(mtSt,
+*** write(addM( emptyMemory, pid(0)), idC(pid(0), nil), $balance, 50),
+*** idC(pid(0), nil))) || memory := write(addM(emptyMemory, pid(0)),
+*** idC(pid(0), nil), $balance, 50) || 'carolAcc := idC(pid(0), nil) || 'v
+*** := 50}
+red < memory 'carolAcc = new ; 'carolAcc . $balance = # 50 ;
+      $alice . $account = 'carolAcc ;
+      var 'v = $alice . $account . $balance ; > ('v == # 50) .                   *** true
+
+*** ---- :230  carol.account.balance = 50; alice.account = carol.account;
+***            v = alice.account.balance;   — the rhs is a memory REFERENCE --
+red run(< memory 'carol = new ;
+          'carol . $account . $balance = # 50 ;
+          $alice . $account = 'carol . $account ;
+          var 'v = $alice . $account . $balance ; >) .
+*** {storage := save(mtSt, $alice $account, copyMem(mtSt,
+*** write(addM( emptyMemory, pid(0)), idC(pid(0), $account), $balance, 50),
+*** idC(pid(0), $account))) || memory := write(addM(emptyMemory, pid(0)),
+*** idC(pid(0), $account), $balance, 50) || 'carol := idC(pid(0), nil) || 'v
+*** := 50}
+red < memory 'carol = new ; 'carol . $account . $balance = # 50 ;
+      $alice . $account = 'carol . $account ;
+      var 'v = $alice . $account . $balance ; > ('v == # 50) .                   *** true
+
+*** ---- :319  carolToken.value = 99; alice.account.token = carolToken;
+***            v = alice.account.token.value; ------------------------------
+red run(< memory 'carolToken = new ;
+          'carolToken . $value = # 99 ;
+          $alice . $account . $token = 'carolToken ;
+          var 'v = $alice . $account . $token . $value ; >) .
+*** {storage := save(mtSt, $alice $account $token,
+*** copyMem(mtSt, write(addM(emptyMemory, pid(0)), idC(pid(0), nil), $value,
+*** 99), idC(pid(0), nil))) || memory := write(addM(emptyMemory, pid(0)),
+*** idC(pid(0), nil), $value, 99) || 'carolToken := idC(pid(0), nil) || 'v
+*** := 99}
+red < memory 'carolToken = new ; 'carolToken . $value = # 99 ;
+      $alice . $account . $token = 'carolToken ;
+      var 'v = $alice . $account . $token . $value ; > ('v == # 99) .            *** true
+
+*** the copy is a SNAPSHOT the other way too: a later MEMORY write is invisible
+red < memory 'carol = new ; 'carol . $age = # 42 ; $alice = 'carol ;
+      'carol . $age = # 7 ; > ($alice . $age == # 42) .                          *** true

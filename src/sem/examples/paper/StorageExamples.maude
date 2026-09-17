@@ -1,0 +1,222 @@
+*** src/sem/examples/paper/StorageExamples.maude
+***
+*** sections/storage-examples.tex, replayed. Each block cites the paper line and
+*** its Solidity listing. `steps` prints the derivation, `|-` checks the paper's
+*** own claim about it, and a Hoare triple states the value the paper ends at.
+***
+*** Two systematic adaptations, both from running on a CONCRETE empty storage
+*** where the paper reasons about a symbolic one. They are listed once here and
+*** not repeated per block:
+***   - a read needs a preceding write, so `v = alice.age` becomes
+***     `$alice . $age = # ageVal ; var 'v = $alice . $age ;`, symbolic in the
+***     VALUE just as the paper is;
+***   - an array index is bounds-checked, so an array is grown with `push`
+***     first and the index is concrete. The paper's two-goal split on
+***     `0 <= ie < len` becomes two runs, one per branch.
+
+load Domain .
+
+fmod PAPER-STORAGE{Field :: TRIV} is
+    pr PAPER-STEPS{Field} .
+endfm
+
+*** ---- :4  alice.age = ageVal; -----------------------------------------------
+*** storageFieldWriteSave: one rule, one update.
+red steps(< $alice . $age = # ageVal ; >) .
+*** < $alice . $age = # ageVal ; > ~> {storage := save(mtSt, $alice $age, ageVal)}
+red |- < $alice . $age = # ageVal ; > ~> { storage := save(mtSt, $alice $age, ageVal) } .   *** true
+
+*** ---- :18  Account storage acc = bob.account; alice.account = acc; ----------
+*** The write stores the VALUE found at the alias path, not the path itself.
+*** The paper elides the middle with ~*>; so does the check below.
+red steps(< $bob . $account . $balance = # balVal ;
+           storage 'acc = $bob . $account ;
+           $alice . $account = 'acc ; >) .
+*** … ~> {storage := save(mtSt, $bob $account $balance, balVal)}< storage 'acc = … >
+***    ~> {… || 'acc := sp($bob $account)}< $alice . $account = 'acc ; >
+***    ~> {storage := save(save(mtSt, $bob $account $balance, balVal),
+***                        $alice $account, save(mtSt, $balance, balVal))
+***        || 'acc := sp($bob $account)}
+red |- < $bob . $account . $balance = # balVal ;
+        storage 'acc = $bob . $account ;
+        $alice . $account = 'acc ; >
+     ~*> { storage := save(save(mtSt, $bob $account $balance, balVal),
+                           $alice $account, save(mtSt, $balance, balVal))
+           || 'acc := sp($bob $account) } .                                     *** true
+*** and it really is a copy: writing alice afterwards leaves bob alone
+red < $bob . $account . $balance = # 11 ;
+      storage 'acc = $bob . $account ;
+      $alice . $account = 'acc ;
+      $alice . $account . $balance = # 99 ; > ($bob . $account . $balance == # 11) .   *** true
+
+*** ---- :40  alice.account.balance = 10; --------------------------------------
+*** The paper unfolds into `pv` / `acc` temps first. Here the statement is PURE,
+*** so Order.maude leaves it alone and it is a single rule — same final update.
+red steps(< $alice . $account . $balance = # 10 ; >) .
+*** < $alice . $account . $balance = # 10 ; > ~> {storage := save(mtSt, $alice $account $balance, 10)}
+
+*** ---- :67  v = alice.account.balance; ---------------------------------------
+red run(< $alice . $account . $balance = # balVal ;
+          var 'v = $alice . $account . $balance ; >) .
+*** {storage := save(mtSt, $alice $account $balance, balVal) || 'v := balVal}
+
+*** ---- :88  alice.account.token.value = 5; -----------------------------------
+red run(< $alice . $account . $token . $value = # 5 ; >) .
+*** {storage := save(mtSt, $alice $account $token $value, 5)}
+
+*** ---- :132  uint v = total;   a storage ROOT read --------------------------
+red run(< $total = # totalVal ; var 'v = $total ; >) .
+*** {storage := save(mtSt, $total, totalVal) || 'v := totalVal}
+
+*** ---- :153  alice = pVal;   a symbolic STRUCT value ------------------------
+red run(< $alice = # pVal ; >) .
+*** {storage := save(mtSt, $alice, pVal)}
+
+*** ---- :169  alice = bob;   root to root, a VALUE copy ---------------------
+red run(< $bob . $age = # ageVal ; $alice = $bob ; >) .
+*** {storage := save(save(mtSt, $bob $age, ageVal), $alice, save(mtSt, $age, ageVal))}
+
+*** ---- :181  rebinding a storage local retargets it -------------------------
+*** `acc` ends up pointing at BOB, so the write lands there and alice is
+*** untouched — the paper's contrast between a local rebind and a root copy.
+red run(< storage 'acc = $alice . $account ;
+          'acc = $bob . $account ;
+          'acc . $balance = # 10 ; >) .
+*** {storage := save(mtSt, $bob $account $balance, 10) || 'acc := sp($bob $account)}
+red < $alice . $account . $balance = # 1 ;
+      storage 'acc = $alice . $account ;
+      'acc = $bob . $account ;
+      'acc . $balance = # 10 ; > ($alice . $account . $balance == # 1 && $bob . $account . $balance == # 10) .  *** true
+
+*** ---- :204  account = bob.account;   a global root copy ------------------
+red run(< $bob . $account . $balance = # balVal ; $account = $bob . $account ; >) .
+*** {storage := save(save(mtSt, $bob $account $balance, balVal), $account, save(mtSt, $balance, balVal))}
+
+*** ---- :218  v = values[i];   the paper's two-goal split, as two runs ------
+*** in bounds (i = 1, length 2)
+red run(< $values .push(# 0) ; $values .push(# elemVal) ;
+          var 'i = # 1 ; var 'v = $values [ 'i ] ; >) .
+*** {storage := save(save(save(save(mtSt, $values 0, 0), $values length, 1),
+***                       $values 1, elemVal), $values length, 2) || 'i := 1 || 'v := elemVal}
+*** out of bounds (i = 1, length 1): the diamond goal is false. The run reverts
+*** and storage rolls back past the push; the LOCALS survive, because memory and
+*** env are transaction-local and unobservable afterwards (see Config.maude).
+red run(< $values .push(# 0) ; var 'i = # 1 ; var 'v = $values [ 'i ] ; >) .
+*** {status := reverted || 'i := 1}
+red < $values .push(# 0) ; var 'i = # 1 ; var 'v = $values [ 'i ] ; > reverts .   *** true
+
+*** ---- :250  values[i] = 100; ---------------------------------------------
+red run(< $values .push(# 0) ; $values .push(# 0) ;
+          var 'i = # 1 ; $values [ 'i ] = # 100 ; >) .
+*** {storage := save(save(save(save(save(mtSt, $values 0, 0), $values length, 1),
+***                       $values 1, 0), $values length, 2), $values 1, 100) || 'i := 1}
+red < $values .push(# 0) ; var 'i = # 1 ; $values [ 'i ] = # 100 ; > reverts .    *** true
+
+*** ---- :265  v = balances[a];   a mapping key MAY be symbolic -------------
+*** Mappings are total and carry no bounds branch, so the paper's symbolic `a`
+*** survives here where an array index could not.
+red run(< $balances [ # a ] = # bal ; var 'v = $balances [ # a ] ; >) .
+*** {storage := save(mtSt, $balances a, bal) || 'v := bal}
+
+*** ---- :278  Token storage tokRef = bob.account.token; tokens[i] = tokRef; -
+red run(< $bob . $account . $token . $value = # valueVal ;
+          $tokens .push() ;
+          storage 'tokRef = $bob . $account . $token ;
+          var 'i = # 0 ;
+          $tokens [ 'i ] = 'tokRef ; >) .
+*** {storage := save(save(delAt(save(mtSt, $bob $account $token $value, valueVal), $tokens 0),
+***                       $tokens length, 1), $tokens 0, save(mtSt, $value, valueVal))
+***  || 'i := 0 || 'tokRef := sp($bob $account $token)}
+red < $bob . $account . $token . $value = # 5 ;
+      $tokens .push() ;
+      storage 'tokRef = $bob . $account . $token ;
+      $tokens [ # 0 ] = 'tokRef ; > ($tokens [ # 0 ] . $value == # 5) .          *** true
+
+*** ---- :297  values.push(42); --------------------------------------------
+red run(< $values .push(# 42) ; >) .
+*** {storage := save(save(mtSt, $values 0, 42), $values length, 1)}
+
+*** ---- :325  tokens.pop();   the paper's non-empty / empty split ----------
+red run(< $tokens .push() ; $tokens .pop() ; >) .
+*** {storage := save(delAt(save(delAt(mtSt, $tokens 0), $tokens length, 1), $tokens 0), $tokens length, 0)}
+red run(< $tokens .pop() ; >) .                                                  *** {status := reverted}
+
+*** ---- :357  push, write, pop, push, read — the popped slot is CLEARED ----
+*** `uint i = tokens.push().value;` desugars to a bare push plus an index read:
+*** push() as an EXPRESSION is outside this fragment. Since the statement push()
+*** clears its slot (SolKey storagePushLengthSave), the read is 0 — the paper's
+*** result for this variant.
+red run(< $tokens .push() ;
+          $tokens [ # 0 ] . $value = # 7 ;
+          $tokens .pop() ;
+          $tokens .push() ;
+          var 'i = $tokens [ # 0 ] . $value ; >) .
+*** {storage := save(delAt(save(delAt(save(save(delAt(mtSt, $tokens 0), $tokens length, 1),
+***                       $tokens 0 $value, 7), $tokens 0), $tokens length, 0), $tokens 0),
+***                  $tokens length, 1) || 'i := 0}
+
+*** ---- :374  the same shape, but reading through `tokens.push()`'s BINDING
+*** form, where the paper gets 7 --------------------------------------------
+*** UNSUPPORTED, and the one place where this is a real difference rather than
+*** a notational one. The paper's `T storage lsv = arr.push();` does NOT clear
+*** the appended slot, so a value written through an alias before the pop is
+*** still there afterwards and the read is 7. The only desugaring available
+*** here is the statement `push();`, which DOES clear (SolKey
+*** storagePushLengthSave), so this program would read 0. The next block is the
+*** variant the two agree on.
+
+*** ---- :407  the same, through a storage alias held across the pop --------
+red run(< $tokens .push() ;
+          storage 'tokRef = $tokens [ # 0 ] ;
+          $tokens .pop() ;
+          'tokRef . $value = # 7 ;
+          $tokens .push() ;
+          var 'i = $tokens [ # 0 ] . $value ; >) .
+*** {storage := save(delAt(save(save(delAt(save(delAt(mtSt, $tokens 0), $tokens length, 1),
+***                       $tokens 0), $tokens length, 0), $tokens 0 $value, 7), $tokens 0),
+***                  $tokens length, 1) || 'i := 0 || 'tokRef := sp($tokens 0)}
+
+*** ---- :428  values.push(); values.pop(); --------------------------------
+red run(< $values .push() ; $values .pop() ; >) .
+*** {storage := save(delAt(save(delAt(mtSt, $values 0), $values length, 1), $values 0), $values length, 0)}
+
+*** ---- :482  alice.accounts[0] = 100; -----------------------------------
+red run(< $alice . $accounts .push(# 0) ; $alice . $accounts [ # 0 ] = # 100 ; >) .
+*** {storage := save(save(save(mtSt, $alice $accounts 0, 0), $alice $accounts length, 1),
+***                  $alice $accounts 0, 100)}
+
+*** ---- :525  alice.accounts[++i] = valueVal;   an IMPURE index -----------
+*** Here the paper's unfold really happens: Order.maude captures the value and
+*** the index into temps tq(0) and tq(1) — the paper's `pv` and `idx`.
+red |- { storage := save(save(save(save(mtSt, $alice $accounts 0, 0), $alice $accounts length, 1),
+                         $alice $accounts 1, 0), $alice $accounts length, 2) || 'i := 0 }
+        < $alice . $accounts [ ++ 'i ] = # valueVal ; >
+     ~> { storage := save(save(save(save(mtSt, $alice $accounts 0, 0), $alice $accounts length, 1),
+                          $alice $accounts 1, 0), $alice $accounts length, 2) || 'i := 0 }
+        < capture tq(0) = # valueVal ; 'i = 'i + # 1 ; capture tq(1) = 'i ;
+          $alice . $accounts [ tq(1) ] = tq(0) ; >
+     ~*> { storage := save(save(save(save(save(mtSt, $alice $accounts 0, 0), $alice $accounts length, 1),
+                           $alice $accounts 1, 0), $alice $accounts length, 2),
+                           $alice $accounts 1, valueVal)
+           || 'i := 1 || tq(0) := valueVal || tq(1) := 1 } .                     *** true
+red < $alice . $accounts .push(# 0) ; $alice . $accounts .push(# 0) ;
+      var 'i = # 0 ;
+      $alice . $accounts [ ++ 'i ] = # 7 ; > ('i == # 1 && $alice . $accounts [ # 1 ] == # 7) .   *** true
+
+*** ---- :550  matrix[i++][i++] = 77;   solc's evaluation order -------------
+*** RHS, then receiver, then index. idx1 reads i, idx2 reads i+1, i ends at i+2,
+*** and 77 lands at matrix[i][i+1] — the paper's final update exactly.
+red steps(< $matrix .push() ;
+            $matrix [ # 0 ] .push(# 0) ; $matrix [ # 0 ] .push(# 0) ;
+            var 'i = # 0 ;
+            $matrix [ 'i ++ ] [ 'i ++ ] = # 77 ; >) .
+*** … the impure statement unfolds to
+***   < capture tq(0) = # 77 ; capture tq(1) = 'i ; 'i = 'i + # 1 ;
+***     capture tq(2) = 'i ; 'i = 'i + # 1 ; $matrix [ tq(1) ] [ tq(2) ] = tq(0) ; >
+*** and ends at {… || 'i := 2 || tq(0) := 77 || tq(1) := 0 || tq(2) := 1}
+*** with storage := save(…, $matrix 0 1, 77)
+red < $matrix .push() ;
+      $matrix [ # 0 ] .push(# 0) ; $matrix [ # 0 ] .push(# 0) ;
+      var 'i = # 0 ;
+      $matrix [ 'i ++ ] [ 'i ++ ] = # 77 ; >
+    ('i == # 2 && $matrix [ # 0 ] [ # 1 ] == # 77) .                             *** true

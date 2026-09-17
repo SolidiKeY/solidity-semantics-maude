@@ -1,0 +1,79 @@
+*** src/sem/examples/paper/MemoryDelete.maude
+***
+*** sections/memory-examples-delete.tex — the three memory delete traces. The
+*** paper states both endpoints of each, so these are checkable oracles: a
+*** memory delete REBINDS the slot to a FRESH object, so an alias taken before
+*** the delete still sees the old value while the deleted name reads 0.
+
+load Domain .
+
+fmod PAPER-MEMORY-DELETE{Field :: TRIV} is
+    pr PAPER-STEPS{Field} .
+endfm
+
+*** ---- :4  delete carol, with an alias taken first ---------------------
+*** the paper: oldAge := 33, newAge := 0
+red run(< memory 'carol = new ;
+          memory 'carolAlias = 'carol ;
+          'carol . $age = # 33 ;
+          delete 'carol ;
+          var 'oldAge = 'carolAlias . $age ;
+          var 'newAge = 'carol . $age ; >) .
+*** {memory := addM(write(addM(emptyMemory, pid(0)),
+*** idC(pid(0), nil), $age, 33), pid(1)) || 'carol := idC(pid(1), nil) ||
+*** 'carolAlias := idC(pid( 0), nil) || 'newAge := 0 || 'oldAge := 33}
+red < memory 'carol = new ;
+      memory 'carolAlias = 'carol ;
+      'carol . $age = # 33 ;
+      delete 'carol ;
+      var 'oldAge = 'carolAlias . $age ;
+      var 'newAge = 'carol . $age ; > ('oldAge == # 33 && 'newAge == # 0) .       *** true
+
+*** ---- :87  delete carol.account ---------------------------------------
+*** the paper: oldBal := 100, newBal := 0
+red run(< memory 'carol = new ;
+          memory 'carolAcc = 'carol . $account ;
+          'carolAcc . $balance = # 100 ;
+          delete 'carol . $account ;
+          var 'oldBal = 'carolAcc . $balance ;
+          var 'newBal = 'carol . $account . $balance ; >) .
+*** {memory := write(addM(write(addM(emptyMemory, pid(0)),
+*** idC(pid(0), $account), $balance, 100), pid(1)), idC(pid(0), nil),
+*** $account, idC(pid(1), nil)) || 'carol := idC(pid(0), nil) || 'carolAcc
+*** := idC(pid(0), $account) || 'newBal := 0 || 'oldBal := 100}
+red < memory 'carol = new ;
+      memory 'carolAcc = 'carol . $account ;
+      'carolAcc . $balance = # 100 ;
+      delete 'carol . $account ;
+      var 'oldBal = 'carolAcc . $balance ;
+      var 'newBal = 'carol . $account . $balance ; > ('oldBal == # 100 && 'newBal == # 0) .   *** true
+
+*** ---- :168  delete carol.account.tokens[i], an element of a memory array --
+*** Adapted: a memory array must be allocated with a size and its element
+*** populated before it can be read — BANK has no default for an Int selector,
+*** so an untouched memory slot is not readable. The paper's symbolic i is
+*** pinned to 0 so `++i` indexes slot 1.
+*** the paper: oldValue := 9, newValue := 0
+red run(< memory 'carol = new ;
+          memory 'toks = new(# 3) ;
+          'carol . $account . $tokens = 'toks ;
+          memory 'tk = new ;
+          'toks [ # 1 ] = 'tk ;
+          var 'i = # 0 ;
+          memory 'tok = 'carol . $account . $tokens [ ++ 'i ] ;
+          'tok . $value = # 9 ;
+          delete 'carol . $account . $tokens [ 'i ] ;
+          var 'oldValue = 'tok . $value ;
+          var 'newValue = 'carol . $account . $tokens [ 'i ] . $value ; >) .
+red < memory 'carol = new ;
+      memory 'toks = new(# 3) ;
+      'carol . $account . $tokens = 'toks ;
+      memory 'tk = new ;
+      'toks [ # 1 ] = 'tk ;
+      var 'i = # 0 ;
+      memory 'tok = 'carol . $account . $tokens [ ++ 'i ] ;
+      'tok . $value = # 9 ;
+      delete 'carol . $account . $tokens [ 'i ] ;
+      var 'oldValue = 'tok . $value ;
+      var 'newValue = 'carol . $account . $tokens [ 'i ] . $value ; >
+    ('i == # 1 && 'oldValue == # 9 && 'newValue == # 0) .                        *** true

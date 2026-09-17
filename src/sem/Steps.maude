@@ -1,0 +1,385 @@
+*** src/sem/Steps.maude — the paper's derivation notation, by metaprogramming
+***
+*** The pre-licentiate paper presents every example as a DERIVATION: a program
+*** modality rewritten one rule at a time, `~>` for a single step and `~*>` for
+*** several elided ones (the paper's \rightsquigarrow and \rightsquigarrow^{*}):
+***
+***      < alice.account.balance = 10; > phi
+***   ~> < int pv = 10; Account storage acc = alice.account; acc.balance = pv; > phi
+***  ~*> { pv := 10 || acc := <alice>.account } < acc.balance = pv; > phi
+***   ~> { pv := 10 || acc := <alice>.account
+***        || storage := save(storage, <alice>.account.balance, 10) } phi
+***
+*** src/sem/ cannot show that by itself: every statement step is an EQUATION on
+*** the configuration (that is what lets ONE `red` discharge a Hoare triple), so
+*** a whole program collapses inside a single reduction and no intermediate
+*** state is observable. The only rules in the tree are the two `.call{value:}`
+*** rules of SOL-CALLBACK.
+***
+*** This file recovers the intermediate states WITHOUT forking the semantics.
+*** It reflects the domain module with `upModule`, and rewrites that module
+*** term: every equation whose left-hand side is a configuration `{ … }` — the
+*** ~43 statement equations of Stmt/Flow/Net/Contract — becomes a RULE, and so
+*** does Order.maude's k-cell capture hook; every other equation (eval, asg,
+*** save/find, copySt/copyMem, the zero-init defaults) stays an equation. One
+*** `~>` is then one rule application in that derived module, with the helpers
+*** normalized as usual. The object semantics is untouched: `< prog > (post)`
+*** still reduces in one step, and this layer is pure addition.
+***
+*** USE. An instance supplies the module to step:
+***
+***     fmod MY-DOMAIN{Field :: TRIV} is pr SOL-HOARE{Field} . … endfm  *** no META-LEVEL
+***     fmod MY-STEPS{Field :: TRIV} is
+***         pr MY-DOMAIN{Field} .  pr SOL-STEPS{Field} .
+***         eq theModule = 'MY-DOMAIN .
+***     endfm
+***     red steps(< $alice . $age = # 5 ; >) .
+***     red |- < $alice . $age = # 5 ; > ~*> { storage := save(mtSt, $alice $age, 5) } .
+***
+*** The two layers are not cosmetic: the module we reflect must NOT itself
+*** import META-LEVEL, or the reflected term is the whole meta-level too.
+***
+*** THREE META-LEVEL TRAPS, all handled below.
+***  1. `Int < Field$Elt` puts Nat into List{Field}'s kind, which then merges
+***     with META-LEVEL's NatList: every prelude LIST operator fails its
+***     preregularity check and the `poly` attributes go kind-level. The LIST
+***     renamings below keep the two apart. `_[_]` is renamed because the object
+***     syntax already declares the array-index `_[_]`, and `_+_` because
+***     META-MODULE's module-expression `+` is assoc comm while Exp's is free.
+***  2. A bare Qid literal such as 'x uplifts as `''x.Sort` once META-LEVEL is
+***     in scope (Sort < Qid there), and the reflected module has no sort Sort,
+***     so the term will not parse in it. `fixQ` retypes those constants to Qid.
+***  3. A configuration cannot be held in a term as-is: the k-cell equations
+***     would normalize it away. `<|_|>` is an inert wrapper, `[strat (0)]`, so
+***     its argument is never reduced at the object level; all reduction happens
+***     inside the derived module, one rule at a time.
+***
+*** STEP ORDER. Order.maude's capture pass is tried FIRST (rule label `unfold`),
+*** mirroring the object level, where Maude normalizes the k cell bottom-up and
+*** so fires that conditional equation before any `{ k(…) C }` equation. Only
+*** if it does not apply do we take one `stmt` rule. Without this an impure
+*** statement would take its top-level rule before being linearized.
+***
+*** GRANULARITY. One `~>` is one statement rule, so a PURE statement is a single
+*** step where the paper shows an unfold into `pv` / `acc` temps. An IMPURE one
+*** statement -- `i++`, or an index with a side effect -- goes through
+*** Order.maude and yields the paper's capture steps, with `tq(0)`, `tq(1)`, …
+*** standing for the paper's `pv`, `idx`.
+*** The desugarings `+=`, `++ ;`, `while`, `if_{_}` are themselves k-cell
+*** equations, hence one `~>` each — visible, as in the paper.
+
+load Hoare .
+
+fmod SOL-STEPS{Field :: TRIV} is
+    pr SOL-HOARE{Field} .
+    pr META-LEVEL * (sort Trace to MetaTrace,
+        op _`[_`] : Qid NeTermList -> Term to _`{`[_`]`},
+        op _+_ : ModuleExpression ModuleExpression -> ModuleExpression to _+M_,
+        op nil : -> NatList to nilN,
+        op __ : NatList NatList -> NatList to _;;_,
+        op append : NatList NatList -> NatList to appendN,
+        op head : NeNatList -> Nat to headN,
+        op tail : NeNatList -> NatList to tailN,
+        op last : NeNatList -> Nat to lastN,
+        op front : NeNatList -> NatList to frontN,
+        op occurs : Nat NatList -> Bool to occursN,
+        op reverse : NatList -> NatList to reverseN,
+        op $reverse : NatList NatList -> NatList to $reverseN,
+        op size : NatList -> Nat to sizeN,
+        op $size : NatList Nat -> Nat to $sizeN) .
+
+    *** ---- the module being stepped ----------------------------------------
+    *** Each instance defines this; it must not import META-LEVEL.
+    op theModule : -> Qid .
+
+    vars H : Header .     var IL : ImportList .   var SS : SortSet .
+    var SSDS : SubsortDeclSet .  var OPDS : OpDeclSet .  var MAS : MembAxSet .
+    var EQS : EquationSet .      var EQ : Equation .     var AS : AttrSet .
+    vars T T2 : Term .    var TL : TermList .    var NTL : NeTermList .
+    var COND : Condition .       var CT : Constant .     var VR : Variable .
+    var QQ : Qid .        var R4 : Result4Tuple? .
+
+    *** ---- the metaprogram: statement equations become rules ---------------
+    *** A configuration equation `{ … } = …` is a step; Order's k-cell hook
+    *** `k(St KK) = k(KS KK)` is the capture pass. Everything else stays
+    *** equational, so one rule application still finishes its helper terms.
+    op eq2rl : Module -> Module .
+    eq eq2rl(fmod H is IL sorts SS . SSDS OPDS MAS EQS endfm) =
+        (mod H is IL sorts SS . SSDS OPDS MAS keep(EQS) rls(EQS) endm) .
+
+    op keep : EquationSet -> EquationSet .
+    eq keep(none) = none .
+    eq keep((eq '`{_`}{[TL]} = T [AS] .) EQS) = keep(EQS) .
+    eq keep((ceq '`{_`}{[TL]} = T if COND [AS] .) EQS) = keep(EQS) .
+    eq keep((ceq 'k{[TL]} = T if COND [AS] .) EQS) = keep(EQS) .
+    eq keep(EQ EQS) = EQ keep(EQS) [owise] .
+
+    op rls : EquationSet -> RuleSet .
+    eq rls(none) = none .
+    eq rls((eq '`{_`}{[TL]} = T [AS] .) EQS) =
+        (rl '`{_`}{[TL]} => T [label('stmt)] .) rls(EQS) .
+    eq rls((ceq '`{_`}{[TL]} = T if COND [AS] .) EQS) =
+        (crl '`{_`}{[TL]} => T if COND [label('stmt)] .) rls(EQS) .
+    eq rls((ceq 'k{[TL]} = T if COND [AS] .) EQS) =
+        (crl 'k{[TL]} => T if COND [label('unfold)] .) rls(EQS) .
+    eq rls(EQ EQS) = rls(EQS) [owise] .
+
+    op stepModule : -> Module [memo] .
+    eq stepModule = eq2rl(upModule(theModule, true)) .
+
+    *** trap 2: a Qid literal uplifts at sort Sort; the reflected module has none
+    op fixQ : TermList -> TermList .
+    eq fixQ(CT) =
+        if getType(CT) == 'Sort then qid(string(getName(CT)) + ".Qid") else CT fi .
+    eq fixQ(VR) = VR .
+    eq fixQ(QQ{[NTL]}) = QQ{[fixQ(NTL)]} .
+    eq fixQ((T, NTL)) = (fixQ(T), fixQ(NTL)) .
+
+    *** ---- inert configurations (trap 3) ------------------------------------
+    sort State .
+    op <|_|> : Cells -> State [ctor strat (0)] .
+    op ?|_|? : Conf -> State [ctor strat (0)] .   *** a helper term that did not finish
+
+    *** ---- paper-style goals -------------------------------------------------
+    *** A goal is the paper's `{updates} <rest> phi`: a parallel update over the
+    *** program variables, applied to the remaining program.
+    sorts Var Rhs Upd Upds Goal Trace .
+    subsort Upd < Upds .
+    subsort Goal < Trace .
+    *** The paper's state variables. Var is deliberately NOT a supersort of Qid:
+    *** that would put it in Exp's kind, where the tokens `storage` / `memory`
+    *** are already the first token of `storage_=_;` / `memory_=_;`, and
+    *** `storage 'acc = $bob . $account ;` then had two parses. Isolated in its
+    *** own kind, a bare `storage` can combine with nothing and the statement
+    *** keywords are unreachable from it.
+    ops storage memory net status : -> Var [ctor] .
+
+    subsort Value < Rhs .
+    *** a storage alias binds the PATH, the paper's <bob>.account. It is wrapped
+    *** because Int is both a Value and a one-element List{Field}, so an
+    *** unwrapped path would leave `'q := 1` meaning two different things.
+    op sp : NeList{Field} -> Rhs [ctor] .
+    *** four declarations at four different domain kinds, not one at a shared
+    *** kind: Memory, Status and Var are foreign to Value's kind and stay so.
+    op _:=_ : Var Rhs -> Upd [ctor prec 50] .
+    op _:=_ : Var Memory -> Upd [ctor prec 50] .
+    op _:=_ : Var Status -> Upd [ctor prec 50] .
+    op _:=_ : Qid Rhs -> Upd [ctor prec 50] .
+    op noUpd : -> Upds [ctor] .
+    op _||_ : Upds Upds -> Upds [ctor assoc comm id: noUpd prec 59 gather (e E)] .
+
+    op <_> : K -> Goal [ctor] .             *** <prog> phi
+    op {_}<_> : Upds K -> Goal [ctor] .     *** {U} <rest> phi
+    op {_} : Upds -> Goal [ctor] .          *** {U} phi — the program has finished
+    op stuck : Conf -> Goal [ctor] .        *** a helper term that did not finish
+    var U : Upds .   var KK : K .
+    eq { noUpd } < KK > = < KK > .
+    eq { U } < nilK > = { U } .
+
+    op _~>_ : Goal Trace -> Trace [ctor prec 90 gather (e E)] .    *** one step
+    op _~*>_ : Goal Trace -> Trace [ctor prec 90 gather (e E)] .   *** zero or more
+
+    *** ---- rendering a configuration as updates ------------------------------
+    *** Shown iff different from the empty initial state, which is what the
+    *** paper's updates are relative to. cnt / sto0 / net0 / msg / out / nochk
+    *** are bookkeeping and never shown.
+    var C : Cells .   vars ST STs NT NTs : Struct .   var M : Memory .
+    var EV : Env .    vars SND VAL N : Int .          var W : Value? .
+    var SC : Status . var B : Binding .  var Q : Qid . var V : Value .
+    var FXS : NeList{Field} .   var R : Rhs .
+    vars S S2 : State .  var G : Goal .  var TR : Trace .  var CF : Conf .
+
+    *** The k cell is matched out and never handed to `upds`: reducing a bare
+    *** `k(…)` fires Order.maude's capture hook, so a rendered goal would show
+    *** the unfold one step BEFORE the derivation actually takes it.
+    op render : State -> Goal .
+    eq render(?| CF |?) = stuck(CF) .
+    eq render(<| k(KK) C |>) = { upds(C) } < KK > .
+
+    op upds : Cells -> Upds .
+    eq upds(sto(ST) sto0(STs) mem(M) env(EV) net(NT) net0(NTs)
+            msg(SND, VAL) cnt(N) out(W) stat(SC) C) =
+        stoU(ST) || memU(M) || envU(EV) || netU(NT) || statU(SC) .
+
+    op stoU : Struct -> Upds .   eq stoU(mtSt) = noUpd .   eq stoU(ST) = storage := ST [owise] .
+    op netU : Struct -> Upds .   eq netU(mtSt) = noUpd .   eq netU(NT) = net := NT [owise] .
+    op memU : Memory -> Upds .   eq memU(emptyMemory) = noUpd .
+                                 eq memU(M) = memory := M [owise] .
+    op statU : Status -> Upds .  eq statU(ok) = noUpd .    eq statU(SC) = status := SC [owise] .
+
+    *** env: outermost binding is the newest, so an overwritten local shows once
+    op envU : Env -> Upds .            eq envU(EV) = envU(EV, noUpd) .
+    op envU : Env Upds -> Upds .
+    eq envU(mtEnv, U) = U .
+    ceq envU(envW(EV, Q, B), U) = envU(EV, U || bind(Q, B)) if bound(Q, U) =/= true .
+    ceq envU(envW(EV, Q, B), U) = envU(EV, U) if bound(Q, U) .
+    op bind : Qid Binding -> Upds .
+    eq bind(Q, bv(V)) = Q := V .
+    eq bind(Q, bp(FXS)) = Q := sp(FXS) .
+    op bound : Qid Upds -> Bool .
+    eq bound(Q, (Q := R) || U) = true .
+    eq bound(Q, U) = false [owise] .
+
+    *** ---- building a configuration from an initial goal --------------------
+    op initCells : -> Cells .
+    eq initCells = sto(mtSt) sto0(mtSt) mem(emptyMemory) env(mtEnv)
+                   net(mtSt) net0(mtSt) msg(0, 0) cnt(0) out(noV) stat(ok) .
+
+    op fill : Goal -> State .
+    eq fill(< KK >) = fill(noUpd, KK) .
+    eq fill({ U } < KK >) = fill(U, KK) .
+    eq fill({ U }) = fill(U, nilK) .
+    op fill : Upds K -> State .
+    ceq fill(U, KK) = <| k(KK) C |> if C := app(U, initCells) .
+
+    *** `storage := S` in an INITIAL goal also sets the entry snapshot, so a
+    *** revert rolls back to S — the same convention as Hoare's `[ st ]< … >`.
+    op app : Upds Cells -> Cells .
+    eq app(noUpd, C) = C .
+    eq app((storage := ST) || U, sto(STs) sto0(STs) C) = app(U, sto(ST) sto0(ST) C) .
+    eq app((net := NT) || U, net(NTs) net0(NTs) C) = app(U, net(NT) net0(NT) C) .
+    eq app((memory := M) || U, mem(M2:Memory) C) = app(U, mem(M) C) .
+    eq app((status := SC) || U, stat(SC2:Status) C) = app(U, stat(SC) C) .
+    eq app((Q := V) || U, env(EV) C) = app(U, env(envW(EV, Q, bv(V))) C) .
+    eq app((Q := sp(FXS)) || U, env(EV) C) = app(U, env(envW(EV, Q, bp(FXS))) C) .
+
+    *** ---- one step ----------------------------------------------------------
+    ops open close : Term -> Term .
+    eq open('<|_|>{[T]}) = '`{_`}{[fixQ(T)]} .
+    eq close('`{_`}{[T]}) = '<|_|>{[T]} .
+    eq close(T) = '?|_|?{[T]} [owise] .
+
+    op step1 : Term -> Term .
+    eq step1(T) = unf(T, metaXapply(stepModule, T, 'unfold, none, 0, unbounded, 0)) .
+    op unf : Term Result4Tuple? -> Term .
+    eq unf(T, failure) = getTerm(metaRewrite(stepModule, T, 1)) .
+    eq unf(T, R4) = getTerm(R4) [owise] .
+
+    op step : State -> State .
+    eq step(<| C |>) = downTerm(close(step1(open(upTerm(<| C |>)))), ?| { C } |?) .
+    eq step(?| CF |?) = ?| CF |? .
+
+    *** ---- the derivation ----------------------------------------------------
+    op steps : Goal -> Trace .
+    eq steps(G) = trc(fill(G)) .
+    op trc : State -> Trace .
+    ceq trc(S) = render(S) ~> trc(S2) if S2 := step(S) /\ S =/= S2 .
+    eq trc(S) = render(S) [owise] .
+
+    op run : Goal -> Goal .
+    eq run(G) = render(final(fill(G))) .
+    op final : State -> State .
+    ceq final(S) = final(S2) if S2 := step(S) /\ S =/= S2 .
+    eq final(S) = S [owise] .
+
+    *** ---- derivability of a written trace ------------------------------------
+    *** `|- G0 ~> G1 ~*> G2` — each ~> must be exactly one rule application,
+    *** each ~*> zero or more. The equational fragment is deterministic here
+    *** -- the callback rules live in SOL-CALLBACK and are not imported -- so
+    *** a single linear walk decides it and no metaSearch is needed.
+    op |-_ : Trace -> Bool [prec 95] .
+    eq |- TR = chk(fill(first(TR)), TR) .
+
+    op first : Trace -> Goal .
+    eq first(G) = G .
+    eq first(G ~> TR) = G .
+    eq first(G ~*> TR) = G .
+
+    op chk : State Trace -> Bool .
+    eq chk(S, G) = (render(S) == G) .
+    ceq chk(S, G ~> TR) = chk(step(S), TR) if render(S) == G .
+    ceq chk(S, G ~*> TR) = reach(step(S), TR) if render(S) == G .
+    eq chk(S, TR) = false [owise] .
+
+    op reach : State Trace -> Bool .
+    ceq reach(S, TR) = true if chk(S, TR) .
+    ceq reach(S, TR) = reach(S2, TR) if chk(S, TR) =/= true /\ S2 := step(S) /\ S =/= S2 .
+    eq reach(S, TR) = false [owise] .
+endfm
+
+*** ---- tests ------------------------------------------------------------------
+*** STEPS-DEMO is the module that gets reflected, so it must not see META-LEVEL;
+*** STEPS-DEMO-STEPS is where the derivations are taken.
+
+fmod STEPS-DEMO{Field :: TRIV} is
+    pr SOL-HOARE{Field} .
+
+    ops $alice $bob $account : -> RefField .
+    ops $age $balance : -> PrimField .
+    op $balances : -> MapField .
+    op $values : -> RefField .
+
+    eq defaultValue($age) = 0 .      eq defaultValue($balance) = 0 .
+    eq defaultValue(length) = 0 .
+    eq defaultValue($alice) = mtSt .  eq defaultValue($bob) = mtSt .
+    eq defaultValue($account) = mtSt . eq defaultValue($values) = mtSt .
+
+    ops $account $age $alice $balance $balances $bob $values : -> Root .
+    var Clv : Cells .
+    eq lower($account, Clv) = sloc($account) .
+    eq lower($age, Clv) = sloc($age) .
+    eq lower($alice, Clv) = sloc($alice) .
+    eq lower($balance, Clv) = sloc($balance) .
+    eq lower($balances, Clv) = sloc($balances) .
+    eq lower($bob, Clv) = sloc($bob) .
+    eq lower($values, Clv) = sloc($values) .
+
+    op ageVal : -> Int .
+endfm
+
+fmod STEPS-DEMO-STEPS{Field :: TRIV} is
+    pr STEPS-DEMO{Field} .
+    pr SOL-STEPS{Field} .
+    eq theModule = 'STEPS-DEMO .
+endfm
+
+*** a two-statement derivation, symbolic value: one ~> per statement
+red steps(< $alice . $age = # ageVal ; var 'v = $alice . $age ; >) .
+*** < $alice . $age = # ageVal ; var 'v = $alice . $age ; >
+***   ~> {storage := save(mtSt, $alice $age, ageVal)}< var 'v = $alice . $age ; >
+***   ~> {storage := save(mtSt, $alice $age, ageVal) || 'v := ageVal}
+
+*** the same derivation, written out and CHECKED (the paper's own claim)
+red |- < $alice . $age = # ageVal ; var 'v = $alice . $age ; >
+      ~> { storage := save(mtSt, $alice $age, ageVal) }< var 'v = $alice . $age ; >
+      ~> { storage := save(mtSt, $alice $age, ageVal) || 'v := ageVal } .   *** true
+
+*** ~*> elides the intermediate goal, exactly as the paper does
+red |- < $alice . $age = # ageVal ; var 'v = $alice . $age ; >
+      ~*> { storage := save(mtSt, $alice $age, ageVal) || 'v := ageVal } .  *** true
+
+*** a WRONG claimed step is false, not stuck
+red |- < $alice . $age = # ageVal ; > ~> { storage := mtSt } .               *** false
+
+*** an unreachable goal is false
+red |- < $alice . $age = # 1 ; > ~*> { storage := save(mtSt, $alice $age, 2) } .  *** false
+
+*** a storage alias binds the PATH (the paper's acc := <bob>.account)
+red run(< storage 'acc = $bob . $account ; 'acc . $balance = # 7 ; >) .
+*** {storage := save(mtSt, $bob $account $balance, 7) || 'acc := sp($bob $account)}
+
+*** an IMPURE statement unfolds through Order.maude: the paper's pv / idx temps
+*** come out as tq(0), tq(1)
+red steps(< var 'i = # 1 ; 'i = 'i ++ + 'i ; >) .
+*** < var 'i = # 1 ; 'i = 'i ++ + 'i ; >
+***   ~> {'i := 1}< 'i = 'i ++ + 'i ; >
+***   ~> {'i := 1}< capture tq(0) = 'i ; capture tq(1) = 'i ; 'i = 'i + # 1 ;
+***                'i = tq(1) + tq(0) ; >
+***   ~> {'i := 1 || tq(0) := 1}< capture tq(1) = 'i ; 'i = 'i + # 1 ; … >
+***   ~> {'i := 1 || tq(0) := 1 || tq(1) := 1}< 'i = 'i + # 1 ; 'i = tq(1) + tq(0) ; >
+***   ~> {'i := 2 || tq(0) := 1 || tq(1) := 1}< 'i = tq(1) + tq(0) ; >
+***   ~> {'i := 2 || tq(0) := 1 || tq(1) := 1}
+*** the RIGHT operand is read before the left bumps it -- solc's order, so 2
+
+*** revert shows as a status update and rolls storage back
+red run(< $alice . $age = # 5 ; require($alice . $age > # 9) ; >) .   *** {status := reverted}
+
+*** starting from a non-empty storage, as Hoare's [ st ]< … >
+red run({ storage := save(mtSt, $alice $balance, 100) }< $alice . $balance += # 5 ; >) .
+*** {storage := save(save(mtSt, $alice $balance, 100), $alice $balance, 105)}
+
+*** a memory copy: the heap update is shown
+red run(< $alice . $age = # 25 ; memory 'carol = $alice ; var 'v = 'carol . $age ; >) .
+*** {storage := save(mtSt, $alice $age, 25)
+***  || memory := copySt(emptyMemory, pid(0), save(mtSt, $age, 25))
+***  || 'carol := idC(pid(0), nil) || 'v := 25}

@@ -1,0 +1,89 @@
+*** src/sem/examples/paper/MemoryExamples.maude
+***
+*** sections/memory-examples.tex — the memory derivations. `carol` and `david`
+*** are the paper's MEMORY Persons, so they are locals here: 'carol, 'david.
+***
+*** One adaptation recurs: a local that holds a memory REFERENCE is declared
+*** with `memory q = e ;`, not `var q = e ;`. `var` takes a value and would
+*** leave an identity-valued right-hand side stuck, which is the honest reading
+*** of the paper's `Person memory carol` declaration anyway.
+
+load Domain .
+
+fmod PAPER-MEMORY{Field :: TRIV} is
+    pr PAPER-STEPS{Field} .
+endfm
+
+*** ---- :4  Person memory carol; Account memory carolAcc = carol.account;
+***          carolAcc.balance = 100;   — the aliasing example -----------------
+*** carolAcc is a REFERENCE into carol, so the write is visible through carol.
+red steps(< memory 'carol = new ;
+            memory 'carolAcc = 'carol . $account ;
+            'carolAcc . $balance = # 100 ; >) .
+red < memory 'carol = new ;
+      memory 'carolAcc = 'carol . $account ;
+      'carolAcc . $balance = # 100 ; > ('carol . $account . $balance == # 100) .    *** true
+
+*** ---- :76  carol.account = david.account;   memory-to-memory ALIASING ----
+*** no copy: carol.account and david.account become the same object
+red run(< memory 'carol = new ; memory 'david = new ;
+          'carol . $account = 'david . $account ; >) .
+*** {memory := write(addM(addM(emptyMemory, pid(0)), pid(1)),
+*** idC(pid( 0), nil), $account, idC(pid(1), $account)) || 'carol :=
+*** idC(pid(0), nil) || 'david := idC(pid(1), nil)}
+red < memory 'carol = new ; memory 'david = new ;
+      'carol . $account = 'david . $account ;
+      'david . $account . $balance = # 5 ; > ('carol . $account . $balance == # 5) .  *** true
+
+*** ---- :103  carol.account.balance = 10; -------------------------------
+red run(< memory 'carol = new ; 'carol . $account . $balance = # 10 ; >) .
+*** {memory := write(addM(emptyMemory, pid(0)), idC(pid(0),
+*** $account), $balance, 10) || 'carol := idC(pid(0), nil)}
+
+*** ---- :130  v = carol.account.balance; -------------------------------
+red run(< memory 'carol = new ;
+          'carol . $account . $balance = # balVal ;
+          var 'v = 'carol . $account . $balance ; >) .
+*** {memory := write(addM(emptyMemory, pid(0)), idC(pid(0),
+*** $account), $balance, balVal) || 'carol := idC(pid(0), nil) || 'v :=
+*** balVal}
+
+*** ---- :159  Person memory carol; Person memory carolAlias = carol; -----
+*** both names denote the SAME identity
+red run(< memory 'carol = new ; memory 'carolAlias = 'carol ; >) .
+*** {memory := addM(emptyMemory, pid(0)) || 'carol :=
+*** idC(pid(0), nil) || 'carolAlias := idC(pid(0), nil)}
+
+*** ---- :199  Token memory t = carol.account.token; --------------------
+red run(< memory 'carol = new ; memory 't = 'carol . $account . $token ; >) .
+*** {memory := addM(emptyMemory, pid(0)) || 'carol :=
+*** idC(pid(0), nil) || 't := idC(pid(0), $account $token)}
+
+*** ---- :235  v = carol; ----------------------------------------------
+red run(< memory 'carol = new ; memory 'v = 'carol ; >) .
+*** {memory := addM(emptyMemory, pid(0)) || 'carol :=
+*** idC(pid(0), nil) || 'v := idC(pid(0), nil)}
+
+*** ---- :249  carol = david;   rebinding the reference, heap untouched --
+red run(< memory 'carol = new ; memory 'david = new ; 'carol = 'david ; >) .
+*** {memory := addM(addM(emptyMemory, pid(0)), pid(1)) ||
+*** 'carol := idC(pid(1), nil) || 'david := idC(pid(1), nil)}
+
+*** ---- :264  choosePersonMem().account = makeAccount(); --------------
+*** UNSUPPORTED: two function calls in expression position. The paper's own
+*** unfolded form, with both results already bound to locals, does run:
+red run(< memory 'pv = new ; memory 'mv = new ; 'mv . $account = 'pv ; >) .
+*** {memory := write(addM(addM(emptyMemory, pid(0)), pid(1)),
+*** idC(pid( 1), nil), $account, idC(pid(0), nil)) || 'mv := idC(pid(1),
+*** nil) || 'pv := idC(pid(0), nil)}
+
+*** ---- :291  carol.age = a + b;   a symbolic sum --------------------
+red run(< memory 'carol = new ; 'carol . $age = # a + # b ; >) .
+*** {memory := write(addM(emptyMemory, pid(0)), idC(pid(0),
+*** nil), $age, a + b) || 'carol := idC(pid(0), nil)}
+
+*** ---- :313  carolAcc = david.account; ------------------------------
+red run(< memory 'carolAcc = new ; memory 'david = new ;
+          'carolAcc = 'david . $account ; >) .
+*** {memory := addM(addM(emptyMemory, pid(0)), pid(1)) ||
+*** 'carolAcc := idC(pid(1), $account) || 'david := idC(pid(1), nil)}
