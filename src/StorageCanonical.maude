@@ -1,319 +1,294 @@
-*** StorageCanonical.maude -- typed store histories.
+*** StorageCanonical.maude -- helper-free lazy storage updates.
 ***
-*** Sorted storage values are typed default roots followed by
-*** store(previous, selector, value) nodes.  Typed overloads enforce declared
-*** fields and value types; malformed stores remain at kind [StValue].  The
-*** outermost matching store wins.  Repeated and default-valued writes remain
-*** in the history, so representations are deliberately not canonical.
+*** Structs are write histories.  Mappings and arrays wrap histories so their
+*** runtime identity is visible without a field declaration environment.
+*** save and delete are themselves pending storage mutations: select/find
+*** interpret them one selector at a time.  Exact aggregate observations keep
+*** those terms suspended.  An explicit MapStruct source has deliberately no
+*** copy equation, so observing a direct or nested mapping copy stays stuck.
 ***
-*** Mappings and arrays carry explicit value-type roots.  Arrays begin with a
-*** length-zero store and check indices against the latest stored length.
-*** Deletion skips whole mappings, resets ordinary struct fields while keeping
-*** directly declared mapping fields, and replaces arrays with fresh empties.
-*** save(V,nil,X) is still wholesale replacement, including mapping-bearing
-*** structs; mapping-preserving recursive copy is outside this variant.
+*** Type arguments provide zero values only.  The frontend remains responsible
+*** for rejecting mapping-containing assignments when an empty runtime value
+*** contains no MapStruct marker with which this model could detect them.
 
-fmod SVALUE is
+fmod GENERIC-STORAGE-VALUES is
   pr INT .
-  sorts StValue Struct Field LengthF Ty IntT .
-  subsort Int Struct < StValue .
-  subsort Int LengthF < Field .  subsort IntT < Ty .
-  op length : -> LengthF [ctor] .  op intT : -> IntT [ctor] .
-  op sel : StValue Field -> [StValue] .
-  op upd : StValue Field StValue -> [StValue] .
-  op del : StValue -> [StValue] .
-  var I : Int .  eq del(I) = 0 .
+
+  sorts StValue Struct MapStruct Array Field LengthField Type .
+  subsort Int Struct MapStruct Array < StValue .
+  subsort Int LengthField < Field .
+
+  op length : -> LengthField [ctor] .
+  ops intT structT : -> Type [ctor] .
+  op mapT : Type -> Type [ctor] .
+  op arrayT : Type -> Type [ctor] .
+
+  op mtst : -> Struct [ctor] .
+  op store : Struct Field StValue -> Struct [ctor] .
+  op map : Struct -> MapStruct [ctor] .
+  op array : Struct -> Array [ctor] .
+
+  op def : Type -> StValue .
+  var T : Type .
+  eq def(intT) = 0 .
+  eq def(structT) = mtst .
+  eq def(mapT(T)) = map(mtst) .
+  eq def(arrayT(T)) = array(store(mtst,length,0)) .
 endfm
 
-view Field from TRIV to SVALUE is sort Elt to Field . endv
+view Field from TRIV to GENERIC-STORAGE-VALUES is sort Elt to Field . endv
 
-fmod PATHS is
-  pr SVALUE .  pr LIST{Field} .
-  op find : StValue List{Field} -> [StValue] .
-  op save : StValue List{Field} StValue -> [StValue] .
-  op delete : StValue NeList{Field} -> [StValue] .
-  op push : StValue NeList{Field} StValue -> [StValue] .
-  op push : StValue NeList{Field} -> [StValue] .
-  op pop : StValue NeList{Field} -> [StValue] .
-  op pushA : StValue StValue -> [StValue] .
-  op pushA : StValue -> [StValue] .  op popA : StValue -> [StValue] .
-  vars V X : StValue .  var F : Field .  var P : List{Field} .
-  var NP : NeList{Field} .
-  eq find(V,nil) = V .  eq find(V,F P) = find(sel(V,F),P) .
-  eq save(V,nil,X) = X .
-  eq save(V,F P,X) = upd(V,F,save(sel(V,F),P,X)) .
-  eq delete(V,NP) = save(V,NP,del(find(V,NP))) .
-  eq push(V,NP,X) = save(V,NP,pushA(find(V,NP),X)) .
-  eq push(V,NP) = save(V,NP,pushA(find(V,NP))) .
-  eq pop(V,NP) = save(V,NP,popA(find(V,NP))) .
+fmod GENERIC-STORAGE is
+  pr GENERIC-STORAGE-VALUES .
+  pr LIST{Field} .
+
+  *** These are the complete public operations.  The more specific overloads
+  *** retain the container sort while a mutation is suspended.
+  op select : Type StValue Field -> [StValue] .
+  op find : Type StValue List{Field} -> [StValue] .
+  op save : StValue List{Field} StValue -> [StValue] [ctor] .
+  op save : Struct List{Field} StValue -> Struct [ctor ditto] .
+  op save : MapStruct List{Field} StValue -> MapStruct [ctor ditto] .
+  op save : Array List{Field} StValue -> Array [ctor ditto] .
+  op delete : Type StValue List{Field} -> [StValue] [ctor] .
+  op delete : Type Struct List{Field} -> Struct [ctor ditto] .
+  op delete : Type MapStruct List{Field} -> MapStruct [ctor ditto] .
+  op delete : Type Array List{Field} -> Array [ctor ditto] .
+  op push : StValue List{Field} StValue -> [StValue] .
+  op push : Type StValue List{Field} -> [StValue] .
+  op pop : Type StValue List{Field} -> [StValue] .
+
+  vars T Q E : Type .
+  vars V X W : StValue .
+  vars S R : Struct .
+  var M : MapStruct .
+  var A : Array .
+  vars F G : Field .
+  vars I L : Int .
+  var N : Nat .
+  var P : List{Field} .
+
+  *** Raw histories and wrappers.
+  eq select(T,mtst,F) = def(T) .
+  eq select(T,store(S,F,V),F) = V .
+  ceq select(T,store(S,F,V),G) = select(T,S,G) if F =/= G .
+  eq select(T,map(S),F) = select(T,S,F) .
+  eq select(intT,array(S),length) = select(intT,S,length) .
+  ceq select(T,array(S),I) = select(T,S,I)
+    if I >= 0 /\ I < select(intT,S,length) .
+
+  eq find(T,V,nil) = V .
+  eq find(T,V,F nil) = select(T,V,F) .
+  eq find(T,V,F G P) = find(T,select(structT,V,F),G P) .
+
+  *** A primitive leaf is the only assignment that resolves without another
+  *** selector.  Aggregate leaves remain save terms.
+  eq save(V,nil,I) = I .
+
+  *** A nonempty mapping/array update enters its wrapper.  Array writes are
+  *** admitted only in bounds; with no equation, an invalid update remains a
+  *** kind-level barrier and no disjoint observation can pass through it.
+  eq save(map(S),F P,X) = map(save(S,F P,X)) .
+  eq save(array(S),length nil,I) = array(save(S,length nil,I)) .
+  ceq save(array(S),I P,X) = array(save(S,I P,X))
+    if I >= 0 /\ I < select(intT,S,length) .
+
+  *** Matching selectors expose the pending write.  Prefix observations keep
+  *** save suspended on the old subtree; disjoint selectors see the old value.
+  eq select(T,save(S,F nil,X),F) = save(select(T,S,F),nil,X) .
+  eq select(T,save(S,F G P,X),F) = save(select(structT,S,F),G P,X) .
+  ceq select(T,save(S,length nil,I),G) = select(T,S,G)
+    if length =/= G .
+  ceq select(T,save(S,F P,X),G) = select(T,S,G)
+    if F =/= G /\ W := find(structT,S,F P) .
+
+  *** Struct and array value assignments are interpreted only when selected.
+  *** MapStruct is intentionally absent: explicit mapping copies stay stuck.
+  eq select(T,save(S,nil,R),F) =
+       save(select(T,S,F),nil,select(T,R,F)) .
+  eq select(intT,save(S,nil,array(R)),length) = select(intT,R,length) .
+  ceq select(T,save(S,nil,array(R)),I) =
+        save(select(T,S,I),nil,select(T,R,I))
+    if I >= 0 /\ I < select(intT,R,length) .
+  eq select(intT,save(array(S),nil,array(R)),length) =
+       select(intT,R,length) .
+  ceq select(T,save(array(S),nil,array(R)),I) =
+        save(select(T,S,I),nil,select(T,R,I))
+    if I >= 0 /\ I < select(intT,R,length) .
+
+  *** Primitive deletion resolves to zero.  Nonempty mapping/array deletions
+  *** enter the wrapper, with the same array-bounds barrier as save.
+  eq delete(intT,I,nil) = 0 .
+  eq delete(T,map(S),F P) = map(delete(T,S,F P)) .
+  ceq delete(T,array(save(delete(arrayT(E),S,nil),length nil,L)),I P) =
+        array(save(delete(T,delete(arrayT(E),S,nil),I P),length nil,L))
+    if I >= 0 /\ I < L .
+  ceq delete(T,array(S),I P) = array(delete(T,S,I P))
+    if I >= 0 /\ I < select(intT,S,length) .
+
+  *** Path deletion is observational, just like assignment.
+  eq select(Q,delete(T,S,F nil),F) = delete(T,select(T,S,F),nil) .
+  eq select(Q,delete(T,S,F G P),F) =
+       delete(T,select(structT,S,F),G P) .
+  ceq select(Q,delete(T,S,F P),G) = select(Q,S,G)
+    if F =/= G /\ W := find(T,S,F P) .
+
+  *** Whole structs recursively expose deletion markers.  If the selected
+  *** member is a mapping, the MapStruct rules below retain its original data.
+  eq select(T,delete(structT,S,nil),F) = delete(T,select(T,S,F),nil) .
+  eq select(T,delete(Q,M,nil),F) = select(T,M,F) .
+
+  *** A deleted array has length zero.  The raw old slots stay below its marker
+  *** and become visible only after growth; then deletion clears ordinary data
+  *** while the whole-mapping rule above preserves mappings.
+  eq select(intT,delete(arrayT(T),A,nil),length) = 0 .
+  eq save(delete(arrayT(T),array(S),nil),length nil,I) =
+       array(save(delete(arrayT(T),S,nil),length nil,I)) .
+  eq select(intT,delete(arrayT(T),S,nil),length) = 0 .
+  eq select(Q,delete(arrayT(T),S,nil),I) =
+       delete(T,select(T,S,I),nil) .
+
+  *** Array maintenance is expressed solely in terms of the public operations.
+  *** push(value) grows before writing; push() grows before deleting the reused
+  *** slot; pop deletes the last slot before shrinking.  Zero has no predecessor,
+  *** so an empty pop has no matching equation.
+  ceq push(V,P,X) = save(save(V,P length,L + 1),P L,X)
+    if L := find(intT,V,P length) .
+  ceq push(T,V,P) = delete(T,save(V,P length,L + 1),P L)
+    if L := find(intT,V,P length) .
+  ceq pop(T,V,P) = save(delete(T,V,P N),P length,N)
+    if s N := find(intT,V,P length) .
+
+  ops fld1 fld2 child balances values items : -> Field [ctor] .
 endfm
 
-*** Kept outside the parameter theory: Maude rejects a subsort overload that
-*** reaches a parameterized module through its parameter.
-fmod CONTAINERS is
-  pr PATHS .
-  op store : StValue Field StValue -> [StValue] [ctor] .
-endfm
+*** Latest write, typed defaults, absent prefixes, and wrapper traversal.
+red select(intT,store(store(mtst,fld1,1),fld1,2),fld1) .       *** 2
+red select(intT,mtst,fld1) .                                  *** 0
+red select(structT,mtst,fld1) .                               *** mtst
+red select(mapT(intT),mtst,balances) .                        *** map(mtst)
+red select(arrayT(intT),mtst,values) .                        *** array(store(mtst,length,0))
+red find(intT,save(mtst,fld1 child,7),fld1 child) .            *** 7
+red find(intT,save(map(mtst),4 child,9),4 child) .             *** 9
+red find(intT,save(array(store(store(mtst,length,1),0,
+                               store(mtst,child,8))),0 child,9),
+         0 child) .                                            *** 9
+red find(structT,save(mtst,fld1 child,7),fld1) .
+                                                               *** save(mtst,child,7)
 
-fth VALTY is
-  pr SVALUE .
-  sort Elt .  subsort Elt < StValue .
-  sort T .  subsort T < Ty .
-  op ty : -> T .  op default : -> Elt .
-endfth
+*** Exact aggregate reads stay suspended; their fields are read lazily.
+red find(structT,save(store(mtst,fld1,1),nil,
+                      store(mtst,fld1,2)),nil) .
+                                                               *** save(...)
+red find(intT,save(store(mtst,fld1,1),nil,
+                   store(mtst,fld1,2)),fld1) .                 *** 2
+red find(arrayT(intT),
+         save(array(store(store(mtst,length,1),0,1)),nil,
+              array(store(store(mtst,length,1),0,2))),nil) .
+                                                               *** save(...)
+red find(intT,
+         save(array(store(store(mtst,length,1),0,1)),nil,
+              array(store(store(mtst,length,1),0,2))),0) .      *** 2
 
-fmod SOL-MAPPING{V :: VALTY} is
-  pr CONTAINERS .
-  sort Mapping{V} .  subsort Mapping{V} < Struct .
-  op mapping : V$T -> Mapping{V} [ctor] .
-  op store : Mapping{V} Int V$Elt -> Mapping{V} [ctor ditto] .
-  var M : Mapping{V} .  vars K J : Int .  var X : V$Elt .
-  eq sel(mapping(ty),K) = default .
-  eq sel(store(M,K,X),K) = X .
-  ceq sel(store(M,K,X),J) = sel(M,J) if K =/= J .
-  eq upd(M,K,X) = store(M,K,X) .  eq del(M) = M .
-endfm
+*** Copies are observationally independent after either side is updated.
+red find(intT,
+         save(save(store(mtst,fld1,store(mtst,child,5)),fld2,
+                   find(structT,store(mtst,fld1,store(mtst,child,5)),fld1)),
+              fld1 child,8),
+         fld2 child) .                                         *** 5
+red find(intT,
+         save(save(store(mtst,fld1,
+                              array(store(store(mtst,length,1),0,5))),
+                   fld2,
+                   find(arrayT(intT),
+                        store(mtst,fld1,
+                              array(store(store(mtst,length,1),0,5))),fld1)),
+              fld1 0,8),
+         fld2 0) .                                             *** 5
 
-view IntV from VALTY to SVALUE is
-  sort Elt to Int .  sort T to IntT .
-  op ty to intT .  op default to term 0 .
-endv
+*** EXPECT STUCK (explicit mapping copy: direct and nested).
+red find(mapT(intT),save(map(mtst),nil,map(store(mtst,1,9))),nil) .
+red find(intT,
+         save(store(mtst,balances,map(mtst)),nil,
+              store(mtst,balances,map(store(mtst,1,9)))),
+         balances 1) .
 
-fmod SOL-ARRAY{V :: VALTY} is
-  pr CONTAINERS .
-  sorts ArraySeed{V} ArrayBase{V} Array{V} .
-  subsort ArraySeed{V} Array{V} < ArrayBase{V} < StValue .
-  subsort Array{V} < Struct .
-  op array : V$T -> ArraySeed{V} [ctor] .
-  op store : ArrayBase{V} LengthF Int -> Array{V} [ctor ditto] .
-  op store : ArrayBase{V} Int V$Elt -> Array{V} [ctor ditto] .
-  op lookup : ArrayBase{V} Int -> [StValue] .
-  op fresh : ArrayBase{V} -> Array{V} .
-  op setLength : ArrayBase{V} Int -> Array{V} .
-  var A : ArrayBase{V} .  vars I J L : Int .  var N : Nat .  var X : V$Elt .
-  eq lookup(store(A,length,L),I) = lookup(A,I) .
-  eq lookup(store(A,I,X),I) = X .
-  ceq lookup(store(A,J,X),I) = lookup(A,I) if I =/= J .
-  eq sel(store(A,length,L),length) = L .
-  eq sel(store(A,I,X),length) = sel(A,length) .
-  ceq sel(A,I) = lookup(A,I) if I >= 0 /\ I < sel(A,length) .
-  ceq upd(A,I,X) = store(A,I,X) if I >= 0 /\ I < sel(A,length) .
-  ceq pushA(A,X) = store(store(A,L,X),length,L + 1)
-    if L := sel(A,length) .
-  ceq pushA(A) = store(store(A,L,default),length,L + 1)
-    if L := sel(A,length) .
-  eq setLength(A,L) = store(A,length,L) .
-  ceq popA(A) = setLength(A,N) if s N := sel(A,length) .
-  eq fresh(array(ty)) = store(array(ty),length,0) .
-  eq fresh(store(A,length,L)) = fresh(A) .
-  eq fresh(store(A,I,X)) = fresh(A) .
-  eq del(A) = fresh(A) .
-endfm
+*** Primitive, recursive-struct, whole-map, entry, and whole-array deletion.
+red find(intT,delete(intT,7,nil),nil) .                         *** 0
+red find(structT,delete(structT,store(mtst,fld1,7),nil),nil) .
+                                                               *** delete(...)
+red find(intT,delete(structT,store(mtst,fld1,7),nil),fld1) .    *** 0
+red find(intT,
+         delete(structT,
+                store(store(mtst,fld1,7),balances,
+                      map(store(mtst,1,9))),nil),balances 1) .  *** 9
+red find(intT,delete(mapT(intT),map(store(mtst,1,9)),nil),1) . *** 9
+red find(intT,delete(intT,map(store(mtst,1,9)),1),1) .         *** 0
+red find(arrayT(intT),
+         delete(arrayT(intT),
+                array(store(store(mtst,length,1),0,9)),nil),nil) .
+                                                               *** delete(...)
+red find(intT,
+         delete(arrayT(intT),
+                array(store(store(mtst,length,1),0,9)),nil),length) .
+                                                               *** 0
 
-fmod SOLKEY-STRUCTS is
-  pr SOL-MAPPING{IntV} .
-  sorts Token Account Person Ledger TokenT AccountT PersonT LedgerT MapIntT .
-  sorts ValueF BalanceF TokenF AccountF AgeF NonceF BalancesF .
-  subsort Token Account Person Ledger < Struct .
-  subsort TokenT AccountT PersonT LedgerT MapIntT < Ty .
-  subsort ValueF BalanceF TokenF AccountF AgeF NonceF BalancesF < Field .
-  op tokenT : -> TokenT [ctor] .  op accountT : -> AccountT [ctor] .
-  op personT : -> PersonT [ctor] .  op ledgerT : -> LedgerT [ctor] .
-  op mapIntT : -> MapIntT [ctor] .
-  op $value : -> ValueF [ctor] .  op $balance : -> BalanceF [ctor] .
-  op $token : -> TokenF [ctor] .  op $account : -> AccountF [ctor] .
-  op $age : -> AgeF [ctor] .  op $nonce : -> NonceF [ctor] .
-  op $balances : -> BalancesF [ctor] .
-  op token0 : -> Token [ctor] .  op account0 : -> Account [ctor] .
-  op person0 : -> Person [ctor] .  op ledger0 : -> Ledger [ctor] .
-  op store : Token ValueF Int -> Token [ctor ditto] .
-  op store : Account BalanceF Int -> Account [ctor ditto] .
-  op store : Account TokenF Token -> Account [ctor ditto] .
-  op store : Person AccountF Account -> Person [ctor ditto] .
-  op store : Person AgeF Int -> Person [ctor ditto] .
-  op store : Ledger NonceF Int -> Ledger [ctor ditto] .
-  op store : Ledger BalancesF Mapping{IntV} -> Ledger [ctor ditto] .
-  var T : Token .  var A : Account .  var P : Person .  var L : Ledger .
-  var I : Int .  var T2 : Token .  var A2 : Account .  var M : Mapping{IntV} .
-  eq sel(token0,$value) = 0 .
-  eq sel(store(T,$value,I),$value) = I .
-  eq upd(T,$value,I) = store(T,$value,I) .
-  eq sel(account0,$balance) = 0 .  eq sel(account0,$token) = token0 .
-  eq sel(store(A,$balance,I),$balance) = I .
-  eq sel(store(A,$balance,I),$token) = sel(A,$token) .
-  eq sel(store(A,$token,T2),$token) = T2 .
-  eq sel(store(A,$token,T2),$balance) = sel(A,$balance) .
-  eq upd(A,$balance,I) = store(A,$balance,I) .
-  eq upd(A,$token,T2) = store(A,$token,T2) .
-  eq sel(person0,$account) = account0 .  eq sel(person0,$age) = 0 .
-  eq sel(store(P,$account,A2),$account) = A2 .
-  eq sel(store(P,$account,A2),$age) = sel(P,$age) .
-  eq sel(store(P,$age,I),$age) = I .
-  eq sel(store(P,$age,I),$account) = sel(P,$account) .
-  eq upd(P,$account,A2) = store(P,$account,A2) .
-  eq upd(P,$age,I) = store(P,$age,I) .
-  eq sel(ledger0,$nonce) = 0 .
-  eq sel(ledger0,$balances) = mapping(intT) .
-  eq sel(store(L,$nonce,I),$nonce) = I .
-  eq sel(store(L,$nonce,I),$balances) = sel(L,$balances) .
-  eq sel(store(L,$balances,M),$balances) = M .
-  eq sel(store(L,$balances,M),$nonce) = sel(L,$nonce) .
-  eq upd(L,$nonce,I) = store(L,$nonce,I) .
-  eq upd(L,$balances,M) = store(L,$balances,M) .
-  eq del(T) = token0 .  eq del(A) = account0 .  eq del(P) = person0 .
-  eq del(L) = store(ledger0,$balances,sel(L,$balances)) .
-endfm
+*** Bounds, pushes, and pop.  Labelled cases are intentionally stuck.
+red find(intT,save(array(store(store(mtst,length,1),0,11)),0,12),0) .
+                                                               *** 12
+red find(intT,save(array(store(store(mtst,length,1),0,11)),0,12),length) .
+                                                               *** 1
+red find(intT,
+         save(store(store(mtst,values,
+                          array(store(store(mtst,length,1),0,11))),fld1,7),
+              values 0,12),fld1) .                             *** 7
+*** EXPECT STUCK (out-of-bounds read).
+red find(intT,array(store(store(mtst,length,1),0,11)),1) .
+*** EXPECT STUCK (invalid write blocks matching observation).
+red find(intT,save(array(store(mtst,length,0)),0,12),0) .
+*** EXPECT STUCK (invalid write blocks disjoint observation).
+red find(intT,save(array(store(mtst,length,0)),0,12),length) .
+*** EXPECT STUCK (nested invalid write blocks a root-disjoint observation).
+red find(intT,
+         save(store(store(mtst,values,array(store(mtst,length,0))),fld1,7),
+              values 0,12),fld1) .
+red find(intT,push(array(store(mtst,length,0)),nil,11),0) .     *** 11
+red find(intT,push(intT,array(store(mtst,length,0)),nil),0) .  *** 0
+red find(intT,push(array(store(mtst,length,0)),nil,11),length) .
+                                                               *** 1
+red find(intT,
+         pop(intT,push(array(store(mtst,length,0)),nil,11),nil),length) .
+                                                               *** 0
+*** EXPECT STUCK (empty pop).
+red pop(intT,array(store(mtst,length,0)),nil) .
 
-view TokenD from VALTY to SOLKEY-STRUCTS is
-  sort Elt to Token . sort T to TokenT . op ty to tokenT . op default to term token0 .
-endv
-view AccountD from VALTY to SOLKEY-STRUCTS is
-  sort Elt to Account . sort T to AccountT . op ty to accountT . op default to term account0 .
-endv
-view PersonD from VALTY to SOLKEY-STRUCTS is
-  sort Elt to Person . sort T to PersonT . op ty to personT . op default to term person0 .
-endv
-view MapIntD from VALTY to SOLKEY-STRUCTS is
-  sort Elt to Mapping{IntV} . sort T to MapIntT .
-  op ty to mapIntT . op default to term mapping(intT) .
-endv
-
-fmod SOLKEY-STORAGE is
-  pr SOLKEY-STRUCTS .  pr SOL-MAPPING{AccountD} .
-  pr SOL-MAPPING{PersonD} .  pr SOL-MAPPING{MapIntD} .
-  pr SOL-ARRAY{IntV} .  pr SOL-ARRAY{TokenD} .
-  sorts TokenBucket Storage TokensF AcctF PeopleF ValuesF LedgerF BucketF .
-  subsort TokenBucket Storage < Struct .
-  subsort TokensF AcctF PeopleF ValuesF LedgerF BucketF < Field .
-  op $tokens : -> TokensF [ctor] .  op $acct : -> AcctF [ctor] .
-  op $people : -> PeopleF [ctor] .  op $values : -> ValuesF [ctor] .
-  op $ledger : -> LedgerF [ctor] .  op $bucket : -> BucketF [ctor] .
-  op bucket0 : -> TokenBucket [ctor] .  op storage0 : -> Storage [ctor] .
-  op store : TokenBucket TokensF Array{TokenD} -> TokenBucket [ctor ditto] .
-  op store : Storage AcctF Account -> Storage [ctor ditto] .
-  op store : Storage BalancesF Mapping{IntV} -> Storage [ctor ditto] .
-  op store : Storage PeopleF Mapping{PersonD} -> Storage [ctor ditto] .
-  op store : Storage ValuesF Array{IntV} -> Storage [ctor ditto] .
-  op store : Storage LedgerF Ledger -> Storage [ctor ditto] .
-  op store : Storage BucketF TokenBucket -> Storage [ctor ditto] .
-  var K : TokenBucket . var S : Storage . var TA : Array{TokenD} .
-  var A : Account . var B : Mapping{IntV} . var PM : Mapping{PersonD} .
-  var IA : Array{IntV} . var L : Ledger .
-  eq sel(bucket0,$tokens) = store(array(tokenT),length,0) .
-  eq sel(store(K,$tokens,TA),$tokens) = TA .
-  eq upd(K,$tokens,TA) = store(K,$tokens,TA) . eq del(K) = bucket0 .
-  eq sel(storage0,$acct) = account0 .
-  eq sel(storage0,$balances) = mapping(intT) .
-  eq sel(storage0,$people) = mapping(personT) .
-  eq sel(storage0,$values) = store(array(intT),length,0) .
-  eq sel(storage0,$ledger) = ledger0 . eq sel(storage0,$bucket) = bucket0 .
-  eq sel(store(S,$acct,A),$acct) = A .
-  eq sel(store(S,$acct,A),$balances) = sel(S,$balances) .
-  eq sel(store(S,$acct,A),$people) = sel(S,$people) .
-  eq sel(store(S,$acct,A),$values) = sel(S,$values) .
-  eq sel(store(S,$acct,A),$ledger) = sel(S,$ledger) .
-  eq sel(store(S,$acct,A),$bucket) = sel(S,$bucket) .
-  eq sel(store(S,$balances,B),$acct) = sel(S,$acct) .
-  eq sel(store(S,$balances,B),$balances) = B .
-  eq sel(store(S,$balances,B),$people) = sel(S,$people) .
-  eq sel(store(S,$balances,B),$values) = sel(S,$values) .
-  eq sel(store(S,$balances,B),$ledger) = sel(S,$ledger) .
-  eq sel(store(S,$balances,B),$bucket) = sel(S,$bucket) .
-  eq sel(store(S,$people,PM),$acct) = sel(S,$acct) .
-  eq sel(store(S,$people,PM),$balances) = sel(S,$balances) .
-  eq sel(store(S,$people,PM),$people) = PM .
-  eq sel(store(S,$people,PM),$values) = sel(S,$values) .
-  eq sel(store(S,$people,PM),$ledger) = sel(S,$ledger) .
-  eq sel(store(S,$people,PM),$bucket) = sel(S,$bucket) .
-  eq sel(store(S,$values,IA),$acct) = sel(S,$acct) .
-  eq sel(store(S,$values,IA),$balances) = sel(S,$balances) .
-  eq sel(store(S,$values,IA),$people) = sel(S,$people) .
-  eq sel(store(S,$values,IA),$values) = IA .
-  eq sel(store(S,$values,IA),$ledger) = sel(S,$ledger) .
-  eq sel(store(S,$values,IA),$bucket) = sel(S,$bucket) .
-  eq sel(store(S,$ledger,L),$acct) = sel(S,$acct) .
-  eq sel(store(S,$ledger,L),$balances) = sel(S,$balances) .
-  eq sel(store(S,$ledger,L),$people) = sel(S,$people) .
-  eq sel(store(S,$ledger,L),$values) = sel(S,$values) .
-  eq sel(store(S,$ledger,L),$ledger) = L .
-  eq sel(store(S,$ledger,L),$bucket) = sel(S,$bucket) .
-  eq sel(store(S,$bucket,K),$acct) = sel(S,$acct) .
-  eq sel(store(S,$bucket,K),$balances) = sel(S,$balances) .
-  eq sel(store(S,$bucket,K),$people) = sel(S,$people) .
-  eq sel(store(S,$bucket,K),$values) = sel(S,$values) .
-  eq sel(store(S,$bucket,K),$ledger) = sel(S,$ledger) .
-  eq sel(store(S,$bucket,K),$bucket) = K .
-  eq upd(S,$acct,A) = store(S,$acct,A) .
-  eq upd(S,$balances,B) = store(S,$balances,B) .
-  eq upd(S,$people,PM) = store(S,$people,PM) .
-  eq upd(S,$values,IA) = store(S,$values,IA) .
-  eq upd(S,$ledger,L) = store(S,$ledger,L) .
-  eq upd(S,$bucket,K) = store(S,$bucket,K) .
-  eq del(S) = store(store(storage0,$balances,sel(S,$balances)),
-                    $people,sel(S,$people)) .
-  op st0 : -> Storage . eq st0 = storage0 .
-  op st1 : -> Storage .
-  eq st1 = save(save(save(save(st0,$acct $balance,5),$balances 9,42),
-                      $ledger $nonce,3),$ledger $balances 1,10) .
-endfm
-
-*** Latest writes and distinct mapping/array integer behavior.
-red find(store(store(token0,$value,1),$value,2),$value) .
-red find(store(store(mapping(intT),7,1),7,2),7) .
-red store(mapping(intT),7,0) .
-red find(mapping(intT),-1) .
-red find(st0,$values -1) .
-red find(st0,$values 0) .
-
-*** Primitive-, struct-, and mapping-valued mappings; absent deep writes.
-red find(save(mapping(intT),4,9),4) .
-red find(save(mapping(accountT),4 $balance,9),4 $balance) .
-red find(save(mapping(personT),2 $account $token $value,8),
-         2 $account $token $value) .
-red find(save(mapping(mapIntT),4 2,9),4 2) .
-red find(save(st0,$ledger $balances 3,7),$ledger $balances 3) .
-
-*** Ill-typed stores and public writes stay kind-level/stuck.
-red store(token0,$value,token0) .
-red store(account0,$age,3) .
-red store(mapping(intT),1,token0) .
-red store(store(array(intT),length,0),0,token0) .
-red store(store(array(intT),length,0),$age,3) .
-red save(st0,$acct $balance,token0) .
-red push(st0,$values,token0) .
-red save(st1,$acct $balance,6) :: Storage .
-
-*** Observable preservation and deletion behavior.
-red st0 :: Storage .
-red st1 :: Storage .
-red find(st1,$acct $balance) .
-red find(st1,$balances 9) .
-red find(st1,$balances 8) .
-red find(st1,$ledger $balances 1) .
-red find(delete(st1,$acct),$acct $balance) .
-red find(delete(st1,$ledger),$ledger $nonce) .
-red find(delete(st1,$ledger),$ledger $balances 1) .
-red find(delete(st1,$ledger $balances),$ledger $balances 1) .
-red find(delete(st1,$ledger $balances 1),$ledger $balances 1) .
-red find(del(st1),$balances 9) .
-red find(del(st1),$acct $balance) .
-red find(save(st0,$people 2 $account $balance,7),
-         $people 2 $account $balance) .
-
-*** Array length, bounds, pop, deletion, and reuse of a popped index.
-red find(push(push(st0,$values,10),$values,20),$values length) .
-red find(push(push(st0,$values,10),$values,20),$values 1) .
-red find(save(push(st0,$values,10),$values 0,5),$values 0) .
-red find(pop(push(push(st0,$values,10),$values,20),$values),$values 1) .
-red find(push(pop(push(push(st0,$values,10),$values,20),$values),
-              $values,30),$values 1) .
-red find(push(st0,$values),$values 0) .
-red pop(st0,$values) .
-red find(delete(push(st0,$values,10),$values),$values length) .
-red push(st0,$bucket $tokens) :: Storage .
-red find(store(store(store(store(array(intT),length,0),0,11),
-                     length,1),0,12),0) .
-
-*** Wholesale copy regression: the source replaces the destination mapping.
-red find(save(save(ledger0,$balances 1,10),nil,
-              save(ledger0,$nonce,7)),$balances 1) .
+*** Nested mappings survive pop/push reuse and whole-array delete/push reuse;
+*** ordinary fields are cleared.
+red find(intT,
+         push(structT,
+              pop(structT,
+                  array(store(store(mtst,length,1),0,
+                              store(store(mtst,fld1,7),balances,
+                                    map(store(mtst,3,44))))),nil),nil),
+         0 fld1) .                                             *** 0
+red find(intT,
+         push(structT,
+              pop(structT,
+                  array(store(store(mtst,length,1),0,
+                              store(store(mtst,fld1,7),balances,
+                                    map(store(mtst,3,44))))),nil),nil),
+         0 balances 3) .                                       *** 44
+red find(intT,
+         push(structT,
+              delete(arrayT(structT),
+                     array(store(store(mtst,length,1),0,
+                                 store(store(mtst,fld1,7),balances,
+                                       map(store(mtst,3,44))))),nil),nil),
+         0 fld1) .                                             *** 0
+red find(intT,
+         push(structT,
+              delete(arrayT(structT),
+                     array(store(store(mtst,length,1),0,
+                                 store(store(mtst,fld1,7),balances,
+                                       map(store(mtst,3,44))))),nil),nil),
+         0 balances 3) .                                       *** 44
